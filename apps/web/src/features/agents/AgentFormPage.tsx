@@ -1,0 +1,309 @@
+import { type Agent, AGENT_LIMITS, type ModelOption, type Project } from '@ea/shared';
+import { type FormEvent, type ReactNode, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { AgentAvatar } from '../../components/AgentAvatar';
+import { Button, buttonClass } from '../../components/Button';
+import { SelectField, Switch, TextAreaField, TextField } from '../../components/Form';
+import { PageHeader } from '../../components/PageHeader';
+import { StateLamp } from '../../components/StateLamp';
+import { ErrorState, LoadingState, PlannedNote } from '../../components/States';
+import { useToast } from '../../components/Toast';
+import { errorMessage, fieldErrors } from '../../lib/errors';
+import { formatCount } from '../../lib/format';
+import {
+  useAgent,
+  useCreateAgent,
+  useModels,
+  useProjects,
+  useUpdateAgent,
+} from '../../lib/queries';
+import { type AgentFormErrors, type AgentFormValues, parseForm, toFormValues } from './agent-form';
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="rounded-lg border border-line bg-sheet p-4">
+      <legend className="px-1 text-base font-semibold">{title}</legend>
+      <div className="space-y-4">{children}</div>
+    </fieldset>
+  );
+}
+
+interface AgentFormProps {
+  agent?: Agent;
+  projects: readonly Project[];
+  models: readonly ModelOption[];
+}
+
+function AgentForm({ agent, projects, models }: AgentFormProps) {
+  const [values, setValues] = useState<AgentFormValues>(() => toFormValues(agent));
+  const [errors, setErrors] = useState<AgentFormErrors>({});
+  const create = useCreateAgent();
+  const update = useUpdateAgent();
+  const navigate = useNavigate();
+  const notify = useToast();
+
+  const saving = create.isPending || update.isPending;
+  const failure = create.error ?? update.error;
+  // A failure that is not about one field is shown next to the buttons.
+  const generalError =
+    failure && Object.keys(fieldErrors(failure)).length === 0 ? errorMessage(failure) : undefined;
+
+  const set = <K extends keyof AgentFormValues>(field: K, value: AgentFormValues[K]) => {
+    setValues((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const text = (field: Exclude<keyof AgentFormValues, 'enabled'>) => ({
+    value: values[field],
+    error: errors[field],
+    onChange: (event: { target: { value: string } }) => set(field, event.target.value),
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const parsed = parseForm(values);
+    if (!parsed.ok) {
+      setErrors(parsed.errors);
+      return;
+    }
+    const onError = (error: unknown) => setErrors(fieldErrors(error));
+    if (agent) {
+      update.mutate(
+        { id: agent.id, patch: parsed.agent },
+        {
+          onSuccess: (saved) => {
+            notify(`${saved.name} salvo.`);
+            void navigate('/agentes');
+          },
+          onError,
+        },
+      );
+    } else {
+      create.mutate(parsed.agent, {
+        onSuccess: (saved) => {
+          notify(`${saved.name} criado.`);
+          void navigate('/agentes');
+        },
+        onError,
+      });
+    }
+  };
+
+  // The agent's current model may have been disabled since it was chosen.
+  const missingModel = agent?.modelId && !models.some((model) => model.id === agent.modelId);
+  const selectedModel = models.find((model) => model.id === values.modelId);
+  const errorCount = Object.values(errors).filter(Boolean).length;
+
+  return (
+    <form onSubmit={submit} noValidate className="max-w-3xl space-y-6">
+      <Section title="Identidade">
+        <TextField label="Nome" maxLength={AGENT_LIMITS.name} required {...text('name')} />
+        <TextField
+          label="Descrição"
+          maxLength={AGENT_LIMITS.description}
+          hint="Uma linha para reconhecer o agente nas listas."
+          {...text('description')}
+        />
+        <TextAreaField
+          label="Objetivo"
+          rows={3}
+          maxLength={AGENT_LIMITS.objective}
+          hint="O que este agente deve alcançar."
+          {...text('objective')}
+        />
+        <SelectField
+          label="Projeto"
+          hint={
+            projects.length === 0
+              ? 'Nenhum projeto ainda. Crie projetos na tela de agentes.'
+              : 'O projeto define a sala do agente no Escritório.'
+          }
+          {...text('projectId')}
+        >
+          <option value="">Sem projeto</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </SelectField>
+        <Switch
+          checked={values.enabled}
+          onChange={(enabled) => set('enabled', enabled)}
+          label="Agente ativo"
+        >
+          {values.enabled ? 'Ativo: pode ser executado' : 'Inativo: não pode ser executado'}
+        </Switch>
+      </Section>
+
+      <Section title="Instruções">
+        <TextAreaField
+          label="Prompt de sistema"
+          rows={10}
+          maxLength={AGENT_LIMITS.systemPrompt}
+          className="font-mono text-sm"
+          hint={`Enviado ao modelo no início de toda conversa. ${formatCount(values.systemPrompt.length)} de ${formatCount(AGENT_LIMITS.systemPrompt)} caracteres.`}
+          {...text('systemPrompt')}
+        />
+      </Section>
+
+      <Section title="Modelo">
+        <SelectField
+          label="Modelo de IA"
+          disabled={models.length === 0 && !missingModel}
+          hint={
+            selectedModel?.isExternal
+              ? `${selectedModel.providerName} é um serviço externo: as instruções e as conversas deste agente serão enviadas a ele.`
+              : models.length === 0
+                ? 'Nenhum modelo disponível. Sem modelo, o agente não pode ser executado.'
+                : 'Sem modelo, o agente não pode ser executado.'
+          }
+          {...text('modelId')}
+        >
+          <option value="">Sem modelo</option>
+          {missingModel && <option value={agent.modelId ?? ''}>Modelo atual (indisponível)</option>}
+          {models.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.displayName} ({model.providerName})
+            </option>
+          ))}
+        </SelectField>
+        {models.length === 0 && (
+          <p className="text-sm">
+            <Link to="/modelos" className="text-info underline underline-offset-4">
+              Conectar um provedor de modelos
+            </Link>
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            label="Temperatura"
+            inputMode="decimal"
+            hint={`De ${AGENT_LIMITS.temperature.min} a ${AGENT_LIMITS.temperature.max}. Valores baixos dão respostas mais previsíveis.`}
+            {...text('temperature')}
+          />
+          <TextField
+            label="Tokens por resposta"
+            inputMode="numeric"
+            hint="Tamanho máximo de cada resposta do modelo."
+            {...text('maxOutputTokens')}
+          />
+        </div>
+      </Section>
+
+      <Section title="Limites de execução">
+        <p className="text-sm text-dim">
+          Uma execução que passa de qualquer limite é encerrada, mesmo que o agente não tenha
+          terminado.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <TextField
+            label="Passos por execução"
+            inputMode="numeric"
+            hint={`De ${AGENT_LIMITS.maxSteps.min} a ${AGENT_LIMITS.maxSteps.max}.`}
+            {...text('maxSteps')}
+          />
+          <TextField
+            label="Tempo por execução (segundos)"
+            inputMode="numeric"
+            hint={`De ${AGENT_LIMITS.maxDurationSeconds.min} a ${formatCount(AGENT_LIMITS.maxDurationSeconds.max)}.`}
+            {...text('maxDurationSeconds')}
+          />
+          <TextField
+            label="Tokens por execução"
+            inputMode="numeric"
+            placeholder="Sem limite"
+            hint="Deixe vazio para não limitar."
+            {...text('maxTotalTokens')}
+          />
+        </div>
+      </Section>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" variant="primary" disabled={saving}>
+          {agent ? 'Salvar alterações' : 'Criar agente'}
+        </Button>
+        <Link to="/agentes" className={buttonClass('secondary')}>
+          Cancelar
+        </Link>
+        {(errorCount > 0 || generalError) && (
+          <p role="alert" className="text-sm text-fail">
+            {generalError ??
+              (errorCount === 1
+                ? 'Corrija o campo destacado.'
+                : `Corrija os ${errorCount} campos destacados.`)}
+          </p>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/** Create (`/agentes/novo`) or edit (`/agentes/:id`) an agent. */
+export function AgentFormPage() {
+  const { id } = useParams();
+  const agent = useAgent(id);
+  const projects = useProjects();
+  const models = useModels();
+
+  const error = agent.error ?? projects.error ?? models.error;
+  const loading = (id !== undefined && agent.isPending) || projects.isPending || models.isPending;
+  const title = id === undefined ? 'Novo agente' : (agent.data?.name ?? 'Agente');
+
+  return (
+    <>
+      <PageHeader
+        title={title}
+        description={
+          agent.data ? (
+            <span className="flex items-center gap-3">
+              <AgentAvatar agentId={agent.data.id} size={28} dimmed={!agent.data.enabled} />
+              <StateLamp state={agent.data.state} />
+            </span>
+          ) : (
+            id === undefined && 'Só o nome é obrigatório. O resto pode ser ajustado depois.'
+          )
+        }
+      />
+
+      {loading && !error && <LoadingState label="Carregando o agente…" />}
+
+      {error && (
+        <ErrorState
+          title={
+            agent.error
+              ? 'Não foi possível abrir este agente.'
+              : 'Não foi possível carregar o formulário.'
+          }
+          error={error}
+          onRetry={() => {
+            void agent.refetch();
+            void projects.refetch();
+            void models.refetch();
+          }}
+        />
+      )}
+
+      {!loading && !error && projects.data && models.data && (
+        <div className="space-y-6">
+          <AgentForm
+            key={agent.data?.id ?? 'new'}
+            {...(agent.data ? { agent: agent.data } : {})}
+            projects={projects.data}
+            models={models.data}
+          />
+          {agent.data && (
+            <section className="max-w-3xl rounded-lg border border-line bg-sheet p-4">
+              <h2 className="text-base font-semibold">Histórico de atividades</h2>
+              <div className="mt-2">
+                <PlannedNote phase={7}>
+                  Conversas e execuções deste agente aparecerão aqui.
+                </PlannedNote>
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

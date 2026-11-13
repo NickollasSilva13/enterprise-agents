@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/bricolage-grotesque';
+
+/*
+ * Visual identity: an office floor plan at night.
+ * Ink-blue sheet, chalk lines, and status lamps as the only saturated colors,
+ * so colour always means "state" and never decoration.
+ */
+@theme {
+  --font-sans: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-ink: #0f1826;
+  --color-sheet: #162238;
+  --color-sheet-raised: #1d2c48;
+  --color-line: #2a3c5c;
+  --color-line-strong: #46608c;
+  --color-chalk: #e8eef8;
+  --color-dim: #94a5c2;
+
+  /* Status lamps */
+  --color-ok: #5fe3a1;
+  --color-wait: #ffc24b;
+  --color-fail: #ff7b72;
+  --color-info: #7cc4ff;
+  --color-idle: #7f92b3;
+
+  --animate-lamp: lamp 1.6s ease-in-out infinite;
+
+  @keyframes lamp {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-chalk);
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-info);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+@layer components {
+  /* Drafting grid behind the office floor plan. */
+  .plan-grid {
+    background-color: var(--color-ink);
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--color-line) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--color-line) 55%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 1.5rem 1.5rem;
+  }
+}

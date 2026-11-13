@@ -1,0 +1,36 @@
+{
+  "name": "enterprise-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plataforma local de gerenciamento e orquestração de agentes de IA",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @ea/server\" \"npm run dev -w @ea/web\"",
+    "build": "npm run build -w @ea/web",
+    "start": "npm run build && npm run start -w @ea/server",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run build && npm run test:e2e -w @ea/web",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "db:generate": "npm run db:generate -w @ea/server",
+    "db:migrate": "npm run db:migrate -w @ea/server"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.7",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.10.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}
