@@ -28,7 +28,29 @@ export function openDatabase(path: string): Database {
   };
 }
 
-/** Applies pending migrations. Safe to call on every start. */
+/**
+ * Applies pending migrations. Safe to call on every start.
+ *
+ * Foreign keys are off while they run. SQLite rebuilds a table by dropping it,
+ * and a drop does an implicit DELETE first: with the keys on, that cascades
+ * (dropping `providers` would delete every model). Drizzle puts
+ * `PRAGMA foreign_keys=OFF` in such migrations, but the pragma does nothing
+ * inside a transaction, and the migrator runs them all in one. So it is done
+ * here, on the connection, and the keys are checked once the work is done.
+ */
 export function runMigrations(database: Database, migrationsFolder = MIGRATIONS_DIR): void {
-  migrate(database.db, { migrationsFolder });
+  const { sqlite } = database;
+  sqlite.pragma('foreign_keys = OFF');
+  try {
+    migrate(database.db, { migrationsFolder });
+    const broken = sqlite.pragma('foreign_key_check') as unknown[];
+    if (broken.length > 0) {
+      throw new Error(
+        `A migração deixou ${broken.length} referência(s) quebrada(s) entre tabelas. ` +
+          'O servidor não inicia sobre um banco nesse estado.',
+      );
+    }
+  } finally {
+    sqlite.pragma('foreign_keys = ON');
+  }
 }
