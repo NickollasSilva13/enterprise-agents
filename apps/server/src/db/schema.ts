@@ -39,7 +39,10 @@ export const providers = sqliteTable('providers', {
   id: id(),
   name: text('name').notNull().unique(),
   kind: text('kind', { enum: PROVIDER_KINDS }).notNull(),
-  baseUrl: text('base_url').notNull(),
+  /** Address of an HTTP provider. Null when the provider is a local harness. */
+  baseUrl: text('base_url'),
+  /** Program of a harness provider, run without a shell. Null for HTTP ones. */
+  command: text('command'),
   /** True when requests leave this machine. Drives the privacy notice (RF-44). */
   isExternal: integer('is_external', { mode: 'boolean' }).notNull(),
   /** Name of the entry in the OS credential vault. Never the secret itself (C-08). */

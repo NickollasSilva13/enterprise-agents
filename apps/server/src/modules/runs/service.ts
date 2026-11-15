@@ -152,6 +152,7 @@ function resolvePlan(deps: RuntimeDeps, ref: RunRef): RunPlan {
     provider: deps.createProvider({
       kind: target.provider.kind,
       baseUrl: target.provider.baseUrl,
+      command: target.provider.command,
       apiKey,
     }),
     model: target.model,

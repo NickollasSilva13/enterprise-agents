@@ -202,7 +202,7 @@ interface RunStore {         // implementado em modules/runs/repository.ts
 
 Passos gravados: `run_started`, `model_call_started`, `model_call_finished`, `tool_call_requested`, `approval_requested`, `approval_decided`, `tool_call_finished`, `delegation_started`, `delegation_finished`, `error`, `run_finished`. O tipo é texto livre, então um passo novo não exige migração; a interface mostra pelo nome um tipo que não conhece. O motivo de término (`runs.end_reason`) segue a lista `RUN_END_REASONS` de `packages/shared/src/runs.ts`.
 
-Adaptadores lançam apenas `ProviderError`, cuja mensagem é uma frase fixa escolhida pelo tipo do erro (`unreachable`, `timeout`, `unauthorized`, `not_found`, `rate_limited`, `rejected`, `server_error`, `invalid_response`, `cancelled`). O texto vindo do provedor fica em `upstreamDetail`, só para log e só depois de redigido. Toda resposta de provedor é validada com Zod.
+Adaptadores lançam apenas `ProviderError`, cuja mensagem é uma frase fixa escolhida pelo tipo do erro (`unreachable`, `timeout`, `unauthorized`, `not_found`, `rate_limited`, `rejected`, `server_error`, `invalid_response`, `cancelled`, `program_missing`, `not_signed_in`). O texto vindo do provedor fica em `upstreamDetail`, só para log e só depois de redigido. Toda resposta de provedor é validada com Zod.
 
 `ToolContext` carrega o agente, a execução, a pasta de trabalho, o `AbortSignal` e a função de delegar. Uma ferramenta nunca recebe acesso direto ao banco nem ao `SecretStore`.
 
@@ -215,7 +215,7 @@ SQLite em `data/app.db`, modo WAL, chaves estrangeiras ativas. Migrações Drizz
 | Tabela | Conteúdo |
 |---|---|
 | `projects` | Agrupadores de agentes. |
-| `providers` | Tipo, URL base, se é externo, referência à credencial no cofre (nunca a credencial). |
+| `providers` | Tipo, URL base **ou** comando do harness (um dos dois, nunca os dois), se é externo, referência à credencial no cofre (nunca a credencial). |
 | `models` | Modelos habilitados por provedor e suas capacidades (ferramentas, streaming). |
 | `agents` | Configuração do agente, limites, estado ativo/inativo, exclusão lógica. |
 | `agent_tools` | Ferramenta concedida ao agente e nível de permissão. |
@@ -237,8 +237,9 @@ Identificadores são ULIDs monotônicos gerados no servidor: o maior id é sempr
 | Ollama | HTTP (`/api/version`, `/api/tags`, `/api/show`, `/api/chat`) | Sem credencial. O suporte a ferramentas vem das capacidades que o servidor informa. |
 | OpenAI-compatível | HTTP(S) (`/models`, `/chat/completions`; o endereço inclui o prefixo `/v1`) | Cobre OpenAI, LM Studio, OpenRouter e similares. Usa `max_completion_tokens` só quando o host é `api.openai.com`; o protocolo não informa suporte a ferramentas, então nenhum é presumido. |
 | Anthropic | HTTPS (Messages API) via SDK oficial | Não envia `temperature`: os modelos atuais recusam parâmetros de amostragem, então a temperatura do agente não se aplica a este provedor. |
+| Claude Code / Codex (harness) | Programa local em modo não interativo, um processo por turno, sem shell, saída de eventos em JSON lida linha a linha (`providers/command.ts`) | A credencial é a sessão que o usuário já tem no harness; o `SecretStore` não entra. O processo roda na pasta do agente, sem variável de ambiente do servidor, com toda a configuração e as ferramentas do harness desligadas por bandeira (C-25). As ferramentas da plataforma vão descritas no prompt de sistema e voltam como blocos `<tool_call>` no texto (`providers/harness.ts`, `ToolCallReader`), que o adaptador converte em eventos `tool_call`: o laço continua no `RunManager`, com um processo do harness por passo. O prompt de sistema vai num arquivo temporário (`--system-prompt-file`), porque a linha de comando do Windows é curta demais para instruções longas. `temperature` e `maxOutputTokens` não têm equivalente na linha de comando. |
 
-Provedores externos recebem o prompt de sistema, o histórico da conversa, as definições de ferramentas e os resultados de ferramentas. A interface informa isso ao configurar o provedor e ao atribuí-lo a um agente.
+Provedores externos recebem o prompt de sistema, o histórico da conversa, as definições de ferramentas e os resultados de ferramentas; um harness recebe o mesmo, com as definições de ferramentas dentro do prompt de sistema. A interface informa isso ao configurar o provedor e ao atribuí-lo a um agente.
 
 ## 9. Concorrência e ciclo de vida
 

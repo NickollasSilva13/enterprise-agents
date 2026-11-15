@@ -474,6 +474,8 @@ export class RunManager {
           maxOutputTokens:
             budget === null ? plan.maxOutputTokens : Math.min(plan.maxOutputTokens, budget),
           ...(tools.length > 0 ? { tools } : {}),
+          // Where a harness provider runs its process.
+          workspaceDir: plan.workspaceDir,
         },
         signal,
       );

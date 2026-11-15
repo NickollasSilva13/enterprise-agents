@@ -8,7 +8,7 @@ import {
   type ModelInfo,
   type ModelProvider,
   ProviderError,
-  type ProviderSettings,
+  type HttpProviderSettings,
   type StopReason,
 } from './types';
 
@@ -100,7 +100,7 @@ export function maxTokensField(baseUrl: string): 'max_completion_tokens' | 'max_
  * the version prefix, e.g. "https://api.openai.com/v1".
  */
 export class OpenAiCompatibleProvider implements ModelProvider {
-  constructor(private readonly settings: ProviderSettings) {}
+  constructor(private readonly settings: HttpProviderSettings) {}
 
   private url(path: string): string {
     return joinUrl(this.settings.baseUrl, path);

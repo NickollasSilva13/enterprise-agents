@@ -30,6 +30,8 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - Testes de adaptador usam servidores HTTP reais de `test/stub-servers.ts`. Ao mexer em um adaptador, valide também contra o Ollama local se ele estiver instalado.
 - O adaptador da Anthropic usa o SDK oficial e sempre passa a chave explicitamente: sem chave o SDK usaria credenciais da própria máquina.
 - Novo provedor: novo adaptador de `ModelProvider` com os testes de contrato compartilhados.
+- Provedores de harness (`claude-code.ts`, `codex.ts`) rodam o programa por `providers/command.ts` (sem shell, ambiente por lista de permissão). As ferramentas da plataforma chegam a eles só pelo protocolo de texto de `harness.ts` (`ToolCallReader`); o laço continua no `RunManager`. Não tire o `--safe-mode`: sem ele o Claude Code carrega servidores MCP, `CLAUDE.md` e a auto-memória do usuário.
+- Não há conta de harness conectada nesta máquina: os testes de harness usam um `CommandRunner` simulado (`harness-tools.test.ts` passa pelo `RunManager` real); `command.test.ts` cria processos de verdade com o próprio Node.
 
 ## Runtime
 

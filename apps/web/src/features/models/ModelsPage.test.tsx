@@ -8,6 +8,7 @@ const ollama: Provider = {
   name: 'Ollama local',
   kind: 'ollama',
   baseUrl: 'http://127.0.0.1:11434',
+  command: null,
   isExternal: false,
   hasApiKey: false,
   apiKeyHint: null,
@@ -28,6 +29,19 @@ const openai: Provider = {
   hasApiKey: true,
   apiKeyHint: '…cdef',
   modelCount: 0,
+  enabledModelCount: 0,
+  agentCount: 0,
+};
+
+const harness: Provider = {
+  ...ollama,
+  id: 'p3',
+  name: 'Claude Code',
+  kind: 'claude_code',
+  baseUrl: null,
+  command: 'claude',
+  isExternal: true,
+  modelCount: 1,
   enabledModelCount: 0,
   agentCount: 0,
 };
@@ -400,6 +414,112 @@ describe('editing a provider', () => {
           { method: 'PATCH', url: '/api/models/m9', body: { supportsTools: true } },
         ]),
       );
+    });
+  });
+});
+
+describe('harness providers (Fase 12)', () => {
+  const harnessApi = {
+    '/api/providers': { providers: [harness] },
+    '/api/providers/p3/models': {
+      models: [
+        {
+          id: 'm3',
+          providerId: 'p3',
+          name: 'default',
+          displayName: 'Padrão da conta',
+          supportsTools: true,
+          enabled: false,
+          agentCount: 0,
+        },
+      ],
+    },
+  };
+
+  it('shows the command instead of an address, and says what the harness sends', async () => {
+    renderApp('/modelos', harnessApi);
+    const cc = await card('Claude Code');
+    expect(cc.getByText('Comando')).toBeTruthy();
+    expect(cc.getByText('claude')).toBeTruthy();
+    expect(cc.queryByText('Endereço')).toBeNull();
+    expect(cc.getByText('Não usa')).toBeTruthy();
+
+    const notice = cc.getByText(/responde pelo serviço dele/);
+    expect(notice.textContent).toContain('prompt de sistema');
+    expect(notice.textContent).toContain('histórico da conversa');
+    // Harness agents use the platform tools, so their results go there too (Fase 13).
+    expect(notice.textContent).toContain('resultados das ferramentas');
+  });
+
+  it('shows tool support without a hand marking on a harness model', async () => {
+    renderApp('/modelos', harnessApi);
+    const cc = await card('Claude Code');
+    expect(await cc.findByText('Aceita ferramentas')).toBeTruthy();
+    expect(cc.queryByRole('switch', { name: /aceita ferramentas/ })).toBeNull();
+  });
+
+  it('asks for the program, no key, and says how tools work there', async () => {
+    const { writes } = renderApp('/modelos', {
+      '/api/providers': { providers: [] },
+      'POST /api/providers': () => json(201, harness),
+      'POST /api/providers/p3/models/sync': { models: [], added: 1, removed: 0 },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Adicionar provedor' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Adicionar provedor' }));
+
+    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
+      target: { value: 'claude_code' },
+    });
+    expect(dialog.getByRole('textbox', { name: 'Nome' })).toHaveProperty('value', 'Claude Code');
+    expect(dialog.getByRole('textbox', { name: 'Comando' })).toHaveProperty('value', 'claude');
+    expect(dialog.queryByRole('textbox', { name: 'Endereço' })).toBeNull();
+    expect(dialog.queryByLabelText('Chave de API')).toBeNull();
+    expect(dialog.getByText(/ferramentas da plataforma conforme as permissões/)).toBeTruthy();
+    expect(dialog.queryByText(/planejado para a Fase/)).toBeNull();
+    expect(dialog.getByText(/responde pelo serviço dele/)).toBeTruthy();
+
+    fireEvent.click(dialog.getByRole('button', { name: 'Adicionar provedor' }));
+    await waitFor(() => expect(writes().length).toBeGreaterThan(0));
+    expect(writes()[0]?.body).toEqual({
+      name: 'Claude Code',
+      kind: 'claude_code',
+      command: 'claude',
+    });
+  });
+
+  it('points out a command with arguments in it', async () => {
+    const { writes } = renderApp('/modelos', { '/api/providers': { providers: [] } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Adicionar provedor' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Adicionar provedor' }));
+    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
+      target: { value: 'codex' },
+    });
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Comando' }), {
+      target: { value: 'codex --dangerously-bypass-approvals' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Adicionar provedor' }));
+    expect(await dialog.findByText('Informe apenas o programa, sem argumentos.')).toBeTruthy();
+    expect(writes()).toEqual([]);
+  });
+
+  it('edits the command of a harness already connected', async () => {
+    const { writes } = renderApp('/modelos', {
+      ...harnessApi,
+      'PATCH /api/providers/p3': { ...harness, command: 'claude.exe' },
+    });
+    fireEvent.click(
+      (await card('Claude Code')).getByRole('button', { name: 'Editar Claude Code' }),
+    );
+    const dialog = within(screen.getByRole('dialog', { name: 'Editar provedor' }));
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Comando' }), {
+      target: { value: 'claude.exe' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Salvar provedor' }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({
+      method: 'PATCH',
+      url: '/api/providers/p3',
+      body: { name: 'Claude Code', command: 'claude.exe' },
     });
   });
 });

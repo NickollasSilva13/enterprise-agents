@@ -8,7 +8,7 @@ import {
   type ModelInfo,
   type ModelProvider,
   ProviderError,
-  type ProviderSettings,
+  type HttpProviderSettings,
   type StopReason,
 } from './types';
 
@@ -84,9 +84,9 @@ function toProviderError(error: unknown, signal?: AbortSignal): ProviderError {
 
 /** Adapter for the Anthropic API, through the official SDK. */
 export class AnthropicProvider implements ModelProvider {
-  private readonly settings: ProviderSettings;
+  private readonly settings: HttpProviderSettings;
 
-  constructor(settings: ProviderSettings) {
+  constructor(settings: HttpProviderSettings) {
     this.settings = settings;
   }
 

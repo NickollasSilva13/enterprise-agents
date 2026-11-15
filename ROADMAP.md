@@ -17,6 +17,8 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 9 | Escritório vivo | Concluída em 2026-11-14 |
 | 10 | Segurança e qualidade | Concluída em 2026-11-14 |
 | 11 | Finalização e documentação | Concluída em 2026-11-15 (aguardando aprovação) |
+| 12 | Harness local como provedor | Planejada (2026-11-15) |
+| 13 | Ferramentas da plataforma para agentes de harness | Planejada |
 
 ## Fases concluídas
 
@@ -150,10 +152,142 @@ Incluída em 2026-11-12 a pedido do usuário.
 - Revisão das pendências: o roteiro manual foi refeito, inclusive o item 4 (reinício), que estava sem verificação desde a Fase 7. O que continua aberto está em "Pendências ao final do projeto", abaixo.
 - Testes E2E do Escritório tornados mais firmes: a preparação de dados refaz a sessão se receber 401, e o pedido de nova leitura é repetido até a tela mostrar a mudança.
 
+## Fase 12 — Harness local como provedor (concluída)
+
+**Objetivo.** Permitir criar agentes que usam um harness de linha de comando já
+instalado e autenticado na máquina do usuário (Claude Code, Codex) em vez de uma
+chave de API, para que a plataforma funcione sem custo por token.
+
+**Decisões tomadas com o usuário em 2026-11-15:**
+
+1. O harness entra como **provedor de texto**: o CLI roda em modo não interativo,
+   com as ferramentas dele desligadas, e serve apenas de modelo. `RunManager`,
+   `PermissionEngine`, aprovações, `run_steps`, delegação, logs e Escritório
+   ficam exatamente como estão. Dar ferramentas da plataforma ao harness é a
+   Fase 13, não esta.
+2. A configuração vai numa coluna nova: migração que torna `base_url` opcional e
+   acrescenta `command` (caminho do executável; vazio significa procurar no
+   `PATH`). Não se reaproveita `base_url` nem se cria um JSON solto.
+3. O adaptador do Codex entra nesta fase atrás do mesmo contrato, com testes
+   contra um CLI simulado, e **marcado como não validado com o serviço real** —
+   o Codex não está instalado nesta máquina, e resultado de teste não se inventa.
+
+**Escopo.**
+
+- Dois `ProviderKind` novos: `claude_code` e `codex`, com `apiKey: 'none'` (o
+  `SecretStore` não é tocado: a credencial é a sessão que o usuário já tem).
+- Adaptadores em `apps/server/src/providers/`, implementando `ModelProvider`:
+  - `testConnection`: executa o CLI pedindo a versão e devolve o que respondeu.
+  - `listModels`: lista fixa por harness (o CLI não publica catálogo), com
+    `supportsTools: false` nesta fase.
+  - `chat`: um processo por turno, sem shell e com argumentos em lista, traduzindo
+    a saída de eventos em JSON do CLI para `ChatEvent` (`text_delta`, `usage`,
+    `done`), e matando o processo quando o `AbortSignal` dispara.
+- Isolamento obrigatório do processo do harness, como controle de segurança:
+  ferramentas próprias desligadas, configuração do usuário neutralizada (para que
+  os hooks, permissões e servidores MCP do `~/.claude` dele não entrem na
+  execução), e pasta de trabalho igual à pasta do agente.
+- Interface: o formulário de provedor mostra campo de comando em vez de endereço
+  para esses tipos, sem pedir chave, e deixa claro que o agente de harness ainda
+  não usa ferramentas.
+- `SECURITY.md`: controle novo para o processo de harness (o que é desligado e
+  por quê), e `TESTING.md` para os testes de CLI simulado.
+
+**Fora do escopo.** Ferramentas para agentes de harness, sessões persistentes do
+harness, contagem de custo (a assinatura não reporta preço por chamada) e
+qualquer harness além desses dois.
+
+**A investigação que abria a fase, respondida.** A chamada de teste a `claude -p`
+que voltava com `model: "<synthetic>"` e custo zero herdava 33 variáveis
+`CLAUDE*`/`ANTHROPIC*` desta sessão do Claude Desktop (entre elas `CLAUDECODE=1`,
+`CLAUDE_CODE_ENTRYPOINT=claude-desktop` e `CLAUDE_CODE_MESSAGING_SOCKET`), e por
+isso se comportava como sessão filha do SDK do hospedeiro, sem chamar o modelo.
+Com o ambiente limpo (a lista de permissão de C-25), o CLI responde outra coisa:
+`Failed to authenticate: OAuth session expired and could not be refreshed`. Ou
+seja, o formato de streaming é o documentado, e o que falta é a conta do harness
+estar conectada fora do aplicativo. Isso não foi contornado: o adaptador detecta
+essa resposta e devolve "o harness não está conectado a uma conta".
+
+**O que foi feito.**
+
+- `claude_code` e `codex` em `PROVIDER_KINDS`, com `transport: 'command'`,
+  `apiKey: 'none'` e comando padrão no `PROVIDER_KIND_INFO`; validação própria do
+  comando (só o programa, sem argumentos, sem quebra de linha, sem começar por
+  `-`) e esquemas que exigem endereço **ou** comando, nunca os dois.
+- Migração `0002_providers_command.sql` (escrita à mão, com `drizzle-kit
+  generate --custom`): `base_url` passa a aceitar nulo e entra a coluna
+  `command`.
+- `providers/command.ts`: executor de programas compartilhado, com lista de
+  permissão de variáveis de ambiente, argumentos em lista sem shell, pasta de
+  trabalho criada se faltar, tempo limite total e de inatividade, cancelamento e
+  leitura linha a linha.
+- `providers/harness.ts` com o que os dois adaptadores compartilham (transcrição
+  da conversa, classificação de erro) e os adaptadores `claude-code.ts` e
+  `codex.ts`. Modelos de harness têm `supportsTools: false` e `chat` recusa
+  especificação de ferramentas.
+- `ProviderError` ganhou `program_missing` e `not_signed_in`, com frases fixas.
+- Interface: campo "Comando" em vez de "Endereço", sem chave de API, com aviso
+  próprio de provedor externo e a nota de que ferramentas vêm na Fase 13.
+- `SECURITY.md`: controle C-25, C-12 estendido e dois problemas conhecidos novos;
+  `TESTING.md`: caso obrigatório de C-25 e o registro desta fase.
+
+**Não validado.** O Codex não está instalado nesta máquina: o adaptador foi
+escrito pela documentação e testado contra um programa simulado. Uma conversa de
+verdade pelo Claude Code também não foi feita, porque a sessão do harness não se
+renova fora do aplicativo (ver acima).
+
+## Fase 13 — Ferramentas da plataforma para agentes de harness (concluída)
+
+**Objetivo.** Agentes de harness passam a usar as ferramentas da plataforma
+(arquivos, busca de URL, script, delegação), sempre pelas permissões do agente.
+
+**O que mudou no plano.** A ideia inicial era um servidor MCP local da
+plataforma. Antes de implementar, um teste com o Claude Code 2.1.301 mostrou que,
+com `--safe-mode` ligado, ele não carrega nenhum servidor MCP passado por
+`--mcp-config`; sem `--safe-mode`, carrega, mas a leitura automática de
+`CLAUDE.md` e a auto-memória do usuário voltam a valer. Com as duas
+alternativas apresentadas, **o usuário escolheu em 2026-11-15 manter o laço na
+plataforma**: o harness continua só texto, isolado como na Fase 12, e as
+ferramentas passam por um protocolo de texto.
+
+**O que foi feito.**
+
+- `providers/harness.ts`: `toolProtocol`/`systemWithTools` descrevem as
+  ferramentas concedidas no prompt de sistema; `ToolCallReader` lê, enquanto a
+  resposta chega, os blocos `<tool_call>{"name", "arguments"}</tool_call>` e os
+  converte em eventos `tool_call`; `promptOf` passou a mostrar, depois da
+  mensagem em resposta, as ferramentas pedidas e os resultados (com o texto dos
+  resultados impedido de imitar o protocolo).
+- Adaptadores do Claude Code e do Codex com esse protocolo e modelos com
+  `supportsTools: true`. Nada mudou no `RunManager`: o pedido segue o caminho
+  único (`PermissionEngine`, validação, aprovação, execução), e cada passo é uma
+  nova execução do programa.
+- Defeito da Fase 12 corrigido: o prompt de sistema ia na linha de comando, que
+  no Windows comporta 32.767 caracteres, menos que as instruções de um agente
+  podem ter. Agora vai num arquivo temporário (`--system-prompt-file`, aceito
+  pela versão instalada embora não apareça no `--help`), apagado ao fim de cada
+  chamada.
+- Interface: nota do formulário e aviso de provedor externo atualizados.
+- `SECURITY.md` (C-25 estendido, problema conhecido novo sobre o sandbox do
+  Codex), `TESTING.md`, `ARCHITECTURE.md`, `SPEC.md` e o guia.
+
+**Validação real (2026-11-15), depois de o usuário entrar na conta.** Com o
+Claude Code 2.1.325 e o modelo Haiku, num servidor à parte com dados
+descartáveis: conversa simples (Fase 12) respondeu em 6,9 s; o modelo escreveu
+o bloco `<tool_call>` no formato certo já na primeira tentativa e o arquivo foi
+criado na pasta do agente; com "Pede aprovação", a execução esperou sem nenhum
+processo do harness vivo e terminou depois da aprovação; sem a permissão de
+escrita, o modelo **pediu `write_file` mesmo assim** e o `PermissionEngine`
+recusou (`not_granted`), sem arquivo criado. A validação achou e corrigiu um
+defeito na contagem de tokens de entrada (`SECURITY.md`, seção 10).
+
+**Não validado.** O Codex não está instalado: segue só contra o programa
+simulado.
+
 ## Pendências ao final do projeto
 
-- **Nada foi commitado desde a Fase 6.** Todo o trabalho das Fases 7 a 11 está na pasta de trabalho, sem commit.
 - OpenAI e Anthropic nunca foram validados com o serviço real (não há chave); só contra servidores simulados.
+- O provedor de Codex (Fases 12 e 13) nunca foi validado: o Codex não está instalado. Falta conferir o formato real da saída dele e se o sandbox o impede de ler arquivos por conta própria. O Claude Code foi validado com um único modelo (Haiku) e poucas execuções: com que frequência um modelo erra o formato dos pedidos de ferramenta não foi medido.
 - Critério de aceite 1 (`SPEC.md`, seção 8), instalar em uma máquina limpa, não foi verificado: tudo foi feito nesta máquina.
 - Encerramento por `Ctrl+C` em terminal interativo nunca foi verificado à mão.
 - O movimento do Escritório não foi visto por uma pessoa.
