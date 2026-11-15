@@ -2,6 +2,8 @@ import type { ZodType } from 'zod';
 import { errorKindForStatus, ProviderError } from './types';
 
 const DETAIL_LIMIT = 500;
+/** No line of a streamed answer comes near this; more is a broken or hostile server. */
+export const STREAM_LINE_LIMIT = 4 * 1024 * 1024;
 
 export interface RequestOptions {
   readonly method?: 'GET' | 'POST';
@@ -95,6 +97,10 @@ export async function* readLines(response: Response, signal?: AbortSignal): Asyn
       const { value, done } = await reader.read();
       if (done) break;
       buffer += value;
+      // Without this, a server that never sends a line break fills the memory.
+      if (buffer.length > STREAM_LINE_LIMIT && !buffer.includes('\n')) {
+        throw new ProviderError('invalid_response', response.status, 'stream line too long');
+      }
       let newline = buffer.indexOf('\n');
       while (newline >= 0) {
         const line = buffer.slice(0, newline).replace(/\r$/, '');

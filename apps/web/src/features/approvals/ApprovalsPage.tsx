@@ -1,0 +1,100 @@
+import type { Approval } from '@ea/shared';
+import { Link } from 'react-router';
+import { ApprovalCard } from '../../components/ApprovalCard';
+import { PageHeader } from '../../components/PageHeader';
+import { Panel } from '../../components/Panel';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
+import { formatDateTime, plural } from '../../lib/format';
+import { useApprovals } from '../../lib/tool-queries';
+
+const OUTCOME: Record<Approval['status'], { label: string; tone: string }> = {
+  pending: { label: 'Pendente', tone: 'text-wait' },
+  approved: { label: 'Aprovada', tone: 'text-ok' },
+  denied: { label: 'Negada', tone: 'text-fail' },
+  cancelled: { label: 'Retirada: a execução terminou antes da resposta', tone: 'text-dim' },
+};
+
+function DecidedList({ approvals }: { approvals: readonly Approval[] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {approvals.map((approval) => (
+        <li key={approval.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5">
+          <p className="min-w-0 flex-1 basis-56">
+            <span className="font-semibold">{approval.agentName}</span>
+            <span className="text-dim"> · {approval.toolTitle}</span>
+            {approval.reason && (
+              <span className="block text-sm text-dim">Motivo: {approval.reason}</span>
+            )}
+          </p>
+          <p className={`text-sm ${OUTCOME[approval.status].tone}`}>
+            {OUTCOME[approval.status].label}
+          </p>
+          <p className="text-sm text-dim">
+            {formatDateTime(approval.decidedAt ?? approval.createdAt)} ·{' '}
+            <Link to={`/logs/${approval.runId}`} className="text-info underline underline-offset-4">
+              Execução
+            </Link>
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The queue of actions waiting for the user, and what was decided before (RF-54). */
+export function ApprovalsPage() {
+  const pending = useApprovals('pending');
+  const decided = useApprovals('decided');
+
+  return (
+    <>
+      <PageHeader
+        title="Aprovações"
+        description="Ações que um agente quer fazer e que esperam a sua decisão. A execução fica parada até você responder."
+      />
+
+      {pending.isPending && <LoadingState label="Carregando as aprovações…" />}
+      {pending.error && !pending.data && (
+        <ErrorState
+          title="Não foi possível carregar as aprovações."
+          error={pending.error}
+          onRetry={() => void pending.refetch()}
+        />
+      )}
+
+      {pending.data && (
+        <div className="space-y-6">
+          <section aria-label="Aprovações pendentes">
+            {pending.data.length === 0 ? (
+              <div className="rounded-lg border border-line bg-sheet">
+                <EmptyState title="Nada esperando por você.">
+                  Quando um agente pedir uma ferramenta marcada como “Pede aprovação”, o pedido
+                  aparece aqui, com os argumentos exatos.
+                </EmptyState>
+              </div>
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-dim">
+                  {plural(pending.data.length, 'ação esperando', 'ações esperando')} a sua decisão.
+                </p>
+                <ul className="space-y-4">
+                  {pending.data.map((approval) => (
+                    <li key={approval.id}>
+                      <ApprovalCard approval={approval} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+
+          {decided.data && decided.data.length > 0 && (
+            <Panel title="Decisões recentes" aside={`${decided.data.length} mais recentes`}>
+              <DecidedList approvals={decided.data} />
+            </Panel>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

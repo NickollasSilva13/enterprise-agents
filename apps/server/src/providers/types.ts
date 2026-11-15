@@ -13,24 +13,54 @@ export interface ConnectionResult {
   readonly detail: string;
 }
 
-export interface ChatMessage {
-  readonly role: 'user' | 'assistant';
-  readonly content: string;
+/** A tool invocation asked for by the model. */
+export interface ToolCallRequest {
+  /** Pairs the call with its result. Generated here when the provider gives none. */
+  readonly id: string;
+  readonly name: string;
+  /** As sent by the model: unvalidated, and not necessarily an object. */
+  readonly arguments: unknown;
 }
 
-/** A provider-neutral chat request. Tool definitions join it in Phase 8. */
+export type ChatMessage =
+  | { readonly role: 'user'; readonly content: string }
+  | {
+      readonly role: 'assistant';
+      readonly content: string;
+      readonly toolCalls?: readonly ToolCallRequest[];
+    }
+  | {
+      readonly role: 'tool';
+      readonly toolCallId: string;
+      readonly name: string;
+      readonly content: string;
+      readonly isError?: boolean;
+    };
+
+/** A tool as described to the model. */
+export interface ToolSpec {
+  readonly name: string;
+  readonly description: string;
+  /** JSON Schema of the arguments (an object schema). */
+  readonly parameters: Record<string, unknown>;
+}
+
+/** A provider-neutral chat request. */
 export interface ChatRequest {
   readonly model: string;
   readonly system: string;
   readonly messages: readonly ChatMessage[];
   readonly temperature: number;
   readonly maxOutputTokens: number;
+  /** Tools the model may ask for. Omitted or empty: plain conversation. */
+  readonly tools?: readonly ToolSpec[];
 }
 
-export type StopReason = 'end' | 'max_tokens' | 'refusal';
+export type StopReason = 'end' | 'max_tokens' | 'refusal' | 'tool_use';
 
 export type ChatEvent =
   | { readonly type: 'text_delta'; readonly text: string }
+  | ({ readonly type: 'tool_call' } & ToolCallRequest)
   | { readonly type: 'usage'; readonly inputTokens: number; readonly outputTokens: number }
   | { readonly type: 'done'; readonly stopReason: StopReason };
 

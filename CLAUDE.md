@@ -38,7 +38,7 @@ packages/shared/src/
 data/                  # não versionado
 ```
 
-`runtime` e `tools` ainda não existem (Fases 7 e 8). `core/errors.ts` tem as classes de erro que qualquer camada pode lançar; só `http/error-handler.ts` as converte em resposta.
+`core/errors.ts` tem as classes de erro que qualquer camada pode lançar; só `http/error-handler.ts` as converte em resposta.
 
 Cada domínio em `modules/<nome>/` tem `routes.ts`, `service.ts`, `repository.ts` e testes ao lado.
 
@@ -49,6 +49,7 @@ Fatos da fundação que não são óbvios pelo código:
 - Importações relativas sem extensão (`moduleResolution: Bundler`).
 - `buildApp()` não escuta em porta; os testes usam `app.inject()` e o helper `makeApp()` de `apps/server/test/helpers.ts`, que já fornece os cabeçalhos de uma requisição legítima.
 - Toda rota nova em `/api` já nasce protegida por Host, Origin, Sec-Fetch-Site e sessão. Não crie rotas de API fora do prefixo `/api`.
+- As guardas decidem se a requisição é de API pela rota casada (`guardedPath` em `http/app.ts`), nunca por `request.url`: o roteador decodifica escapes (`/%61pi/x` é `/api/x`). Qualquer checagem nova por caminho deve usar `guardedPath`.
 - A CSP proíbe estilos e scripts inline: na interface, nunca use o atributo `style` nem carregue recursos de outro domínio. Use classes Tailwind e os tokens de `apps/web/src/app/theme.css`.
 - Testes de componente usam `renderApp()` de `apps/web/src/test/render.tsx`, que monta as rotas reais sobre uma API simulada.
 - Limites e padrões dos campos de agente e projeto vivem só em `packages/shared/src/agents.ts` (`AGENT_LIMITS`, `AGENT_DEFAULTS`); servidor, formulário e textos de ajuda leem de lá.
@@ -63,9 +64,31 @@ Fatos da fundação que não são óbvios pelo código:
 - Migração com SQL escrito à mão (gatilhos, por exemplo): `npx drizzle-kit generate --custom --name <nome>` em `apps/server`, depois preencher o arquivo gerado.
 - Dados de teste no servidor: construtores em `apps/server/test/fixtures.ts`.
 - Use sempre `newId()` para ids; consultas assumem que o maior id é o mais recente.
-- Não deixe servidores rodando em segundo plano após testar: `tsx watch` reinicia sozinho e ocupa a porta 4317. Antes de rodar E2E, as portas 4391 a 4394 precisam estar livres.
+- O runtime (`runtime/`) não importa `db` nem `modules`: o que executar chega por `RunPlan` e o que aconteceu sai por `RunStore` e pelo `EventBus`. A ligação com o banco fica em `modules/runs` (`createRunsContext`).
+- Todo passo de execução é emitido com `bus.emitStep()`, que grava antes de distribuir. Nunca insira em `run_steps` por fora (exceção: a recuperação na inicialização).
+- Mensagens de erro de execução gravadas no banco são frases fixas e seguras; o detalhe do provedor só vai ao log, com `redactSecrets`.
+- Respostas SSE usam `SseHub` (`http/sse.ts`): ele repassa os cabeçalhos de segurança e fecha os fluxos no desligamento. Não escreva em `reply.raw` por fora.
+- Ao iniciar, o servidor marca como `interrupted` toda execução ativa que encontrar. Em testes, insira execuções "em andamento" depois de `makeApp()`, ou elas serão interrompidas.
+- Testes de runtime e de API usam o `FakeProvider` em processo (`apps/server/test/fake-provider.ts`), passado por `makeApp({ createProvider })`.
+- Saída de modelo na interface só pelo componente `Markdown`. Não habilite HTML bruto nem imagens nele.
+- Nos desenhos SVG do Escritório, não use `<text>` (o texto entra no conteúdo lido da mesa) nem o atributo `style`; uma classe de animação nunca vai no mesmo elemento que tem `transform`.
+- Testes de componente que precisam de eventos do servidor usam `installFakeEventSource()` (`apps/web/src/test/fake-event-source.ts`); sem ele, `EventSource` não existe no jsdom e as telas caem na consulta periódica.
+- Em `renderApp()`, uma requisição com query string também casa com a entrada do caminho sem ela.
+- O provedor simulado do E2E responde conforme uma palavra na mensagem: `devagar` (resposta longa, para testar streaming e interrupção) e `perigo` (resposta com HTML hostil).
+- Não deixe servidores rodando em segundo plano após testar: `tsx watch` reinicia sozinho e ocupa a porta 4317. Antes de rodar E2E, as portas 4391 a 4395 precisam estar livres.
 - Testes E2E que alteram dados usam o servidor `CRUD_URL` (porta 4393) e colocam o nome do projeto do Playwright nos nomes que criam, porque desktop e celular compartilham o banco.
-- Playwright fica em `workers: 2` de propósito (ver `TESTING.md`, seção 8).
+- Playwright fica em `workers: 2` e com espera de 20 s nas verificações de propósito (ver `TESTING.md`, seção 8).
+- O único caminho do pedido do modelo até uma ferramenta é `RunManager.dispatch` (`runtime/run-manager.ts`): decisão do `PermissionEngine`, validação Zod, aprovação se `ask`, execução. Ferramenta nova entra em `tools/builtin/` e em `createBuiltinRegistry()`; nunca chame `execute` por fora.
+- Ferramentas recebem só `ToolContext` (pasta do agente, sinal, delegar). Caminho vindo do modelo passa sempre por `resolveInWorkspace`; endereço vindo do modelo, por `fetchPublicUrl`.
+- `makeApp()` cria um `DATA_DIR` temporário (`dataDir`): as pastas de trabalho dos testes ficam lá, nunca em `data/`.
+- Permissões em teste: `grantTools()` de `test/fixtures.ts`; modelo que aceita ferramentas: `addModel(db, provider, nome, { supportsTools: true })`; o `FakeProvider` pede ferramentas com `toolCalls` no roteiro.
+- Os passos de ferramenta levam `toolTitle` no payload; a interface não tem cópia do catálogo.
+- O provedor simulado do E2E pede ferramentas com as palavras `anote` (escrever arquivo) e `delegue a "<agente>"`; `tools.spec.ts` usa um servidor só dele (`TOOLS_URL`, porta 4395).
+- Escritório vivo: o lugar de cada agente é decidido só por `placeOf` (`features/office/scene.ts`) a partir de `/api/office`; não guarde posição em lugar nenhum. O motor (`SceneEngine`) não toca o DOM e se testa como função pura; os personagens se movem pelo atributo `transform`, nunca por `style`.
+- Testes do Escritório leem `data-place` e `data-seated` (na mesa) e `data-walker`/`data-moving` (no personagem). `delegue devagar a "<agente>"` no provedor simulado cria uma delegação longa. `office.spec.ts` prepara dados pela API a partir da página e espera 2 s antes de pedir nova leitura (`staleTime`).
+- Exportar e importar agentes: `modules/agents/transfer.ts`. O arquivo nomeia projeto, modelo e provedor (nunca ids, endereço ou chave) e a importação nunca grava `allow`: tudo entra como `ask`. Campo novo de agente precisa entrar em `exportedAgentSchema` e nos dois sentidos de `transfer.ts`.
+- Em E2E, prepare dados com `api()` de `e2e/helpers.ts` (refaz a sessão em 401). Os arquivos de `e2e/` não têm os tipos do Node: nada de `node:fs` nem `Buffer` neles.
+- `Panel` rotula a própria região com o título: em testes, `getByRole('region', { name: título })`.
 - No PowerShell 5.1, `Set-Content -Encoding utf8` grava BOM. Use as ferramentas de edição, não redirecionamento de shell, para alterar arquivos.
 
 ## Padrões de código
@@ -106,6 +129,8 @@ Fatos da fundação que não são óbvios pelo código:
 | `npm test -w @ea/server -- test/db.test.ts` | Rodar um único arquivo de teste. |
 | `npm run test:e2e` | Compila a interface e roda o Playwright (desktop e celular). |
 | `npm run test:e2e -w @ea/web -- -g "texto"` | Rodar testes E2E pelo nome (exige `npm run build` antes). |
+| `npm run test:coverage` | Testes do servidor com cobertura; falha abaixo das metas de `TESTING.md`. |
+| `npm run test:perf` | Desempenho da API sobre um banco volumoso; falha acima dos limites. |
 | `npm run db:generate` | Gerar migração a partir do esquema. |
 | `npm run db:migrate` | Aplicar migrações. |
 

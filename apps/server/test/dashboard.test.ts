@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { agents } from '../src/db/schema';
 import { getDashboardSummary } from '../src/modules/dashboard/service';
 import { getOffice } from '../src/modules/office/service';
+import { createBuiltinRegistry } from '../src/tools/builtin';
 import {
   addAgent,
   addModel,
@@ -212,7 +213,7 @@ describe('office', () => {
     addAgent(database, { name: 'Solto', enabled: false });
     addAgent(database, { name: 'Removido', projectId: support, deletedAt: hoursAgo(1) });
 
-    const { rooms } = getOffice(database.db);
+    const { rooms } = getOffice(database.db, createBuiltinRegistry());
     expect(rooms.map((room) => room.name)).toEqual(['Arquivo', 'Suporte', 'Sem projeto']);
     expect(rooms[0]?.agents).toEqual([]);
     expect(rooms[1]).toMatchObject({ id: support, description: 'Atende clientes' });
@@ -227,10 +228,47 @@ describe('office', () => {
     ]);
   });
 
+  it('says since when an idle agent has had nothing to do, from what is already stored (RF-80)', async () => {
+    const { database } = await start();
+    const created = hoursAgo(5);
+    const stamps = { createdAt: created, updatedAt: created };
+    // Never ran: idle since it was last changed.
+    addAgent(database, { name: 'A nova', ...stamps });
+    // Ran after that: idle since the end of the last run.
+    const ran = addAgent(database, { name: 'B rodou', ...stamps });
+    addRun(database, ran, { status: 'completed', finishedAt: hoursAgo(3) });
+    addRun(database, ran, { status: 'completed', finishedAt: hoursAgo(2) });
+    // Edited or switched on after its last run: idle since that change.
+    const edited = addAgent(database, {
+      name: 'C editado',
+      createdAt: created,
+      updatedAt: hoursAgo(1),
+    });
+    addRun(database, edited, { status: 'completed', finishedAt: hoursAgo(4) });
+    // Not idle: nothing to say.
+    const busy = addAgent(database, { name: 'D ocupado', ...stamps });
+    addRun(database, busy, { status: 'running' });
+    const failed = addAgent(database, { name: 'E falhou', ...stamps });
+    addRun(database, failed, { status: 'failed', finishedAt: hoursAgo(2) });
+    addAgent(database, { name: 'F inativo', enabled: false, ...stamps });
+
+    const { rooms } = getOffice(database.db, createBuiltinRegistry());
+    expect(rooms[0]?.agents.map((agent) => [agent.name, agent.state, agent.idleSince])).toEqual([
+      ['A nova', 'idle', created],
+      ['B rodou', 'idle', hoursAgo(2)],
+      ['C editado', 'idle', hoursAgo(1)],
+      ['D ocupado', 'working', null],
+      ['E falhou', 'failed', null],
+      ['F inativo', 'inactive', null],
+    ]);
+  });
+
   it('has no "Sem projeto" room when every agent has a project', async () => {
     const { database } = await start();
     addAgent(database, { name: 'Ana', projectId: addProject(database, 'Suporte') });
-    expect(getOffice(database.db).rooms.map((room) => room.name)).toEqual(['Suporte']);
+    expect(getOffice(database.db, createBuiltinRegistry()).rooms.map((room) => room.name)).toEqual([
+      'Suporte',
+    ]);
   });
 });
 

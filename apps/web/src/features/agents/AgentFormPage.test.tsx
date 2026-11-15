@@ -202,7 +202,12 @@ describe('editing an agent', () => {
     expect(await field('Tokens por execução')).toHaveProperty('value', '9000');
     expect(screen.getByRole('combobox', { name: 'Projeto' })).toHaveProperty('value', 'p1');
     expect(screen.getByRole('combobox', { name: 'Modelo de IA' })).toHaveProperty('value', 'm1');
-    expect(screen.getByText('Planejado para a Fase 7')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Abrir as conversas' }).getAttribute('href')).toBe(
+      '/agentes/a1/conversa',
+    );
+    expect(screen.getByRole('link', { name: 'Ver as execuções' }).getAttribute('href')).toBe(
+      '/logs?agente=a1',
+    );
   });
 
   it('saves the changes and returns to the list', async () => {

@@ -372,4 +372,34 @@ describe('editing a provider', () => {
     await waitFor(() => expect(writes()).toHaveLength(2));
     expect(writes()[1]?.body).toMatchObject({ apiKey: null });
   });
+  describe('tool support marked by hand', () => {
+    const gpt: ProviderModel = {
+      ...phi,
+      id: 'm9',
+      providerId: 'p2',
+      name: 'gpt-local',
+      displayName: 'gpt-local',
+    };
+
+    it('offers the marking only where the provider cannot tell', async () => {
+      const view = renderApp('/modelos', {
+        ...api(),
+        '/api/providers/p2/models': { models: [gpt] },
+        'PATCH /api/models/m9': () => json(200, { ...gpt, supportsTools: true }),
+      });
+
+      const toggle = await screen.findByRole('switch', { name: 'gpt-local aceita ferramentas' });
+      expect(toggle.getAttribute('aria-checked')).toBe('false');
+      expect(
+        (await card('Ollama local')).queryByRole('switch', { name: /aceita ferramentas/ }),
+      ).toBeNull();
+
+      fireEvent.click(toggle);
+      await waitFor(() =>
+        expect(view.writes()).toEqual([
+          { method: 'PATCH', url: '/api/models/m9', body: { supportsTools: true } },
+        ]),
+      );
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agentStateSchema } from './api';
+import { TOOL_PERMISSIONS } from './enums';
 
 const id = z.string().min(1).max(40);
 const count = z.number().int().nonnegative();
@@ -164,3 +165,85 @@ export const modelOptionSchema = z.object({
 export type ModelOption = z.infer<typeof modelOptionSchema>;
 
 export const modelListSchema = z.object({ models: z.array(modelOptionSchema) });
+
+// ---- Export and import (RF-20) --------------------------------------------
+
+export const AGENT_EXPORT_FORMAT = 'enterprise-agents/agents';
+export const AGENT_EXPORT_VERSION = 1;
+export const AGENT_IMPORT_LIMITS = { agents: 100, tools: 50, ids: 200 } as const;
+
+/**
+ * An agent as written to a file. It carries no ids, no history and nothing
+ * secret: the project and the model go by name, and of the provider only the
+ * name is kept, never its address or key (RN-11).
+ */
+export const exportedAgentSchema = z.strictObject({
+  name: agentFields.name,
+  description: agentFields.description.default(AGENT_DEFAULTS.description),
+  objective: agentFields.objective.default(AGENT_DEFAULTS.objective),
+  systemPrompt: agentFields.systemPrompt.default(AGENT_DEFAULTS.systemPrompt),
+  temperature: agentFields.temperature.default(AGENT_DEFAULTS.temperature),
+  maxOutputTokens: agentFields.maxOutputTokens.default(AGENT_DEFAULTS.maxOutputTokens),
+  maxSteps: agentFields.maxSteps.default(AGENT_DEFAULTS.maxSteps),
+  maxDurationSeconds: agentFields.maxDurationSeconds.default(AGENT_DEFAULTS.maxDurationSeconds),
+  maxTotalTokens: agentFields.maxTotalTokens.default(AGENT_DEFAULTS.maxTotalTokens),
+  enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
+  /** Name of the project, or null for none. */
+  project: z.string().trim().min(1).max(PROJECT_LIMITS.name).nullable().default(null),
+  model: z
+    .strictObject({
+      name: z.string().min(1).max(200),
+      provider: z.string().min(1).max(200),
+    })
+    .nullable()
+    .default(null),
+  tools: z
+    .array(
+      z.strictObject({
+        toolName: z.string().min(1).max(41),
+        permission: z.enum(TOOL_PERMISSIONS),
+      }),
+    )
+    .max(AGENT_IMPORT_LIMITS.tools)
+    .default([]),
+});
+export type ExportedAgent = z.infer<typeof exportedAgentSchema>;
+
+export const agentExportSchema = z.strictObject({
+  format: z.literal(AGENT_EXPORT_FORMAT, 'Este não é um arquivo de agentes do Enterprise Agents.'),
+  version: z.literal(
+    AGENT_EXPORT_VERSION,
+    'Este arquivo é de uma versão que esta instalação não sabe ler.',
+  ),
+  exportedAt: z.string().max(40).optional(),
+  agents: z
+    .array(exportedAgentSchema)
+    .min(1, 'O arquivo não tem nenhum agente.')
+    .max(
+      AGENT_IMPORT_LIMITS.agents,
+      `Um arquivo pode ter até ${AGENT_IMPORT_LIMITS.agents} agentes.`,
+    ),
+});
+export type AgentExport = z.infer<typeof agentExportSchema>;
+
+/** `ids`: comma-separated agent ids; absent means every agent. */
+export const agentExportQuerySchema = z.strictObject({
+  ids: z
+    .string()
+    .max(AGENT_IMPORT_LIMITS.ids * 41)
+    .optional(),
+});
+
+export const agentImportResultSchema = z.object({
+  imported: z.array(
+    z.object({
+      id,
+      /** The name the agent has now; differs from the file when it was taken. */
+      name: z.string(),
+      nameInFile: z.string(),
+      /** What could not be brought over as it was, in words for the user. */
+      warnings: z.array(z.string()),
+    }),
+  ),
+});
+export type AgentImportResult = z.infer<typeof agentImportResultSchema>;

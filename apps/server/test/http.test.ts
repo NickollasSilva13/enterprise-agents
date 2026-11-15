@@ -182,6 +182,70 @@ describe('request origin (C-02, C-03)', () => {
   });
 });
 
+// Found in the Phase 10 review: the router decodes percent-escapes before
+// matching, so "/%61pi/agents" reached the API while the guards, which looked
+// at the address as written, took it for a page and let it through with no
+// session and no origin check.
+describe('other spellings of an API path (C-02 to C-04)', () => {
+  const SPELLINGS = [
+    '/%61pi/projects',
+    '/%61%70%69/projects',
+    '/api%2Fprojects',
+    '/api/%70rojects',
+    '/./api/projects',
+    '/%2e/api/projects',
+    '/api/../api/projects',
+    '/api/projects/',
+    '/api/projects?x=1',
+    '/%61pi/projects?x=1',
+  ];
+
+  it.each(SPELLINGS)('needs a session to read %s', async (url) => {
+    const { app } = await start();
+    const response = await app.inject({ url, headers: { host: TEST_HOST } });
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it.each(SPELLINGS)('needs the right origin to write to %s', async (url) => {
+    const { app, database } = await start();
+    const cookie = `ea_session=${TEST_SESSION_TOKEN}`;
+    const send = (headers: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { host: TEST_HOST, cookie, ...headers },
+        payload: { name: 'Intruso' },
+      });
+    expect((await send({})).statusCode).toBe(403);
+    expect((await send({ origin: 'http://evil.example' })).statusCode).toBe(403);
+    expect((await send({ origin: TEST_ORIGIN, 'sec-fetch-site': 'cross-site' })).statusCode).toBe(
+      403,
+    );
+    const rows = database.sqlite.prepare('select count(*) as n from projects').get() as {
+      n: number;
+    };
+    expect(rows.n).toBe(0);
+  });
+
+  it('gives no session to another origin through an escaped path', async () => {
+    const { app } = await start();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/%61pi/session',
+      headers: { host: TEST_HOST, origin: 'http://evil.example' },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('still serves the escaped spelling to a legitimate request', async () => {
+    const { app, trusted } = await start();
+    const response = await app.inject({ url: '/%61pi/projects', headers: trusted });
+    expect(response.statusCode).toBe(200);
+  });
+});
+
 describe('health', () => {
   it('reports server and database status in the shared contract', async () => {
     const { app, trusted } = await start();

@@ -6,7 +6,7 @@ import { Button, buttonClass } from '../../components/Button';
 import { SelectField, Switch, TextAreaField, TextField } from '../../components/Form';
 import { PageHeader } from '../../components/PageHeader';
 import { StateLamp } from '../../components/StateLamp';
-import { ErrorState, LoadingState, PlannedNote } from '../../components/States';
+import { ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 import { formatCount } from '../../lib/format';
@@ -295,10 +295,19 @@ export function AgentFormPage() {
           {agent.data && (
             <section className="max-w-3xl rounded-lg border border-line bg-sheet p-4">
               <h2 className="text-base font-semibold">Histórico de atividades</h2>
-              <div className="mt-2">
-                <PlannedNote phase={7}>
-                  Conversas e execuções deste agente aparecerão aqui.
-                </PlannedNote>
+              <p className="mt-1 text-sm text-dim">
+                As conversas ficam no chat do agente; cada execução, com seus passos, fica nos logs.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link
+                  to={`/agentes/${agent.data.id}/conversa`}
+                  className={buttonClass('secondary')}
+                >
+                  Abrir as conversas
+                </Link>
+                <Link to={`/logs?agente=${agent.data.id}`} className={buttonClass('secondary')}>
+                  Ver as execuções
+                </Link>
               </div>
             </section>
           )}

@@ -21,7 +21,7 @@ test.describe('fresh installation', () => {
     expect(problems).toEqual([]);
   });
 
-  test('every area is reachable and unfinished ones say so', async ({ page }) => {
+  test('every area is reachable and none is a placeholder', async ({ page }) => {
     const problems = watchForProblems(page);
     await page.goto(EMPTY_URL);
 
@@ -38,19 +38,26 @@ test.describe('fresh installation', () => {
     await expect(page.getByText('Nenhum provedor conectado.')).toBeVisible();
     await expectNoHorizontalScroll(page);
 
-    const planned = [
-      ['Ferramentas', 8],
-      ['Aprovações', 8],
-      ['Logs', 7],
-    ] as const;
-    for (const [label, phase] of planned) {
-      await navigateTo(page, label);
-      await expect(page.getByRole('heading', { name: label, level: 1 })).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: `Planejado para a Fase ${phase}` }),
-      ).toBeVisible();
-      await expectNoHorizontalScroll(page);
-    }
+    await navigateTo(page, 'Ferramentas');
+    await expect(page.getByRole('heading', { name: 'Ferramentas', level: 1 })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Catálogo' }).getByRole('listitem')).toHaveCount(
+      6,
+    );
+    await expect(page.getByText('Nenhum agente ainda.')).toBeVisible();
+    await expectNoHorizontalScroll(page);
+
+    await navigateTo(page, 'Aprovações');
+    await expect(page.getByRole('heading', { name: 'Aprovações', level: 1 })).toBeVisible();
+    await expect(page.getByText('Nada esperando por você.')).toBeVisible();
+    await expectNoHorizontalScroll(page);
+
+    // Nothing in the navigation is a placeholder any more.
+    await expect(page.getByText(/Planejado para a Fase/)).toHaveCount(0);
+
+    await navigateTo(page, 'Logs');
+    await expect(page.getByRole('heading', { name: 'Logs', level: 1 })).toBeVisible();
+    await expect(page.getByText('Nenhuma execução ainda.')).toBeVisible();
+    await expectNoHorizontalScroll(page);
 
     await navigateTo(page, 'Configurações');
     await expect(page.getByText(EMPTY_URL, { exact: true })).toBeVisible();

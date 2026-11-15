@@ -1,11 +1,11 @@
-import type { DashboardAlert, DashboardSummary, RecentRun, RunStatus } from '@ea/shared';
+import type { ActivityItem, DashboardAlert, DashboardSummary, RecentRun } from '@ea/shared';
 import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router';
 import { type Column, DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
 import { type Stat, StatBoard } from '../../components/StatBoard';
-import { EmptyState, ErrorState, LoadingState, PlannedNote } from '../../components/States';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import {
   formatCount,
   formatDateTime,
@@ -15,20 +15,17 @@ import {
   plural,
 } from '../../lib/format';
 import { useDashboardSummary } from '../../lib/queries';
-
-const RUN_STATUS: Record<RunStatus, { label: string; tone: string }> = {
-  queued: { label: 'Na fila', tone: 'text-dim' },
-  running: { label: 'Em andamento', tone: 'text-ok' },
-  waiting_approval: { label: 'Aguardando aprovação', tone: 'text-wait' },
-  completed: { label: 'Concluída', tone: 'text-chalk' },
-  failed: { label: 'Falhou', tone: 'text-fail' },
-  cancelled: { label: 'Cancelada', tone: 'text-dim' },
-  timed_out: { label: 'Tempo esgotado', tone: 'text-fail' },
-  interrupted: { label: 'Interrompida', tone: 'text-dim' },
-};
+import { RUN_STATUS } from '../../lib/run-labels';
 
 const RUN_COLUMNS: readonly Column<RecentRun>[] = [
-  { header: 'Agente', cell: (run) => run.agentName },
+  {
+    header: 'Agente',
+    cell: (run) => (
+      <Link to={`/logs/${run.id}`} className="underline-offset-4 hover:underline">
+        {run.agentName}
+      </Link>
+    ),
+  },
   {
     header: 'Estado',
     cell: (run) => (
@@ -43,6 +40,8 @@ function alertText(alert: DashboardAlert): string {
   switch (alert.kind) {
     case 'failed_agents':
       return `${plural(alert.count, 'agente falhou', 'agentes falharam')} na última execução.`;
+    case 'provider_unreachable':
+      return `${plural(alert.count, 'agente não conseguiu', 'agentes não conseguiram')} falar com o provedor do modelo na última execução.`;
     case 'pending_approvals':
       return `${plural(alert.count, 'ação espera', 'ações esperam')} a sua aprovação.`;
     case 'agents_without_model':
@@ -71,6 +70,14 @@ function Alerts({ alerts }: { alerts: readonly DashboardAlert[] }) {
             <Icon className={`mt-0.5 size-4.5 shrink-0 ${tone}`} aria-hidden />
             <div>
               <p>{alertText(alert)}</p>
+              {alert.kind === 'provider_unreachable' && (
+                <Link
+                  to="/modelos"
+                  className="mt-1 inline-block text-info underline underline-offset-4"
+                >
+                  Testar a conexão
+                </Link>
+              )}
               {alert.kind === 'no_provider' && (
                 <Link
                   to="/modelos"
@@ -84,6 +91,55 @@ function Alerts({ alerts }: { alerts: readonly DashboardAlert[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/** What an activity item says, after the agent's name (RF-04). */
+function activityText(item: ActivityItem): { text: string; tone: string } {
+  if (item.kind === 'started') return { text: 'começou a trabalhar', tone: 'text-ok' };
+  switch (item.status) {
+    case 'completed':
+      return { text: 'concluiu a execução', tone: 'text-chalk' };
+    case 'failed':
+      return { text: 'falhou na execução', tone: 'text-fail' };
+    case 'timed_out':
+      return { text: 'passou do tempo máximo', tone: 'text-fail' };
+    case 'cancelled':
+      return { text: 'foi interrompido por você', tone: 'text-dim' };
+    case 'interrupted':
+      return { text: 'foi interrompido pelo encerramento do servidor', tone: 'text-dim' };
+    default:
+      return { text: 'encerrou a execução', tone: 'text-dim' };
+  }
+}
+
+function Activity({ items }: { items: readonly ActivityItem[] }) {
+  if (items.length === 0) {
+    return (
+      <EmptyState title="Nenhuma atividade ainda.">
+        O que os agentes começam e terminam aparece aqui, do mais recente para o mais antigo.
+      </EmptyState>
+    );
+  }
+  return (
+    <ol className="divide-y divide-line" aria-label="Atividade dos agentes">
+      {items.map((item) => {
+        const { text, tone } = activityText(item);
+        return (
+          <li key={item.id} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5 text-sm">
+            <time dateTime={item.at} className="w-20 shrink-0 text-dim">
+              {formatTime(item.at)}
+            </time>
+            <p className="min-w-0 flex-1">
+              <Link to={`/logs/${item.runId}`} className="font-semibold hover:underline">
+                {item.agentName}
+              </Link>{' '}
+              <span className={tone}>{text}</span>
+            </p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -152,10 +208,8 @@ export function DashboardPage() {
             >
               {data.recentRuns.length === 0 ? (
                 <EmptyState title="Nenhuma execução ainda.">
-                  <p>Cada vez que um agente trabalhar, a execução aparece aqui.</p>
-                  <div className="mt-2">
-                    <PlannedNote phase={7}>Executar agentes ainda não é possível.</PlannedNote>
-                  </div>
+                  Cada vez que um agente trabalhar, a execução aparece aqui. Para começar, abra um
+                  agente e envie uma mensagem.
                 </EmptyState>
               ) : (
                 <DataTable
@@ -173,11 +227,7 @@ export function DashboardPage() {
           </div>
 
           <Panel title="Atividade dos agentes">
-            <div className="px-4 py-4">
-              <PlannedNote phase={7}>
-                O que cada agente está fazendo, passo a passo e em tempo real.
-              </PlannedNote>
-            </div>
+            <Activity items={data.activity} />
           </Panel>
         </div>
       )}

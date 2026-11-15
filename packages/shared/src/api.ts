@@ -48,6 +48,7 @@ export const DASHBOARD_ALERT_KINDS = [
   'agents_without_model',
   'failed_agents',
   'pending_approvals',
+  'provider_unreachable',
 ] as const;
 
 export const dashboardAlertSchema = z.object({
@@ -56,6 +57,20 @@ export const dashboardAlertSchema = z.object({
   count,
 });
 export type DashboardAlert = z.infer<typeof dashboardAlertSchema>;
+
+/** One line of the activity feed: something an agent started or finished. */
+export const activityItemSchema = z.object({
+  /** Stable key: run id plus step sequence. */
+  id: z.string(),
+  runId: z.string(),
+  agentId: z.string(),
+  agentName: z.string(),
+  kind: z.enum(['started', 'finished']),
+  /** Final status, for `finished`. */
+  status: z.enum(RUN_STATUSES).nullable(),
+  at: z.string(),
+});
+export type ActivityItem = z.infer<typeof activityItemSchema>;
 
 export const dashboardSummarySchema = z.object({
   agents: z.object({
@@ -84,6 +99,7 @@ export const dashboardSummarySchema = z.object({
   pendingApprovals: count,
   providers: count,
   recentRuns: z.array(recentRunSchema),
+  activity: z.array(activityItemSchema),
   alerts: z.array(dashboardAlertSchema),
   generatedAt: z.string(),
 });
@@ -94,6 +110,27 @@ export const officeAgentSchema = z.object({
   name: z.string(),
   objective: z.string(),
   state: agentStateSchema,
+  /** What the agent is doing now: its run in progress, if any. */
+  currentRun: z
+    .object({
+      id: z.string(),
+      conversationId: z.string().nullable(),
+      status: z.enum(RUN_STATUSES),
+      /** Start of the message being answered; shown in the activity balloon. */
+      prompt: z.string().nullable(),
+    })
+    .nullable(),
+  /** Why the last run failed, when the agent is in the failed state. */
+  lastError: z.string().nullable(),
+  /** The decision this agent is waiting for, so it can be given at the desk (RF-09). */
+  pendingApproval: z.object({ id: z.string(), toolTitle: z.string() }).nullable(),
+  /** Agents working right now on a task this agent delegated (RF-09). */
+  delegatingTo: z.array(z.string()),
+  /**
+   * Since when the agent has had nothing to do; null unless it is idle.
+   * Derived, never stored: it decides who has gone to the pantry (RF-80).
+   */
+  idleSince: z.string().nullable(),
 });
 export type OfficeAgent = z.infer<typeof officeAgentSchema>;
 

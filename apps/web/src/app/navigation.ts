@@ -40,38 +40,4 @@ export interface PlannedArea {
  * Areas that exist in the navigation but are not built yet. Each one is
  * replaced by its real page in the phase named here (RNF-12).
  */
-export const PLANNED_AREAS: readonly PlannedArea[] = [
-  {
-    path: '/ferramentas',
-    title: 'Ferramentas',
-    phase: 8,
-    summary: 'O que cada agente pode fazer além de conversar.',
-    capabilities: [
-      'Liberar ferramentas por agente: arquivos, busca na web, delegação',
-      'Escolher entre bloquear, pedir aprovação ou permitir',
-      'Definir a pasta de trabalho de cada agente',
-    ],
-  },
-  {
-    path: '/aprovacoes',
-    title: 'Aprovações',
-    phase: 8,
-    summary: 'As ações que esperam a sua decisão.',
-    capabilities: [
-      'Ver a ferramenta e os argumentos exatos antes de decidir',
-      'Aprovar ou negar cada ação',
-      'Consultar as decisões já tomadas',
-    ],
-  },
-  {
-    path: '/logs',
-    title: 'Logs',
-    phase: 7,
-    summary: 'O registro do que cada agente fez.',
-    capabilities: [
-      'Ver cada execução passo a passo, com horários e duração',
-      'Filtrar por agente, estado e período',
-      'Abrir o erro de uma execução que falhou',
-    ],
-  },
-];
+export const PLANNED_AREAS: readonly PlannedArea[] = [];

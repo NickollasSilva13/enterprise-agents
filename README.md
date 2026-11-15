@@ -2,22 +2,24 @@
 
 Plataforma local para criar, configurar, executar e monitorar agentes de IA por uma interface gráfica. Roda inteiramente na sua máquina, com modelos locais (Ollama) ou externos (OpenAI, Anthropic e compatíveis).
 
-> **Estado do projeto:** Fase 6 concluída (integração com modelos de IA). Já é possível cadastrar agentes e projetos, conectar provedores de modelos e escolher o modelo de cada agente. Ainda não é possível conversar com os agentes nem executá-los; isso chega na Fase 7. O andamento está em [ROADMAP.md](ROADMAP.md).
+> **Estado do projeto:** as onze fases estão concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, e acompanhar tudo no painel, nos logs e no escritório. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
 
 ## Funcionalidades
 
-Planejadas; cada uma será marcada como disponível quando for entregue.
+Cada uma é marcada como disponível quando é entregue.
 
 | Funcionalidade | Fase | Disponível |
 |---|---|---|
-| Painel com estado dos agentes, execuções e alertas | 4 / 7 | Sim (atividade em tempo real na Fase 7) |
-| Visão "Escritório" com projetos e agentes | 4 / 7 | Sim (atualiza a cada 5 s) |
+| Painel com estado dos agentes, execuções, atividade e alertas, ao vivo | 4 / 7 | Sim |
+| Escritório ilustrado: salas, agentes às mesas, animação por estado; clique para conversar | 4 / 7 | Sim |
+| Escritório vivo: recepção e copa; agentes que andam, vão à copa quando ociosos, saem quando inativos e visitam a mesa do colega ao delegar | 9 | Sim |
 | Criar, editar, duplicar, ativar e excluir agentes; projetos | 5 | Sim |
 | Provedores e modelos (Ollama, OpenAI-compatível, Anthropic) | 6 | Sim (OpenAI e Anthropic ainda não validados com o serviço real) |
-| Chat com streaming, histórico e interrupção | 7 | Não |
-| Logs e linha do tempo das execuções | 7 | Não |
-| Ferramentas com permissões e aprovação humana | 8 | Não |
-| Delegação entre agentes | 8 | Não |
+| Chat com streaming, histórico e interrupção | 7 | Sim (validado com o Ollama) |
+| Logs e linha do tempo das execuções | 7 | Sim |
+| Ferramentas com permissões por agente e aprovação humana | 8 | Sim (validado com o Ollama) |
+| Delegação entre agentes, com árvore de execução | 8 | Sim (validado com o Ollama) |
+| Exportar e importar agentes em JSON, sem segredos | 11 | Sim |
 
 ## Pré-requisitos
 
@@ -41,7 +43,8 @@ Opcional. Para mudar algum padrão, copie `.env.example` para `.env` e ajuste. V
 | `APP_PORT` | `4317` | Porta do servidor local. |
 | `DATA_DIR` | `./data` | Pasta do banco e das pastas de trabalho dos agentes. |
 | `LOG_LEVEL` | `info` | Nível de log do servidor. |
-| `MAX_CONCURRENT_RUNS` | `4` | Execuções simultâneas (usado a partir da Fase 7). |
+| `MAX_CONCURRENT_RUNS` | `4` | Execuções simultâneas; o excedente espera na fila. |
+| `MAX_DELEGATION_DEPTH` | `3` | Quantos níveis uma cadeia de delegação entre agentes pode ter. |
 | `WEB_DEV_PORT` | `5173` | Porta da interface no modo de desenvolvimento. |
 
 O servidor sempre escuta em `127.0.0.1`; isso não é configurável, por segurança.
@@ -74,6 +77,20 @@ Testes ponta a ponta no navegador (na primeira vez, instale o navegador de teste
 npm run test:e2e
 ```
 
+## Ferramentas e aprovações
+
+Um agente começa sem nenhuma ferramenta. Na tela **Ferramentas**, escolha o agente e marque cada ferramenta como bloqueada, "pede aprovação" ou permitida:
+
+| Ferramenta | O que faz | Risco |
+|---|---|---|
+| Ler arquivo, Listar pasta | Leem a pasta de trabalho do agente. | Baixo |
+| Escrever arquivo | Cria ou substitui arquivos na pasta de trabalho do agente. | Médio |
+| Buscar URL | Lê páginas públicas da internet; endereços desta máquina e da rede local são bloqueados. | Médio |
+| Delegar a agente | Passa uma tarefa a outro agente, que usa as próprias permissões. | Médio |
+| Executar script | Roda um script Node.js da pasta de trabalho. Desligada por padrão e sempre com aprovação. | Alto |
+
+Cada agente tem a sua pasta, em `data/workspaces/<id do agente>` (o caminho aparece na tela). Quando um agente pede uma ferramenta marcada como "pede aprovação", a execução para e o pedido aparece na conversa, na tela **Aprovações** e na mesa do agente no Escritório, com os argumentos exatos. O modelo precisa aceitar ferramentas: no Ollama isso é detectado; em serviços compatíveis com OpenAI, marque o modelo na tela Modelos.
+
 ## Estrutura do projeto
 
 ```
@@ -87,6 +104,7 @@ data/            Banco e pastas de trabalho (não versionado)
 
 | Documento | Conteúdo |
 |---|---|
+| [docs/GUIA.md](docs/GUIA.md) | Guia de utilização, passo a passo. |
 | [SPEC.md](SPEC.md) | Requisitos, casos de uso, regras de negócio, critérios de aceite. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Componentes, fluxos de dados, persistência. |
 | [SECURITY.md](SECURITY.md) | Modelo de ameaças, controles, segredos, permissões. |
@@ -96,4 +114,4 @@ data/            Banco e pastas de trabalho (não versionado)
 
 ## Privacidade
 
-Com modelos locais, nada sai da sua máquina. Ao usar um provedor externo, o prompt de sistema, o histórico da conversa e os resultados de ferramentas do agente são enviados a esse provedor. A interface sinaliza isso em cada agente.
+Com modelos locais, nada sai da sua máquina. Ao usar um provedor externo, o prompt de sistema e o objetivo do agente, todas as mensagens da conversa (suas e do agente), a descrição das ferramentas liberadas e os resultados delas (o conteúdo de um arquivo lido, o texto de uma página buscada, a resposta de outro agente) são enviados a esse provedor a cada mensagem. A interface sinaliza isso ao cadastrar o provedor, ao escolher o modelo do agente e na própria tela de conversa. Chaves de API nunca são enviadas ao modelo.

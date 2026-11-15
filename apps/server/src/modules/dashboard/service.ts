@@ -1,15 +1,19 @@
 import {
   ACTIVE_RUN_STATUSES,
+  type ActivityItem,
   type DashboardAlert,
   type DashboardSummary,
   type RecentRun,
+  RUN_STATUSES,
 } from '@ea/shared';
-import { and, count, desc, eq, gte, inArray, notInArray, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNull, max, notInArray, sql, sum } from 'drizzle-orm';
 import type { Db } from '../../db/client';
-import { agents, approvals, providers, runs } from '../../db/schema';
+import { agents, approvals, providers, runs, runSteps } from '../../db/schema';
 import { listAgentsWithState } from '../agents/repository';
 
 const RECENT_RUNS_LIMIT = 10;
+const ACTIVITY_LIMIT = 15;
+const UNREACHABLE_REASONS = ['provider_unreachable', 'provider_timeout'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const durationMs = sql<
@@ -36,6 +40,54 @@ function recentRuns(db: Db): RecentRun[] {
       ...run,
       durationMs: run.durationMs === null ? null : Math.max(0, Math.round(run.durationMs)),
     }));
+}
+
+/** What agents started and finished lately, newest first (RF-04). */
+function recentActivity(db: Db): ActivityItem[] {
+  return db
+    .select({
+      runId: runSteps.runId,
+      seq: runSteps.seq,
+      type: runSteps.type,
+      payload: runSteps.payload,
+      at: runSteps.createdAt,
+      agentId: runs.agentId,
+      agentName: agents.name,
+    })
+    .from(runSteps)
+    .innerJoin(runs, eq(runSteps.runId, runs.id))
+    .innerJoin(agents, eq(runs.agentId, agents.id))
+    .where(inArray(runSteps.type, ['run_started', 'run_finished']))
+    .orderBy(desc(runSteps.id))
+    .limit(ACTIVITY_LIMIT)
+    .all()
+    .map((step) => {
+      const status = (step.payload as { status?: unknown } | null)?.status;
+      const known = RUN_STATUSES.find((candidate) => candidate === status) ?? null;
+      return {
+        id: `${step.runId}:${step.seq}`,
+        runId: step.runId,
+        agentId: step.agentId,
+        agentName: step.agentName,
+        kind: step.type === 'run_started' ? ('started' as const) : ('finished' as const),
+        status: step.type === 'run_finished' ? known : null,
+        at: step.at,
+      };
+    });
+}
+
+/** Live agents whose most recent finished run could not reach its provider (RF-06). */
+function agentsWithUnreachableProvider(db: Db): number {
+  // Ids are ULIDs: the greatest id per agent is its latest finished run, and
+  // SQLite returns the other columns from that same row.
+  return db
+    .select({ endReason: runs.endReason, lastId: max(runs.id) })
+    .from(runs)
+    .innerJoin(agents, eq(runs.agentId, agents.id))
+    .where(and(notInArray(runs.status, ACTIVE_RUN_STATUSES), isNull(agents.deletedAt)))
+    .groupBy(runs.agentId)
+    .all()
+    .filter((row) => row.endReason !== null && UNREACHABLE_REASONS.includes(row.endReason)).length;
 }
 
 function last24h(db: Db, now: Date): DashboardSummary['runs']['last24h'] {
@@ -105,6 +157,10 @@ export function getDashboardSummary(db: Db, now = new Date()): DashboardSummary 
   if (agentCounts.failed > 0) {
     alerts.push({ kind: 'failed_agents', severity: 'error', count: agentCounts.failed });
   }
+  const unreachable = agentsWithUnreachableProvider(db);
+  if (unreachable > 0) {
+    alerts.push({ kind: 'provider_unreachable', severity: 'error', count: unreachable });
+  }
   if (pendingApprovals > 0) {
     alerts.push({ kind: 'pending_approvals', severity: 'warning', count: pendingApprovals });
   }
@@ -121,6 +177,7 @@ export function getDashboardSummary(db: Db, now = new Date()): DashboardSummary 
     pendingApprovals,
     providers: providerCount,
     recentRuns: recentRuns(db),
+    activity: recentActivity(db),
     alerts,
     generatedAt: now.toISOString(),
   };

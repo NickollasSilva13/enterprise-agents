@@ -1,7 +1,16 @@
 import type { RunStatus, RunTrigger } from '@ea/shared';
 import type { Database } from '../src/db/client';
 import { newId } from '../src/db/ids';
-import { agents, approvals, models, projects, providers, runs, toolCalls } from '../src/db/schema';
+import {
+  agents,
+  agentTools,
+  approvals,
+  models,
+  projects,
+  providers,
+  runs,
+  toolCalls,
+} from '../src/db/schema';
 
 // Small builders for test data. Each returns the id it created.
 
@@ -14,10 +23,29 @@ export function addProvider(database: Database, name = 'Ollama local'): string {
   return id;
 }
 
-export function addModel(database: Database, providerId: string, name = 'llama3'): string {
+export function addModel(
+  database: Database,
+  providerId: string,
+  name = 'llama3',
+  options: { supportsTools?: boolean } = {},
+): string {
   const id = newId();
-  database.db.insert(models).values({ id, providerId, name, displayName: name }).run();
+  database.db
+    .insert(models)
+    .values({ id, providerId, name, displayName: name, supportsTools: options.supportsTools })
+    .run();
   return id;
+}
+
+/** Grants tools to an agent, as the user would on the Ferramentas page. */
+export function grantTools(
+  database: Database,
+  agentId: string,
+  grants: Record<string, 'ask' | 'allow'>,
+): void {
+  for (const [toolName, permission] of Object.entries(grants)) {
+    database.db.insert(agentTools).values({ agentId, toolName, permission }).run();
+  }
 }
 
 export function addProject(database: Database, name: string, description = ''): string {

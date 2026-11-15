@@ -1,5 +1,8 @@
 import {
   type AgentCreateInput,
+  type AgentExport,
+  agentExportSchema,
+  agentImportResultSchema,
   agentListSchema,
   agentSchema,
   type AgentUpdate,
@@ -15,8 +18,11 @@ import {
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiFetch, apiSend } from './api';
 
-/** Until live events arrive (Phase 7), state on screen is refreshed by polling. */
-const REFRESH_MS = 5000;
+/**
+ * Screens refresh when the server announces a change (see `useLiveRefresh`).
+ * This slower polling is only the safety net for a dropped event stream.
+ */
+export const REFRESH_MS = 15_000;
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -112,6 +118,20 @@ export function useDuplicateAgent() {
   const refresh = useRefreshAll();
   return useMutation({
     mutationFn: (id: string) => apiSend('POST', `${agentPath(id)}/duplicate`, agentSchema),
+    onSuccess: refresh,
+  });
+}
+
+/** Every agent as a document that can be saved to a file (RF-20). */
+export const fetchAgentExport = (): Promise<AgentExport> =>
+  apiFetch('/api/agents/export', agentExportSchema);
+
+/** Creates the agents of a file. The file is checked by the server, not here. */
+export function useImportAgents() {
+  const refresh = useRefreshAll();
+  return useMutation({
+    mutationFn: (document: unknown) =>
+      apiSend('POST', '/api/agents/import', agentImportResultSchema, document),
     onSuccess: refresh,
   });
 }

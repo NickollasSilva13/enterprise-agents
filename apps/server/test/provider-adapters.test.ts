@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { AnthropicProvider } from '../src/providers/anthropic';
+import { AnthropicProvider, toAnthropicMessages } from '../src/providers/anthropic';
 import { createProvider } from '../src/providers/factory';
 import { OllamaProvider } from '../src/providers/ollama';
 import { maxTokensField, OpenAiCompatibleProvider } from '../src/providers/openai-compatible';
@@ -41,11 +41,44 @@ const chatRequest: ChatRequest = {
   maxOutputTokens: 256,
 };
 
-async function collect(provider: ModelProvider, signal?: AbortSignal): Promise<ChatEvent[]> {
+async function collect(
+  provider: ModelProvider,
+  signal?: AbortSignal,
+  request: ChatRequest = chatRequest,
+): Promise<ChatEvent[]> {
   const events: ChatEvent[] = [];
-  for await (const event of provider.chat(chatRequest, signal)) events.push(event);
+  for await (const event of provider.chat(request, signal)) events.push(event);
   return events;
 }
+
+/** A conversation in the middle of tool use: one call made, its result in hand. */
+const toolRequest: ChatRequest = {
+  ...chatRequest,
+  tools: [
+    {
+      name: 'read_file',
+      description: 'Lê um arquivo.',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+        additionalProperties: false,
+      },
+    },
+  ],
+  messages: [
+    { role: 'user', content: 'Leia a.txt' },
+    {
+      role: 'assistant',
+      content: 'Vou ler.',
+      toolCalls: [{ id: 'call_1', name: 'read_file', arguments: { path: 'a.txt' } }],
+    },
+    { role: 'tool', toolCallId: 'call_1', name: 'read_file', content: 'não existe', isError: true },
+  ],
+};
+
+const toolCallsOf = (events: ChatEvent[]) =>
+  events.flatMap((event) => (event.type === 'tool_call' ? [event] : []));
 
 const textOf = (events: ChatEvent[]) =>
   events.flatMap((event) => (event.type === 'text_delta' ? [event.text] : [])).join('');
@@ -193,6 +226,204 @@ describe('Ollama adapter', () => {
     })();
     expect((await failure(run)).kind).toBe('cancelled');
     expect(events).toEqual([{ type: 'text_delta', text: 'primeiro' }]);
+  });
+});
+
+describe('tool calls (RF-50)', () => {
+  it('Ollama: offers the tools, sends calls and results back, and reads the calls asked', async () => {
+    const stub = await track(
+      ollamaStub({
+        chat: (_request, response) => {
+          response.writeHead(200, { 'content-type': 'application/x-ndjson' });
+          response.write(
+            `${JSON.stringify({
+              message: {
+                role: 'assistant',
+                content: 'Vou ler.',
+                tool_calls: [
+                  { function: { name: 'read_file', arguments: { path: 'b.txt' } } },
+                  { function: { name: 'read_file', arguments: { path: 'c.txt' } } },
+                ],
+              },
+            })}\n`,
+          );
+          response.end(
+            `${JSON.stringify({ message: { role: 'assistant', content: '' }, done: true, done_reason: 'stop', prompt_eval_count: 20, eval_count: 8 })}\n`,
+          );
+        },
+      }),
+    );
+    const events = await collect(
+      new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, apiKey: null }),
+      undefined,
+      toolRequest,
+    );
+
+    expect(textOf(events)).toBe('Vou ler.');
+    expect(toolCallsOf(events)).toEqual([
+      { type: 'tool_call', id: 'call_1', name: 'read_file', arguments: { path: 'b.txt' } },
+      { type: 'tool_call', id: 'call_2', name: 'read_file', arguments: { path: 'c.txt' } },
+    ]);
+    expect(events.at(-1)).toEqual({ type: 'done', stopReason: 'tool_use' });
+
+    expect(stub.requests.at(-1)?.body).toMatchObject({
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'read_file',
+            description: 'Lê um arquivo.',
+            parameters: toolRequest.tools?.[0]?.parameters,
+          },
+        },
+      ],
+      messages: [
+        { role: 'system', content: 'Seja breve.' },
+        { role: 'user', content: 'Leia a.txt' },
+        {
+          role: 'assistant',
+          content: 'Vou ler.',
+          tool_calls: [{ function: { name: 'read_file', arguments: { path: 'a.txt' } } }],
+        },
+        { role: 'tool', content: 'não existe', tool_name: 'read_file' },
+      ],
+    });
+  });
+
+  it('Ollama: sends no tools field for a plain conversation', async () => {
+    const stub = await track(ollamaStub());
+    await collect(new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, apiKey: null }));
+    expect(stub.requests.at(-1)?.body).not.toHaveProperty('tools');
+  });
+
+  it('OpenAI-compatible: joins the pieces of each streamed call', async () => {
+    const stub = await track(
+      openAiStub({
+        chat: (_request, response) => {
+          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          const send = (delta: unknown, finish: string | null = null) =>
+            response.write(
+              `data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish }] })}\n\n`,
+            );
+          send({ content: 'Vou ler.' });
+          send({
+            tool_calls: [
+              { index: 0, id: 'call_abc', function: { name: 'read_file', arguments: '{"pa' } },
+            ],
+          });
+          send({ tool_calls: [{ index: 1, id: 'call_def', function: { name: 'read_file' } }] });
+          send({ tool_calls: [{ index: 0, function: { arguments: 'th":"b.txt"}' } }] });
+          send({ tool_calls: [{ index: 1, function: { arguments: 'isto não é JSON' } }] });
+          send({}, 'tool_calls');
+          response.end('data: [DONE]\n\n');
+        },
+      }),
+    );
+    const events = await collect(
+      new OpenAiCompatibleProvider({
+        kind: 'openai_compatible',
+        baseUrl: `${stub.url}/v1`,
+        apiKey: null,
+      }),
+      undefined,
+      toolRequest,
+    );
+
+    expect(toolCallsOf(events)).toEqual([
+      { type: 'tool_call', id: 'call_abc', name: 'read_file', arguments: { path: 'b.txt' } },
+      // Arguments that are not valid JSON are handed on as text: validation refuses them.
+      { type: 'tool_call', id: 'call_def', name: 'read_file', arguments: 'isto não é JSON' },
+    ]);
+    expect(events.at(-1)).toEqual({ type: 'done', stopReason: 'tool_use' });
+
+    expect(stub.requests.at(-1)?.body).toMatchObject({
+      tools: [{ type: 'function', function: { name: 'read_file' } }],
+      messages: [
+        { role: 'system', content: 'Seja breve.' },
+        { role: 'user', content: 'Leia a.txt' },
+        {
+          role: 'assistant',
+          content: 'Vou ler.',
+          tool_calls: [
+            {
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'read_file', arguments: '{"path":"a.txt"}' },
+            },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'call_1', content: 'não existe' },
+      ],
+    });
+  });
+
+  it('Anthropic: reads tool_use blocks and returns results as blocks of a user turn', async () => {
+    const stub = await track(
+      anthropicStub({
+        reply: ['Vou ler.'],
+        toolUse: { id: 'toolu_1', name: 'read_file', inputJson: ['{"path":', '"b.txt"}'] },
+      }),
+    );
+    const events = await collect(
+      new AnthropicProvider({ kind: 'anthropic', baseUrl: stub.url, apiKey: 'sk-ant-test-key' }),
+      undefined,
+      toolRequest,
+    );
+
+    expect(textOf(events)).toBe('Vou ler.');
+    expect(toolCallsOf(events)).toEqual([
+      { type: 'tool_call', id: 'toolu_1', name: 'read_file', arguments: { path: 'b.txt' } },
+    ]);
+    expect(events.at(-1)).toEqual({ type: 'done', stopReason: 'tool_use' });
+
+    expect(stub.requests.at(-1)?.body).toMatchObject({
+      tools: [
+        {
+          name: 'read_file',
+          description: 'Lê um arquivo.',
+          input_schema: { type: 'object', required: ['path'] },
+        },
+      ],
+      messages: [
+        { role: 'user', content: 'Leia a.txt' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Vou ler.' },
+            { type: 'tool_use', id: 'call_1', name: 'read_file', input: { path: 'a.txt' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'call_1', content: 'não existe', is_error: true },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('Anthropic: puts the results of one round in a single user turn', () => {
+    const messages = toAnthropicMessages([
+      { role: 'user', content: 'Leia os dois' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: 'a', name: 'read_file', arguments: { path: '1' } },
+          { id: 'b', name: 'read_file', arguments: { path: '2' } },
+        ],
+      },
+      { role: 'tool', toolCallId: 'a', name: 'read_file', content: 'um' },
+      { role: 'tool', toolCallId: 'b', name: 'read_file', content: 'dois' },
+    ]);
+    expect(messages.map((message) => message.role)).toEqual(['user', 'assistant', 'user']);
+    expect(messages[2]?.content).toEqual([
+      { type: 'tool_result', tool_use_id: 'a', content: 'um' },
+      { type: 'tool_result', tool_use_id: 'b', content: 'dois' },
+    ]);
+    // No empty text block: the API refuses one.
+    expect(messages[1]?.content).toHaveLength(2);
   });
 });
 

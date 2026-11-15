@@ -16,6 +16,7 @@ import { agents, agentTools, models, runs } from '../src/db/schema';
 import { copyName } from '../src/modules/agents/service';
 import { getDashboardSummary } from '../src/modules/dashboard/service';
 import { getOffice } from '../src/modules/office/service';
+import { createBuiltinRegistry } from '../src/tools/builtin';
 import { addModel, addProvider, addRun } from './fixtures';
 import { makeApp, type TestApp } from './helpers';
 
@@ -304,7 +305,7 @@ describe('deleting agents (RF-10, RN-07)', () => {
 
     expect(await listAgents()).toEqual([]);
     expect((await call('GET', `/api/agents/${agent.id}`)).status).toBe(404);
-    expect(getOffice(t.database.db).rooms).toEqual([]);
+    expect(getOffice(t.database.db, createBuiltinRegistry()).rooms).toEqual([]);
 
     const summary = getDashboardSummary(t.database.db);
     expect(summary.agents.total).toBe(0);
@@ -370,10 +371,9 @@ describe('projects', () => {
     expect(await listAgents()).toMatchObject([
       { id: agent.id, projectId: null, projectName: null },
     ]);
-    expect(getOffice(t.database.db).rooms.map((room) => room.name)).toEqual([
-      'Arquivo',
-      'Sem projeto',
-    ]);
+    expect(
+      getOffice(t.database.db, createBuiltinRegistry()).rooms.map((room) => room.name),
+    ).toEqual(['Arquivo', 'Sem projeto']);
   });
 
   it('rejects blank, long and duplicate names', async () => {

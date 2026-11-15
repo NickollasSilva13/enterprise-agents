@@ -12,8 +12,9 @@ import {
 } from '../test/fixtures';
 
 // Prepares a throwaway database for the end-to-end tests, optionally with
-// sample data (`--seed`). Until agents can be created through the UI
-// (Phase 5), this is the only way to exercise the populated screens.
+// sample data (`--seed`). The seed includes two runs left active, as if the
+// previous server had stopped in the middle of them: the server that starts
+// next must mark them as interrupted (RN-12), and the tests check that.
 
 const config = loadConfig(process.env);
 
@@ -54,7 +55,13 @@ if (process.argv.includes('--seed')) {
     finishedAt: minutesAgo(29),
   });
 
-  const summarizer = addAgent(database, { name: 'Resumidor', projectId: research });
+  // Idle for an hour: long enough to be found at the pantry (RF-80).
+  const summarizer = addAgent(database, {
+    name: 'Resumidor',
+    projectId: research,
+    createdAt: minutesAgo(90),
+    updatedAt: minutesAgo(90),
+  });
   addRun(database, summarizer, {
     status: 'completed',
     createdAt: minutesAgo(60),

@@ -95,6 +95,7 @@ describe('DashboardPage', () => {
     );
     expect(rows).toHaveLength(3);
     expect(rows[1]?.textContent).toContain('Triagem');
+    expect(within(rows[1]!).getByRole('link').getAttribute('href')).toBe('/logs/r2');
     expect(rows[1]?.textContent).toContain('Falhou');
     expect(rows[1]?.textContent).toContain('2,5 s');
     expect(rows[2]?.textContent).toContain('Em andamento');
@@ -109,12 +110,65 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Nada pede a sua atenção agora.')).toBeTruthy();
   });
 
-  it('marks the activity feed as planned instead of faking it', async () => {
+  it('says so when no agent has done anything yet', async () => {
     renderApp('/', { '/api/dashboard/summary': emptySummary });
     const panel = (await screen.findByRole('heading', { name: 'Atividade dos agentes' })).closest(
       'section',
     );
-    expect(panel?.textContent).toContain('Planejado para a Fase 7');
+    expect(panel?.textContent).toContain('Nenhuma atividade ainda.');
+    expect(panel?.textContent).not.toContain('Planejado');
+  });
+
+  it('tells what the agents did in plain language, linking to each run (RF-04)', async () => {
+    renderApp('/', {
+      '/api/dashboard/summary': {
+        ...emptySummary,
+        activity: [
+          {
+            id: 'r2:4',
+            runId: 'r2',
+            agentId: 'a1',
+            agentName: 'Triagem',
+            kind: 'finished',
+            status: 'failed',
+            at: '2026-11-12T11:00:02.000Z',
+          },
+          {
+            id: 'r2:1',
+            runId: 'r2',
+            agentId: 'a1',
+            agentName: 'Triagem',
+            kind: 'started',
+            status: null,
+            at: '2026-11-12T11:00:00.000Z',
+          },
+          {
+            id: 'r1:4',
+            runId: 'r1',
+            agentId: 'a2',
+            agentName: 'Leitor',
+            kind: 'finished',
+            status: 'completed',
+            at: '2026-11-12T10:00:00.000Z',
+          },
+        ],
+        alerts: [{ kind: 'provider_unreachable', severity: 'error', count: 1 }],
+      } satisfies DashboardSummary,
+    });
+
+    const feed = within(await screen.findByRole('list', { name: 'Atividade dos agentes' }));
+    const lines = feed.getAllByRole('listitem').map((item) => item.textContent);
+    expect(lines[0]).toContain('Triagem falhou na execução');
+    expect(lines[1]).toContain('Triagem começou a trabalhar');
+    expect(lines[2]).toContain('Leitor concluiu a execução');
+    expect(feed.getAllByRole('link')[0]?.getAttribute('href')).toBe('/logs/r2');
+
+    expect(
+      screen.getByText('1 agente não conseguiu falar com o provedor do modelo na última execução.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Testar a conexão' }).getAttribute('href')).toBe(
+      '/modelos',
+    );
   });
 
   it('shows the error and recovers when the user retries', async () => {

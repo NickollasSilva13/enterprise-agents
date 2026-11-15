@@ -1,5 +1,5 @@
 import { type Agent, AGENT_STATES, type AgentState } from '@ea/shared';
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, History, MessageSquare, Pencil, Plus, Trash2, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { AgentAvatar } from '../../components/AgentAvatar';
@@ -15,6 +15,7 @@ import { AGENT_STATE_STYLES } from '../../lib/agent-state';
 import { errorMessage } from '../../lib/errors';
 import { plural } from '../../lib/format';
 import { useAgents, useDeleteAgent, useDuplicateAgent, useUpdateAgent } from '../../lib/queries';
+import { AgentTransfer } from './AgentTransfer';
 import { ProjectsPanel } from './ProjectsPanel';
 
 const normalize = (text: string) =>
@@ -81,6 +82,30 @@ function AgentRow({ agent, onDelete }: { agent: Agent; onDelete: (agent: Agent) 
       />
       <div className="flex">
         <Link
+          to={`/agentes/${agent.id}/conversa`}
+          aria-label={`Conversar com ${agent.name}`}
+          title="Conversar"
+          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
+        >
+          <MessageSquare className="size-4.5" aria-hidden />
+        </Link>
+        <Link
+          to={`/logs?agente=${agent.id}`}
+          aria-label={`Histórico de ${agent.name}`}
+          title="Histórico de execuções"
+          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
+        >
+          <History className="size-4.5" aria-hidden />
+        </Link>
+        <Link
+          to={`/ferramentas?agente=${agent.id}`}
+          aria-label={`Ferramentas de ${agent.name}`}
+          title="Ferramentas e permissões"
+          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
+        >
+          <Wrench className="size-4.5" aria-hidden />
+        </Link>
+        <Link
           to={`/agentes/${agent.id}`}
           aria-label={`Editar ${agent.name}`}
           title="Editar"
@@ -138,10 +163,13 @@ export function AgentsPage() {
         title="Agentes"
         description="Cada agente tem um objetivo, instruções e limites próprios."
         actions={
-          <Link to="/agentes/novo" className={buttonClass('primary')}>
-            <Plus className="size-4.5" aria-hidden />
-            Novo agente
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <AgentTransfer agentCount={agents?.length ?? 0} />
+            <Link to="/agentes/novo" className={buttonClass('primary')}>
+              <Plus className="size-4.5" aria-hidden />
+              Novo agente
+            </Link>
+          </div>
         }
       />
 

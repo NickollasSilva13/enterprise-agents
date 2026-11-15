@@ -1,7 +1,15 @@
-import { agentCreateSchema, agentUpdateSchema } from '@ea/shared';
+import {
+  type AgentExport,
+  agentCreateSchema,
+  agentExportQuerySchema,
+  agentExportSchema,
+  type AgentImportResult,
+  agentUpdateSchema,
+} from '@ea/shared';
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../../db/client';
 import { idParamSchema, parseInput } from '../../http/error-handler';
+import type { ToolRegistry } from '../../tools/registry';
 import {
   createAgent,
   deleteAgent,
@@ -10,12 +18,27 @@ import {
   listAgents,
   updateAgent,
 } from './service';
+import { exportAgents, importAgents } from './transfer';
 
-export function registerAgentRoutes(app: FastifyInstance, deps: { database: Database }): void {
+export function registerAgentRoutes(
+  app: FastifyInstance,
+  deps: { database: Database; registry: ToolRegistry },
+): void {
   const { db } = deps.database;
   const idOf = (params: unknown) => parseInput(idParamSchema, params).id;
 
   app.get('/api/agents', async () => ({ agents: listAgents(db) }));
+
+  // Agents as a JSON document, with nothing secret in it (RF-20, RN-11).
+  app.get('/api/agents/export', async (request): Promise<AgentExport> => {
+    const { ids } = parseInput(agentExportQuerySchema, request.query);
+    return exportAgents(db, ids === undefined ? undefined : ids.split(',').filter(Boolean));
+  });
+
+  app.post('/api/agents/import', async (request, reply): Promise<AgentImportResult> => {
+    const result = importAgents(db, deps.registry, parseInput(agentExportSchema, request.body));
+    return reply.status(201).send(result);
+  });
 
   app.get('/api/agents/:id', async (request) => getAgent(db, idOf(request.params)));
 

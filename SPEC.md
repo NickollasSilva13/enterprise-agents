@@ -1,7 +1,7 @@
 # SPEC — Especificação funcional e técnica
 
 > Nome de trabalho do projeto: **Enterprise Agents** (derivado da pasta; pode ser trocado sem impacto técnico).
-> Estado deste documento: Fase 2. É atualizado ao fim de cada fase.
+> Estado deste documento: atualizado na Fase 7. É revisto ao fim de cada fase.
 
 ## 1. Objetivos
 
@@ -69,8 +69,8 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | RF-15 | Definir limites de execução: tempo, número de passos, tokens. | 5 |
 | RF-16 | Definir ferramentas disponíveis e o nível de permissão de cada uma. | 8 |
 | RF-17 | Visualizar o estado atual do agente. | 5 |
-| RF-18 | Executar manualmente e interromper execuções. | 7 |
-| RF-19 | Consultar o histórico de atividades do agente. | 7 |
+| RF-18 | Executar manualmente e interromper execuções. Executar é enviar uma mensagem ao agente pelo chat; interromper está no chat e na página da execução. | 7 |
+| RF-19 | Consultar o histórico de atividades do agente: suas conversas e a lista de execuções filtrada por ele. | 7 |
 | RF-20 | Exportar e importar agentes em JSON (sem segredos). | 11 |
 
 ### 4.3 Interação com agentes
@@ -208,6 +208,13 @@ Coincidem com os critérios de conclusão do projeto:
 - **Custo estimado.** Depende de o provedor informar o uso de tokens e de uma tabela de preços mantida manualmente; pode divergir da cobrança real.
 - **Usuário único.** Não há contas nem perfis. Quem acessa a máquina com o usuário do sistema acessa a aplicação.
 - **Temperatura com a Anthropic.** Os modelos atuais da Anthropic recusam parâmetros de amostragem, então a temperatura configurada no agente não é enviada a esse provedor.
-- **Suporte a ferramentas em serviços compatíveis com OpenAI.** O protocolo não informa quais modelos aceitam ferramentas; eles aparecem como "só conversa" até que a Fase 8 permita marcar isso manualmente.
+- **Suporte a ferramentas em serviços compatíveis com OpenAI.** O protocolo não informa quais modelos aceitam ferramentas; eles aparecem como "só conversa" até que o usuário marque, na tela Modelos, que o modelo aceita ferramentas.
 - **Chamada de ferramentas em modelos locais.** Nem todo modelo do Ollama suporta ferramentas; nesses casos o agente funciona apenas como chat.
+- **Scripts só em Node.js.** A ferramenta de script executa arquivos `.js`, `.mjs` e `.cjs`; scripts Python não são suportados.
+- **Memória de ferramentas entre mensagens.** Dentro de uma mesma resposta o agente vê os resultados das ferramentas que usou; nas mensagens seguintes ele vê só o que escreveu, não os resultados brutos.
+- **Execução manual.** Executar um agente é enviar uma mensagem no chat; não há botão de execução sem conversa.
+- **Tamanho da conversa.** O histórico inteiro é enviado ao modelo a cada mensagem. Conversas muito longas podem passar da janela de contexto do modelo; não há corte nem resumo automático.
+- **Formatação das respostas.** As respostas são exibidas como Markdown básico (negrito, listas, código, citações, links). Tabelas não são formatadas e imagens não são carregadas, por segurança.
+- **Tokens de execuções interrompidas.** Os provedores informam o uso de tokens só ao fim da resposta; uma execução interrompida ou que falha no meio fica com contagem zero.
+- **Taxa de sucesso.** É a fração de execuções concluídas entre as encerradas; uma execução interrompida por você conta como não concluída.
 - **Aplicação de referência.** A área logada do Habblaude não foi analisada; nada do seu funcionamento interno foi presumido.

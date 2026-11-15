@@ -1,4 +1,4 @@
-import type { Agent, DashboardSummary } from '@ea/shared';
+import type { Agent, DashboardSummary, RunSummary } from '@ea/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -32,6 +32,7 @@ export const emptySummary: DashboardSummary = {
   pendingApprovals: 0,
   providers: 0,
   recentRuns: [],
+  activity: [],
   alerts: [],
   generatedAt: '2026-11-12T12:00:00.000Z',
 };
@@ -58,6 +59,27 @@ export function makeAgent(overrides: Partial<Agent> & { id: string; name: string
   };
 }
 
+export function makeRun(overrides: Partial<RunSummary> & { id: string }): RunSummary {
+  return {
+    agentId: 'a1',
+    agentName: 'Triagem',
+    agentDeleted: false,
+    conversationId: 'c1',
+    parentRunId: null,
+    trigger: 'chat',
+    status: 'completed',
+    endReason: 'completed',
+    errorMessage: null,
+    inputTokens: 100,
+    outputTokens: 20,
+    createdAt: '2026-11-12T12:00:00.000Z',
+    startedAt: '2026-11-12T12:00:00.000Z',
+    finishedAt: '2026-11-12T12:00:03.000Z',
+    durationMs: 3000,
+    ...overrides,
+  };
+}
+
 export interface RecordedRequest {
   readonly method: string;
   readonly url: string;
@@ -71,13 +93,19 @@ type Handler = (request: RecordedRequest) => Response | Promise<Response>;
  * Renders the real route tree at `path` against a scripted API.
  *
  * `api` maps "METHOD /path" (or just "/path", for any method) to a JSON body
- * or to a function returning a Response. The session handshake and the
- * dashboard summary used by the status strip are answered for you.
+ * or to a function returning a Response. A request with a query string also
+ * matches the entry for its path alone. The session handshake the dashboard
+ * summary used by the status strip and an empty approval queue are answered
+ * for you.
  */
 export function renderApp(path: string, api: Record<string, unknown>) {
   resetSessionForTests();
   const requests: RecordedRequest[] = [];
-  const routesByKey: Record<string, unknown> = { '/api/dashboard/summary': emptySummary, ...api };
+  const routesByKey: Record<string, unknown> = {
+    '/api/dashboard/summary': emptySummary,
+    '/api/approvals': { approvals: [] },
+    ...api,
+  };
 
   vi.stubGlobal(
     'fetch',
@@ -92,8 +120,11 @@ export function renderApp(path: string, api: Record<string, unknown>) {
       };
       requests.push(request);
 
+      const path = url.split('?', 1)[0] ?? url;
       const entry =
-        routesByKey[`${method} ${url}`] ?? (method === 'GET' ? routesByKey[url] : undefined);
+        routesByKey[`${method} ${url}`] ??
+        routesByKey[`${method} ${path}`] ??
+        (method === 'GET' ? (routesByKey[url] ?? routesByKey[path]) : undefined);
       if (entry === undefined) {
         return json(404, { code: 'not_found', message: `Sem resposta para ${method} ${url}.` });
       }

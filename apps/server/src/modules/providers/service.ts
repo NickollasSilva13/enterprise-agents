@@ -338,7 +338,13 @@ export async function syncProviderModels(deps: ProviderDeps, id: string): Promis
       const known = existingByName.get(model.name);
       if (known) {
         tx.update(models)
-          .set({ displayName: model.displayName, supportsTools: model.supportsTools })
+          .set({
+            displayName: model.displayName,
+            // OpenAI-compatible services do not say whether a model accepts
+            // tools: there the user's own marking is what counts.
+            supportsTools:
+              row.kind === 'openai_compatible' ? known.supportsTools : model.supportsTools,
+          })
           .where(eq(models.id, known.id))
           .run();
       }
@@ -384,7 +390,32 @@ export function updateModel(
   const model = deps.db.select().from(models).where(eq(models.id, modelId)).get();
   if (!model) throw new NotFoundError('Modelo não encontrado.');
 
-  if (!patch.enabled) {
+  if (patch.supportsTools !== undefined && patch.supportsTools !== model.supportsTools) {
+    const provider = findRow(deps.db, model.providerId);
+    if (provider.kind !== 'openai_compatible') {
+      throw new ConflictError(
+        'tools_support_detected',
+        'Neste provedor o suporte a ferramentas é detectado automaticamente.',
+      );
+    }
+    deps.db
+      .update(models)
+      .set({ supportsTools: patch.supportsTools })
+      .where(eq(models.id, modelId))
+      .run();
+    recordAudit(deps.db, {
+      actor: 'user',
+      action: 'model.tools_support_changed',
+      target: modelId,
+      details: {
+        providerId: model.providerId,
+        name: model.name,
+        supportsTools: patch.supportsTools,
+      },
+    });
+  }
+
+  if (patch.enabled === false) {
     const inUse =
       deps.db
         .select({ total: count() })
@@ -400,7 +431,7 @@ export function updateModel(
     }
   }
 
-  if (model.enabled !== patch.enabled) {
+  if (patch.enabled !== undefined && model.enabled !== patch.enabled) {
     deps.db.update(models).set({ enabled: patch.enabled }).where(eq(models.id, modelId)).run();
     recordAudit(deps.db, {
       actor: 'user',

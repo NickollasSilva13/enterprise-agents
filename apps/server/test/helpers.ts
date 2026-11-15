@@ -7,6 +7,7 @@ import { type Database, openDatabase, runMigrations } from '../src/db/client';
 import { buildApp } from '../src/http/app';
 import type { ProviderFactory } from '../src/providers/factory';
 import { MemorySecretStore } from '../src/security/secret-store';
+import type { ToolRegistry } from '../src/tools/registry';
 
 export const TEST_PORT = 4317;
 export const TEST_HOST = `127.0.0.1:${TEST_PORT}`;
@@ -33,6 +34,8 @@ export interface TestApp {
   readonly app: FastifyInstance;
   readonly database: Database;
   readonly secrets: MemorySecretStore;
+  /** Temporary DATA_DIR of this app: the agents' workspaces are under it. */
+  readonly dataDir: string;
   /** Headers of a legitimate same-origin request carrying a valid session. */
   readonly trusted: Record<string, string>;
   close(): Promise<void>;
@@ -43,14 +46,20 @@ export async function makeApp(
     env?: Record<string, string>;
     configure?: (app: FastifyInstance) => void;
     createProvider?: ProviderFactory;
+    /** A database prepared beforehand, to test what the server does on start. */
+    database?: Database;
+    toolRegistry?: ToolRegistry;
   } = {},
 ): Promise<TestApp> {
-  const database = makeDatabase();
+  const database = options.database ?? makeDatabase();
   const secrets = new MemorySecretStore();
+  // Never the real data folder: tools write files under DATA_DIR.
+  const data = makeTempDir();
   const app = await buildApp({
     secrets,
     ...(options.createProvider ? { createProvider: options.createProvider } : {}),
-    config: makeConfig(options.env),
+    ...(options.toolRegistry ? { toolRegistry: options.toolRegistry } : {}),
+    config: makeConfig({ DATA_DIR: data.path, ...options.env }),
     database,
     version: '0.0.0-test',
     sessionToken: TEST_SESSION_TOKEN,
@@ -62,6 +71,7 @@ export async function makeApp(
     app,
     database,
     secrets,
+    dataDir: data.path,
     trusted: {
       host: TEST_HOST,
       origin: TEST_ORIGIN,
@@ -71,6 +81,7 @@ export async function makeApp(
     close: async () => {
       await app.close();
       database.close();
+      data.remove();
     },
   };
 }

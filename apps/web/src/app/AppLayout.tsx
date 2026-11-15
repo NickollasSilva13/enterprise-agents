@@ -2,6 +2,7 @@ import { Menu, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { ToastProvider } from '../components/Toast';
+import { useLiveRefresh } from '../lib/events';
 import { Brand } from './Brand';
 import { NAV_ITEMS, PLANNED_AREAS } from './navigation';
 import { StatusStrip } from './StatusStrip';
@@ -88,6 +89,7 @@ export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const main = useRef<HTMLElement>(null);
+  useLiveRefresh();
 
   // Each page starts at the top, as a full navigation would.
   useEffect(() => {

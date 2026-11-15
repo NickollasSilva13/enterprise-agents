@@ -156,7 +156,18 @@ export const modelSyncResultSchema = z.object({
 });
 export type ModelSyncResult = z.infer<typeof modelSyncResultSchema>;
 
-export const modelUpdateSchema = z.strictObject({ enabled: z.boolean() });
+export const modelUpdateSchema = z
+  .strictObject({
+    enabled: z.boolean().optional(),
+    /**
+     * Whether the model can call tools. Only for providers that do not say so
+     * themselves (OpenAI-compatible services); the others are detected.
+     */
+    supportsTools: z.boolean().optional(),
+  })
+  .refine((value) => value.enabled !== undefined || value.supportsTools !== undefined, {
+    message: 'Informe o que alterar.',
+  });
 export type ModelUpdate = z.infer<typeof modelUpdateSchema>;
 
 export const connectionTestSchema = z.object({

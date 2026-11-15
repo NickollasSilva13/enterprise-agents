@@ -4,7 +4,13 @@ import { expect, type Page } from '@playwright/test';
 export function watchForProblems(page: Page): string[] {
   const problems: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') problems.push(`console: ${message.text()}`);
+    if (message.type() !== 'error') return;
+    // Desktop and mobile share one database: a provider the other project has
+    // just deleted may still be on this page's list when its models are read.
+    const staleProvider =
+      message.text().includes('404') &&
+      /\/api\/providers\/[^/]+\/models$/.test(message.location().url);
+    if (!staleProvider) problems.push(`console: ${message.text()}`);
   });
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
   page.on('requestfailed', (request) => {
@@ -44,3 +50,31 @@ export const figure = (page: Page, board: string, label: string) =>
     .getByRole('group', { name: board })
     .locator('div', { has: page.getByText(label, { exact: true }) })
     .locator('dd');
+
+/**
+ * Calls the local API as the open page would, to prepare data quickly. The
+ * page may not have opened its session yet (or the server may have issued a
+ * new one), so a 401 is answered the way the interface does: ask for a
+ * session and try once more.
+ */
+export async function api<T>(page: Page, method: string, path: string, body?: unknown): Promise<T> {
+  return page.evaluate(
+    async ({ method, path, body }) => {
+      const send = () =>
+        fetch(path, {
+          method,
+          credentials: 'same-origin',
+          headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+      let response = await send();
+      if (response.status === 401) {
+        await fetch('/api/session', { method: 'POST', credentials: 'same-origin' });
+        response = await send();
+      }
+      if (!response.ok) throw new Error(`${method} ${path}: ${response.status}`);
+      return response.status === 204 ? null : ((await response.json()) as unknown);
+    },
+    { method, path, body },
+  ) as Promise<T>;
+}

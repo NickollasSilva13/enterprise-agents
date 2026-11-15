@@ -115,6 +115,8 @@ export interface OpenAiStubOptions {
   models?: string[];
   reply?: string[];
   finishReason?: string;
+  /** Replaces the whole /v1/chat/completions behaviour. */
+  chat?: StubHandler;
 }
 
 export function openAiStub(options: OpenAiStubOptions = {}): Promise<StubServer> {
@@ -132,6 +134,7 @@ export function openAiStub(options: OpenAiStubOptions = {}): Promise<StubServer>
       });
     }
     if (request.path === '/v1/chat/completions') {
+      if (options.chat) return options.chat(request, response);
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       const send = (data: unknown) => response.write(`data: ${JSON.stringify(data)}\n\n`);
       for (const piece of options.reply ?? ['Olá', ', mundo']) {
@@ -152,6 +155,8 @@ export interface AnthropicStubOptions {
   requireKey?: string;
   reply?: string[];
   stopReason?: string;
+  /** A tool the model asks for after its text; the input arrives in JSON pieces. */
+  toolUse?: { id: string; name: string; inputJson: string[] };
 }
 
 export function anthropicStub(options: AnthropicStubOptions = {}): Promise<StubServer> {
@@ -216,9 +221,28 @@ export function anthropicStub(options: AnthropicStubOptions = {}): Promise<StubS
         } as { type: string });
       }
       send({ type: 'content_block_stop', index: 0 } as { type: string });
+      if (options.toolUse) {
+        const { id, name, inputJson } = options.toolUse;
+        send({
+          type: 'content_block_start',
+          index: 1,
+          content_block: { type: 'tool_use', id, name, input: {} },
+        } as { type: string });
+        for (const piece of inputJson) {
+          send({
+            type: 'content_block_delta',
+            index: 1,
+            delta: { type: 'input_json_delta', partial_json: piece },
+          } as { type: string });
+        }
+        send({ type: 'content_block_stop', index: 1 } as { type: string });
+      }
       send({
         type: 'message_delta',
-        delta: { stop_reason: options.stopReason ?? 'end_turn', stop_sequence: null },
+        delta: {
+          stop_reason: options.stopReason ?? (options.toolUse ? 'tool_use' : 'end_turn'),
+          stop_sequence: null,
+        },
         usage: { output_tokens: 7 },
       } as { type: string });
       send({ type: 'message_stop' });

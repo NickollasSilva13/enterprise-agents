@@ -11,12 +11,12 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 3 | Fundação do projeto | Concluída em 2026-11-12 |
 | 4 | Interface e dashboard | Concluída em 2026-11-12 |
 | 5 | Gerenciamento de agentes | Concluída em 2026-11-12 |
-| 6 | Integração com modelos de IA | Concluída em 2026-11-12 (aguardando aprovação) |
-| 7 | Execução e interação | Pendente |
-| 8 | Orquestração e ferramentas | Pendente |
-| 9 | Escritório vivo | Pendente |
-| 10 | Segurança e qualidade | Pendente |
-| 11 | Finalização e documentação | Pendente |
+| 6 | Integração com modelos de IA | Concluída em 2026-11-12 |
+| 7 | Execução e interação | Concluída em 2026-11-13 |
+| 8 | Orquestração e ferramentas | Concluída em 2026-11-13 |
+| 9 | Escritório vivo | Concluída em 2026-11-14 |
+| 10 | Segurança e qualidade | Concluída em 2026-11-14 |
+| 11 | Finalização e documentação | Concluída em 2026-11-15 (aguardando aprovação) |
 
 ## Fases concluídas
 
@@ -76,55 +76,95 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 - Ficou para a Fase 8: chamadas de ferramenta nos adaptadores.
 - Não validado com serviço real: OpenAI e Anthropic (testados contra servidores simulados que seguem o protocolo).
 
-## Fases planejadas
-
 ### Fase 7 — Execução e interação
-- Runtime: loop do agente, streaming, limites, cancelamento, fila; `FakeProvider` em processo para os testes.
-- `EventBus`, persistência de passos, SSE com retomada.
-- Chat, histórico de conversas, linha do tempo da execução.
-- Tela de Logs; dashboard e Escritório com dados ao vivo.
-- Escritório ilustrado (RF-08): salas com móveis, agentes sentados às mesas, animações por estado, balão de atividade, clique para abrir a conversa. Substitui a planta baixa da Fase 4.
-- Controles C-07, C-13, C-14.
-
-**Pronto quando:** RF-02 a RF-08, RF-18, RF-19, RF-30 a RF-36, RF-70, RF-71 funcionam.
+- Runtime (`apps/server/src/runtime`): fila com limite global de execuções simultâneas, um controlador de cancelamento por execução, limites de tempo, passos e tokens, e encerramento limpo no desligamento. Não lê nem grava o banco: recebe o plano da execução e devolve o resultado por interfaces.
+- `EventBus`: cada passo é gravado antes de ser distribuído; o texto do modelo é transmitido ao vivo e gravado como mensagem ao final.
+- API: conversas (`/api/conversations`, `/api/agents/:id/conversations`), execuções (`/api/runs`, com filtros e paginação, `/api/runs/:id`, `/api/runs/:id/cancel`) e dois fluxos SSE: `/api/runs/:id/events` (uma execução, com retomada por `Last-Event-ID`) e `/api/events` (aviso de qualquer mudança).
+- Chat por agente: resposta em streaming, histórico de conversas, interromper, continuar na mesma conversa, excluir conversa; aviso do que é enviado quando o modelo é externo.
+- Saída do modelo exibida como Markdown seguro: sem HTML, sem imagens, links em nova aba.
+- Logs: lista de execuções com filtro por agente, estado e período, e a página de cada execução com a linha do tempo dos passos.
+- Painel ao vivo: atividade dos agentes em linguagem natural, execuções recentes com link, alerta de provedor inacessível.
+- Escritório ilustrado (RF-08), substituindo a planta baixa da Fase 4: salas com parede, janelas e piso; cada agente sentado à sua mesa com computador e um objeto pessoal; animação por estado (digitando, mão levantada, cabeça balançando, respirando, cadeira vazia quando inativo); balão com o que está fazendo; clique abre a conversa. Arte em SVG própria, sem recursos externos.
+- Regras: RN-01, RN-02 e RN-06 aplicadas ao enviar a mensagem e de novo quando a execução sai da fila; RN-05 (limites); RN-12 (execuções ativas viram `interrupted` ao iniciar o servidor, e as aprovações pendentes delas são canceladas).
+- Controles C-07, C-13 e C-14, com testes.
+- `FakeProvider` em processo para os testes do runtime; o provedor simulado dos testes E2E passou a conversar em streaming.
+- Validado com o Ollama real (`llama3.2:3b`): conversa com streaming pela interface e interrupção de uma resposta longa.
+- Ficou para a Fase 8: o limite de passos só pode ser atingido quando houver ferramentas (hoje toda execução tem uma única chamada ao modelo); a origem "manual" de uma execução ainda não é usada (executar um agente é enviar uma mensagem no chat).
+- Pendências: ver `TESTING.md`, seções 7 e 8.
 
 ### Fase 8 — Orquestração e ferramentas
-- `ToolRegistry`, `PermissionEngine`, pasta de trabalho por agente.
-- Ferramentas: arquivos, busca de URL, delegação, script (desligada por padrão).
-- Fila de aprovações; árvore de execução.
-- Escritório (RF-09): delegações visíveis entre as mesas e aprovação a partir do agente.
-- Controles C-15 a C-23.
-
-**Pronto quando:** RF-09, RF-16, RF-50 a RF-55, RF-60 a RF-63 e RF-72 funcionam e os testes de segurança correspondentes passam.
+- Chamadas de ferramenta nos três adaptadores de provedor (Ollama, compatível com OpenAI, Anthropic).
+- `ToolRegistry` (catálogo com esquema Zod e risco) e `PermissionEngine` (única decisão de permissão, consultada a cada chamada; negação por padrão).
+- Ferramentas: ler arquivo, listar pasta, escrever arquivo, buscar URL, delegar a agente e executar script (desligada por padrão, só Node.js, sempre com aprovação).
+- Pasta de trabalho por agente em `DATA_DIR/workspaces/<id>`, com resolvedor de caminhos confinado.
+- Runtime: laço modelo → ferramentas → modelo, limite de passos agora alcançável, pausa para aprovação (o relógio do tempo máximo para enquanto espera), cancelamento que interrompe a ferramenta em curso.
+- Aprovações: fila com os argumentos exatos, aprovar ou negar com motivo; pedido retirado se a execução é interrompida (RN-09).
+- Delegação: execução filha ligada à de origem, com modelo, limites e permissões do agente que recebe; profundidade máxima (`MAX_DELEGATION_DEPTH`, padrão 3) e recusa de ciclos (RN-10).
+- API: `/api/tools`, `/api/agents/:id/tools`, `/api/approvals`, `/api/approvals/:id/decision`; a execução passou a trazer a árvore de delegação.
+- Telas: Ferramentas (catálogo e permissões por agente), Aprovações (fila e decisões recentes), cartão de aprovação dentro da conversa e da execução, árvore de delegação nos logs, passos de ferramenta em linguagem natural.
+- Escritório (RF-09): botão "Decidir" na mesa de quem espera aprovação; delegação mostrada por uma linha entre as mesas e pelos balões dos dois agentes.
+- Modelos de serviços compatíveis com OpenAI podem ser marcados à mão como capazes de usar ferramentas.
+- Trilha de auditoria completa (RF-72): permissões alteradas, ferramenta ligada ou desligada, aprovações decididas, delegações e toda execução de ferramenta de risco médio ou alto.
+- Controles C-15 a C-23 e a parte de ferramentas de C-11, C-13 e C-14, com testes.
+- Validado com o Ollama real (`llama3.2:3b`): escrita de arquivo com aprovação a partir do Escritório e delegação entre dois agentes.
+- Não existe mais área "planejada" na navegação.
+- Ficou de fora, de propósito: scripts Python (só Node.js, que permite restringir o script à pasta de trabalho); a origem "manual" de execução continua sem uso.
+- Pendências: ver `TESTING.md`, seções 7 e 8, e `SECURITY.md`, seção 10.
 
 ### Fase 9 — Escritório vivo
-Incluída em 2026-11-12 a pedido do usuário. Depende do Escritório ilustrado (Fase 7) e das delegações (Fase 8).
+Incluída em 2026-11-12 a pedido do usuário.
 
-- Áreas comuns desenhadas: recepção e copa, além das salas dos projetos.
-- Personagens que se levantam e andam: agente ocioso há algum tempo vai à copa; agente inativo fica fora do escritório; novo agente entra pela recepção.
-- Delegação mostrada como visita: o agente caminha até a mesa de quem recebe a tarefa e volta com o resultado.
-- Trajetos entre salas, animação de caminhada e posição coerente após recarregar a página.
-- Com a preferência "reduzir movimento" do sistema, os agentes mudam de lugar sem animação.
-- É apenas apresentação: nenhum dado novo é gravado; a cena deriva do estado que já existe.
-- Arte original em SVG, sem recursos externos e dentro da CSP.
-
-**Pronto quando:** RF-80 funciona; a cena continua fluida com 30 agentes; os testes E2E do Escritório passam com e sem redução de movimento.
+- Áreas comuns desenhadas: Recepção (porta da rua, balcão) e Copa (geladeira, cafeteira, bebedouro), antes das salas dos projetos; toda área tem uma porta para o corredor que as liga.
+- Personagens em pé, com o mesmo rosto do agente, que andam pelo corredor e pelas portas: ocioso há 2 minutos vai à copa e toma café; inativo sai pela porta da rua e fica fora; agente novo ou reativado entra pela recepção e senta.
+- Delegação como visita (RF-80): quem delegou caminha até a mesa de quem recebeu a tarefa, espera ao lado e volta com um papel na mão. Substitui a linha tracejada entre as mesas da Fase 8.
+- A cadeira fica vazia enquanto o agente está fora da mesa e só é ocupada quando ele chega de volta.
+- Onde cada um está também aparece em texto: "Na copa" ou "Na mesa de …" na mesa do agente, e a lista de quem está na copa e fora do escritório nas áreas comuns. A camada dos personagens é só decoração.
+- Posição coerente ao recarregar: o lugar de cada agente deriva só do estado que o servidor informa; ao carregar a página todos já aparecem no lugar, sem caminhada.
+- Com "reduzir movimento", os agentes mudam de lugar sem caminhada.
+- Nenhum dado novo é gravado. A API do Escritório ganhou um campo derivado, `idleSince` (fim da última execução ou última alteração do agente, o que for mais recente).
+- Arte original em SVG, sem recursos externos, sem estilo inline e sem `<text>`.
+- Medido no E2E com 30 agentes andando ao mesmo tempo: 60 quadros por segundo em desktop e celular (Chromium sem interface, nesta máquina).
+- Decisões: 2 minutos de ócio para ir à copa (`PANTRY_AFTER_MS`); nenhuma caminhada dura mais de 7 s (trajetos longos são andados mais rápido); quem espera a sua aprovação ou falhou fica na mesa; uma caminhada em curso termina antes de a seguinte começar.
+- Pendências: ver `TESTING.md`, seções 7 e 8.
 
 ### Fase 10 — Segurança e qualidade
-- Revisão de segurança de todo o código contra `SECURITY.md`.
-- Completar E2E, testes de concorrência e de desempenho.
-- `npm audit`; correção ou registro de cada achado.
-- Verificação das metas de cobertura.
+- Revisão do código do servidor contra cada controle de `SECURITY.md`: camada HTTP, guardas de requisição, sessão, cabeçalhos, redação de segredos, cofre, runtime, `PermissionEngine`, resolvedor de caminhos, guarda de rede, ferramentas, provedores, auditoria; na interface, o componente `Markdown` e uma varredura por HTML bruto, `eval` e armazenamento no navegador.
+- **Falha encontrada e corrigida (C-03, C-04):** um caminho de API escrito com escape de URL (`/%61pi/agents`) chegava à rota sem sessão e sem checagem de origem, porque as guardas julgavam o endereço como escrito e o roteador o decodifica antes de casar a rota. As guardas passaram a julgar a rota casada. Detalhes em `SECURITY.md`, seção 10.
+- Reforços: o limite de tokens passa a contar uma estimativa quando o provedor não informa o uso (fecha a pendência da Fase 7); uma linha sem fim em resposta de provedor é cortada em 4 MB em vez de ocupar a memória; o log de erro inesperado passa pela redação de segredos.
+- Testes de concorrência (`apps/server/test/concurrency.test.ts`): 40 mensagens simultâneas com limite de 3 execuções; 10 mensagens simultâneas na mesma conversa; cancelamentos em dobro; 12 respostas simultâneas à mesma aprovação.
+- Desempenho: `npm run test:perf`, sobre 200 agentes, 20.000 execuções, 120.000 passos e 40.000 mensagens, com limite por medição.
+- Cobertura: `npm run test:coverage`, que falha se alguma área ficar abaixo da meta de `TESTING.md`. Medido: 97,9% das linhas do servidor.
+- `npm audit`: 0 vulnerabilidades no que roda em produção; `npm audit fix` reduziu os avisos de ferramentas de desenvolvimento de 13 para 11, e os restantes estão registrados.
+- Dependência nova, só de desenvolvimento: `@vitest/coverage-v8`.
+- Ficou de fora: revisão linha a linha da interface além dos pontos citados; validação com modelo real (nada no caminho do modelo mudou além da estimativa de tokens).
+- Pendências: ver `SECURITY.md`, seção 10, e `TESTING.md`, seções 7 e 8.
 
 ### Fase 11 — Finalização e documentação
-- Exportar e importar agentes (RF-20).
-- Revisão geral e pendências.
-- Atualização final de todos os documentos.
-- Guia completo de utilização (`docs/GUIA.md`) com os dez tópicos exigidos.
+- Exportar e importar agentes (RF-20): `GET /api/agents/export` e `POST /api/agents/import`, e os botões Exportar e Importar na tela Agentes.
+  - O arquivo JSON leva a configuração do agente e nomeia projeto, modelo e provedor; não leva ids, histórico, endereço de provedor nem chave (RN-11).
+  - Importar sempre acrescenta: nome repetido ganha "(importado)"; projeto de mesmo nome é usado e o que falta é criado; modelo só é ligado se existir aqui, habilitado, com o mesmo nome no provedor de mesmo nome.
+  - Decisão de segurança: nenhuma ferramenta entra liberada por um arquivo. O que estava "Permitida" entra como "Pede aprovação", e o resultado da importação diz isso agente por agente.
+  - Arquivo inválido não importa nada; cada importação fica na auditoria.
+- Guia de utilização em `docs/GUIA.md`, em dez tópicos. A lista de tópicos "exigidos" citada neste roteiro não estava em nenhum documento do projeto; os tópicos foram escolhidos para cobrir o uso de ponta a ponta e precisam da confirmação do usuário.
+- Validação final com o Ollama real (`llama3.2:3b`), pela interface: conversa, uso de ferramenta, reinício do servidor com o histórico preservado, e exportar e importar.
+- Revisão das pendências: o roteiro manual foi refeito, inclusive o item 4 (reinício), que estava sem verificação desde a Fase 7. O que continua aberto está em "Pendências ao final do projeto", abaixo.
+- Testes E2E do Escritório tornados mais firmes: a preparação de dados refaz a sessão se receber 401, e o pedido de nova leitura é repetido até a tela mostrar a mudança.
 
-## Funcionalidades pendentes
+## Pendências ao final do projeto
 
-Todos os requisitos funcionais de `SPEC.md`. Entregues até agora: infraestrutura (RNF-02 a RNF-08, RNF-10, RNF-12), RF-01, RF-07 (planta baixa), RF-10 a RF-15, RF-17, RF-40 a RF-44, RF-73 e o início de RF-72. RF-02, RF-03, RF-05 e RF-06 já são lidos do banco e só terão dados quando os agentes puderem ser executados (Fase 7).
+- **Nada foi commitado desde a Fase 6.** Todo o trabalho das Fases 7 a 11 está na pasta de trabalho, sem commit.
+- OpenAI e Anthropic nunca foram validados com o serviço real (não há chave); só contra servidores simulados.
+- Critério de aceite 1 (`SPEC.md`, seção 8), instalar em uma máquina limpa, não foi verificado: tudo foi feito nesta máquina.
+- Encerramento por `Ctrl+C` em terminal interativo nunca foi verificado à mão.
+- O movimento do Escritório não foi visto por uma pessoa.
+- O E2E falha de vez em quando sem causa identificada (`TESTING.md`, seção 8).
+- `npm audit` completo: 11 avisos moderados em ferramentas de desenvolvimento, aceitos (`SECURITY.md`, seção 10).
+- macOS e Linux não foram testados.
+- Limitações de produto aceitas: `SPEC.md`, seção 9.
+
+## Funcionalidades entregues
+
+Todos os requisitos funcionais de `SPEC.md`: infraestrutura (RNF-02 a RNF-12), RF-01 a RF-20, RF-30 a RF-36, RF-40 a RF-44, RF-50 a RF-55, RF-60 a RF-63, RF-70 a RF-73 e RF-80.
 
 ## Melhorias futuras (fora do escopo atual)
 

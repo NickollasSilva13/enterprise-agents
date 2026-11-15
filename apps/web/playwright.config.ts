@@ -7,6 +7,7 @@ import {
   FAKE_PROVIDER_KEY,
   FAKE_PROVIDER_PORT,
   SEEDED_PORT,
+  TOOLS_PORT,
 } from './e2e/servers';
 
 const serverDir = fileURLToPath(new URL('../server', import.meta.url));
@@ -36,6 +37,10 @@ export default defineConfig({
   // parallel made page loads hang even against a bare Node HTTP server
   // (see TESTING.md, "Problemas conhecidos"). Two are reliable.
   workers: 2,
+  // On the development machine a Node process occasionally freezes for about
+  // 10 s (seen in the fake provider; cause unknown, see TESTING.md). The
+  // default 5 s would turn that into a failure of whatever was waiting.
+  expect: { timeout: 20_000 },
   forbidOnly: true,
   reporter: [['list']],
   use: { trace: 'retain-on-failure' },
@@ -43,6 +48,7 @@ export default defineConfig({
     server('empty', EMPTY_PORT, false),
     server('seeded', SEEDED_PORT, true),
     server('crud', CRUD_PORT, false),
+    server('tools', TOOLS_PORT, false),
     {
       command: 'node e2e/fake-provider.mjs',
       url: `http://127.0.0.1:${FAKE_PROVIDER_PORT}/api/version`,

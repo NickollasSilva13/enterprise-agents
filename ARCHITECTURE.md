@@ -1,6 +1,6 @@
 # ARCHITECTURE — Documentação arquitetural
 
-> Estado: Fase 6. Estão implementados a camada HTTP, a configuração, a persistência (seção 7), a proteção de requisições (seção 11), a interface (seção 13) os módulos de leitura `dashboard`, `office`, `system` e `models`, os módulos `agents`, `projects` e `providers` com escrita, a camada de provedores (seção 6) e a auditoria. Runtime, provedores, ferramentas e EventBus continuam como projeto e serão confirmados ou corrigidos quando forem escritos.
+> Estado: Fase 7. Está implementado tudo o que este documento descreve, exceto ferramentas, permissões, aprovações e delegação (`tools`, `PermissionEngine`, seções 5.2 e 5.3), que são projeto da Fase 8 e serão confirmados ou corrigidos quando forem escritos.
 
 ## 1. Visão geral
 
@@ -88,11 +88,11 @@ flowchart TB
 |---|---|---|
 | Camada HTTP | Roteamento, validação de entrada e saída, sessão, formato de erro, SSE. | Regra de negócio. |
 | Módulos de domínio | Regras de negócio e persistência de cada entidade. | Chamar provedores diretamente. |
-| Runtime | Conduzir uma execução: montar contexto, chamar o modelo, despachar ferramentas, aplicar limites, cancelar. | Decidir permissões; persistir direto no banco. |
+| Runtime | Conduzir uma execução: fila, chamar o modelo, despachar ferramentas, aplicar limites, cancelar. | Decidir permissões; ler ou gravar o banco (recebe o plano da execução e entrega o resultado por interfaces que o módulo `runs` implementa). |
 | ModelProvider | Traduzir uma requisição neutra para a API de cada provedor e devolver um fluxo de eventos neutro. | Conhecer agentes ou ferramentas concretas. |
 | ToolRegistry | Catálogo de ferramentas, com esquema de entrada e nível de risco. | Autorizar. |
 | PermissionEngine | Decidir `allow`, `ask` ou `deny` para cada chamada, a partir da configuração do agente. | Executar. |
-| EventBus | Receber eventos do runtime, persistir e distribuir aos assinantes SSE. | Interpretar eventos. |
+| EventBus | Receber eventos do runtime, persistir os passos (por uma função que o módulo `runs` fornece) e distribuir aos assinantes SSE. Trechos de texto do modelo são só distribuídos. | Interpretar eventos. |
 | SecretStore | Guardar e recuperar credenciais no cofre do sistema. | Expor segredos à camada HTTP. |
 
 Regra de dependência: `http → modules → runtime → providers/tools`. Camadas internas não importam as externas. O pacote `shared` não depende de nada do servidor nem da interface.
@@ -108,9 +108,9 @@ sequenceDiagram
   participant R as Runtime
   participant P as Provedor
   participant B as EventBus
-  U->>A: POST /conversations/:id/messages
-  A->>R: iniciar execução
-  A-->>U: 202 { runId }
+  U->>A: POST /conversations (primeira mensagem) ou /conversations/:id/messages
+  A->>R: enfileirar execução
+  A-->>U: 202 { conversationId, runId }
   U->>A: GET /runs/:id/events (SSE)
   R->>P: chat(messages, tools) em streaming
   P-->>R: trechos de texto
@@ -121,23 +121,36 @@ sequenceDiagram
   B-->>U: SSE run_completed
 ```
 
-O POST retorna imediatamente; o progresso chega pelo SSE. Se a conexão cair, a interface reabre o SSE informando o último evento recebido e o servidor reenvia o que faltou a partir do banco.
+O POST retorna imediatamente; o progresso chega pelo SSE. Se a conexão cair, o navegador reabre o SSE informando o último evento recebido (`Last-Event-ID`) e o servidor reenvia o que faltou a partir do banco.
+
+Há dois fluxos de eventos:
+
+| Fluxo | Conteúdo | Retomada |
+|---|---|---|
+| `GET /api/runs/:id/events` | Uma execução. Abre com `snapshot` (estado e todo o texto já escrito), depois `step` (cada passo, com `id` igual à sequência), `delta` (trecho de texto), `status` e, ao final, `end`, quando o servidor fecha a conexão. | Passos depois do `Last-Event-ID`; o texto vem inteiro no `snapshot`, que substitui o que a tela tinha. |
+| `GET /api/events` | Uma linha `run` a cada mudança de estado de qualquer execução. As telas (painel, escritório, listas) apenas recarregam os dados. | Nenhuma: ao reconectar chega `hello` e a tela recarrega tudo. |
+
+Os trechos de texto não são gravados um a um: o texto completo vira uma mensagem ao fim da execução, mesmo quando ela é interrompida. Como salvaguarda, a interface também consulta a conversa a cada 2 s enquanto há execução ativa, e os dados gerais a cada 15 s.
 
 ### 5.2 Chamada de ferramenta com aprovação
 
-1. O modelo emite uma chamada de ferramenta.
-2. O runtime valida os argumentos contra o esquema da ferramenta.
-3. O `PermissionEngine` responde:
+Tudo acontece em um só lugar, `RunManager.dispatch`:
+
+1. O modelo emite uma ou mais chamadas de ferramenta; elas são atendidas uma por vez, na ordem.
+2. O `PermissionEngine` responde, a partir das permissões do agente e das ferramentas ligadas na instalação:
    - `deny`: o modelo recebe um resultado de erro e a execução continua;
-   - `allow`: a ferramenta executa;
-   - `ask`: cria-se uma aprovação, a execução vai para `waiting_approval` e o runtime aguarda.
-4. O usuário decide pela interface (`POST /approvals/:id/decision`).
-5. Aprovado, a ferramenta executa; negado, o modelo recebe a negativa como resultado.
-6. Tudo vira `run_step` e, quando sensível, registro de auditoria.
+   - `allow` ou `ask`: segue.
+3. O runtime valida os argumentos contra o esquema Zod da ferramenta; inválidos viram erro para o modelo.
+4. Se a decisão foi `ask`, cria-se uma aprovação, a execução vai para `waiting_approval`, o relógio do tempo máximo para e o runtime aguarda.
+5. O usuário decide pela interface (`POST /api/approvals/:id/decision`). Aprovado, a ferramenta executa; negado, o modelo recebe a negativa (e o motivo) como resultado. Se a execução for interrompida enquanto espera, o pedido é retirado.
+6. O resultado volta ao modelo rotulado como dado, e o laço continua até o modelo responder sem pedir ferramentas ou até um limite.
+7. Cada etapa vira `run_step` (`tool_call_requested`, `approval_requested`, `approval_decided`, `tool_call_finished`), a chamada fica em `tool_calls` e, para risco médio ou alto, há registro de auditoria.
+
+O texto que o modelo escreve entre uma ferramenta e outra fica na resposta final, em parágrafos. Só essa resposta é gravada como mensagem da conversa.
 
 ### 5.3 Delegação
 
-`delegate_to_agent` é uma ferramenta como as outras. Ao executar, cria uma execução filha (`parent_run_id`) para o agente alvo, aguarda o resultado e o devolve como resultado da ferramenta. O cancelamento da execução pai propaga para as filhas.
+`delegate_to_agent` é uma ferramenta como as outras, sujeita às mesmas permissões. Ao executar, o runtime pede ao módulo `runs` uma execução filha (`parent_run_id`, origem `delegation`) para o agente alvo, com uma conversa própria cuja primeira mensagem é a tarefa; a criação é recusada se o agente não existe ou não pode trabalhar, se a cadeia passaria da profundidade máxima ou se o agente já está nela. A filha roda na hora, fora da fila (a de origem já ocupa uma vaga e está esperando), com o modelo, os limites, as permissões e a pasta do agente alvo. A resposta dela é o resultado da ferramenta. Interromper a execução de origem interrompe as filhas; enquanto uma filha espera aprovação, o relógio das execuções acima dela também para.
 
 ## 6. Contratos internos
 
@@ -165,11 +178,35 @@ interface ToolDefinition<I> {
 }
 ```
 
-Estado em código (Fase 6): `ModelProvider` tem `testConnection`, `listModels` e `chat`, cada um aceitando um `AbortSignal`. `ChatRequest` ainda não leva ferramentas, e `ChatEvent` ainda não tem `tool_call`; os dois entram na Fase 8. O motivo de parada é `end`, `max_tokens` ou `refusal`.
+Estado em código (Fase 8): `ModelProvider` tem `testConnection`, `listModels` e `chat`, cada um aceitando um `AbortSignal`. `ChatRequest` leva as ferramentas oferecidas (`tools`), as mensagens podem ser de usuário, do agente (com chamadas de ferramenta) ou resultado de ferramenta, e `ChatEvent` tem `tool_call`. O motivo de parada é `end`, `max_tokens`, `refusal` ou `tool_use`. `ToolDefinition` tem ainda `title` e `summary` (textos para o usuário) e `offByDefault`.
+
+Contratos do runtime (`apps/server/src/runtime/types.ts`):
+
+```ts
+interface RunPlan {          // resolvido quando a execução começa, não quando entra na fila
+  provider: ModelProvider; model: string; system: string; messages: ChatMessage[];
+  temperature: number; maxOutputTokens: number;
+  limits: { maxSteps: number; maxDurationMs: number; maxTotalTokens: number | null };
+  knownSecrets: string[];    // para redigir o que for ao log
+  tools: ToolDefinition[];   // oferecidas ao modelo; oferecer não é permitir
+  grants: Map<string, ToolPermission>; enabledTools: Set<string>;   // o que o PermissionEngine consulta
+  workspaceDir: string;
+}
+interface RunStore {         // implementado em modules/runs/repository.ts
+  begin(runId: string): void;
+  finish(runId: string, outcome: RunOutcome): void;   // estado final, motivo, uso, texto
+  setStatus(runId, status): void;                     // running <-> waiting_approval
+  createToolCall / updateToolCall / createApproval / resolveApproval / auditToolCall
+}
+```
+
+Passos gravados: `run_started`, `model_call_started`, `model_call_finished`, `tool_call_requested`, `approval_requested`, `approval_decided`, `tool_call_finished`, `delegation_started`, `delegation_finished`, `error`, `run_finished`. O tipo é texto livre, então um passo novo não exige migração; a interface mostra pelo nome um tipo que não conhece. O motivo de término (`runs.end_reason`) segue a lista `RUN_END_REASONS` de `packages/shared/src/runs.ts`.
 
 Adaptadores lançam apenas `ProviderError`, cuja mensagem é uma frase fixa escolhida pelo tipo do erro (`unreachable`, `timeout`, `unauthorized`, `not_found`, `rate_limited`, `rejected`, `server_error`, `invalid_response`, `cancelled`). O texto vindo do provedor fica em `upstreamDetail`, só para log e só depois de redigido. Toda resposta de provedor é validada com Zod.
 
-`ToolContext` carrega o agente, a execução, a pasta de trabalho e o `AbortSignal`. Uma ferramenta nunca recebe acesso direto ao banco nem ao `SecretStore`.
+`ToolContext` carrega o agente, a execução, a pasta de trabalho, o `AbortSignal` e a função de delegar. Uma ferramenta nunca recebe acesso direto ao banco nem ao `SecretStore`.
+
+Ferramentas embutidas ficam em `apps/server/src/tools/builtin/` e são registradas em `createBuiltinRegistry()`. As ferramentas ligadas na instalação ficam na tabela `settings` (chave `tools.enabled`); as permissões por agente, em `agent_tools` (ausência de linha é bloqueio). A Fase 8 não exigiu migração: as tabelas já existiam desde a Fase 3.
 
 ## 7. Persistência
 
@@ -205,10 +242,13 @@ Provedores externos recebem o prompt de sistema, o histórico da conversa, as de
 
 ## 9. Concorrência e ciclo de vida
 
-- Cada execução é uma tarefa assíncrona com seu próprio `AbortController`.
-- Um limite global de execuções simultâneas (configurável) evita sobrecarga; o excedente fica `queued`.
+- Cada execução é uma tarefa assíncrona com seu próprio `AbortController` (`RunManager`).
+- Um limite global de execuções simultâneas (`MAX_CONCURRENT_RUNS`) evita sobrecarga; o excedente fica `queued` e entra por ordem de chegada.
 - Uma execução ativa por conversa (RN-06).
-- No desligamento, o servidor cancela as execuções ativas; na inicialização, marca como `interrupted` as que ficaram abertas (RN-12).
+- O agente é verificado duas vezes: ao receber a mensagem (resposta 409 se estiver inativo ou sem modelo) e de novo quando a execução sai da fila, porque a configuração pode ter mudado nesse intervalo.
+- Limites: um temporizador aborta a execução no tempo máximo (parado enquanto ela espera uma aprovação); o teto de saída pedido ao modelo nunca passa do saldo de tokens; a contagem de passos limita as chamadas ao modelo.
+- Execuções delegadas rodam dentro da execução de origem e não ocupam vaga no limite global; a profundidade é limitada por `MAX_DELEGATION_DEPTH`.
+- No desligamento (gancho `preClose` do Fastify), o servidor interrompe as execuções ativas, que ficam `interrupted` com o texto já produzido, e fecha os fluxos SSE, que de outro modo manteriam o servidor aberto. Na inicialização, marca como `interrupted` as que ficaram abertas e cancela as aprovações pendentes delas (RN-12).
 
 ## 10. Execução e empacotamento
 
@@ -226,6 +266,8 @@ Toda requisição passa, nesta ordem, por:
 3. **Origin** na lista permitida, obrigatório em métodos que alteram estado (rotas `/api`).
 4. **Cookie de sessão** válido (rotas `/api`, exceto `POST /api/session`, que o emite).
 
+O que conta como "rota `/api`" é a rota que o Fastify casou (`request.routeOptions.url`), não o texto do endereço: o roteador decodifica escapes de URL, então `/%61pi/agents` é a rota `/api/agents` e recebe as mesmas guardas (`guardedPath` em `http/app.ts`).
+
 A interface chama `POST /api/session` ao abrir e repete a chamada uma vez se receber 401, pois o token muda a cada reinício do servidor.
 
 ## 12. Estado do agente
@@ -236,11 +278,16 @@ O estado exibido de um agente é derivado, nunca gravado. A única função que 
 
 Formulários validam no navegador com o mesmo esquema Zod que o servidor usa (`packages/shared/src/agents.ts`), então as duas pontas nunca divergem; o servidor valida de novo de qualquer forma. Toda alteração de agente ou projeto invalida as consultas de agentes, projetos, escritório e painel.
 
+Exportar e importar agentes (RF-20) vivem em `modules/agents/transfer.ts`. O arquivo (`agentExportSchema`, em `packages/shared/src/agents.ts`) nomeia projeto, modelo e provedor em vez de apontar ids, que não valem em outra instalação, e não leva nada do provedor além do nome. A importação roda em uma transação, só acrescenta, e rebaixa toda permissão `allow` para `ask`.
+
 - `app/`: roteamento, layout, navegação e tema. `PLANNED_AREAS` em `navigation.ts` lista as áreas ainda não construídas; cada uma sai da lista quando sua página real entra em `router.tsx`.
 - `components/`: peças visuais sem conhecimento de domínio.
 - `features/<área>/`: uma pasta por tela.
 - `lib/`: cliente da API (valida toda resposta com os esquemas de `@ea/shared`), consultas TanStack Query, formatação em pt-BR.
-- Atualização dos dados por consulta periódica (5 s) até a Fase 7, quando entra o SSE.
+- Atualização dos dados por eventos: `useLiveRefresh` (montado uma vez, no layout) escuta `/api/events` e invalida as consultas afetadas; `useRunStream` acompanha uma execução no chat. Consulta periódica lenta (15 s) fica só como salvaguarda.
+- Saída do modelo passa sempre pelo componente `Markdown` (`react-markdown`, sem HTML bruto, sem imagens); o que o usuário digitou é exibido como texto puro.
+- O Escritório é desenhado em SVG por `features/office/DeskScene.tsx`. As animações são classes `desk-*` em `app/theme.css`; a preferência "reduzir movimento" do sistema as desliga.
+- Escritório vivo (RF-80), em `features/office/`: `scene.ts` não toca o DOM e tem duas partes, `placeOf` (onde o agente deve estar: mesa, copa, fora ou em visita, só a partir do que `/api/office` informa) e `SceneEngine` (leva cada personagem de onde está até lá, por porta, corredor e porta). `Walkers.tsx` mede a página (`data-area`, `data-door`, `data-floor`, `data-seat`, `data-entrance`), roda o motor com `requestAnimationFrame` e escreve a posição no atributo `transform` de cada personagem, sem passar pelo React. `CommonAreas.tsx` desenha portas, recepção e copa. Nada é gravado: recarregar a página dá a mesma cena.
 - Sem estilos inline e sem recursos externos, para cumprir a CSP. Cores vêm dos tokens em `app/theme.css`; cor saturada significa sempre estado.
 
 ## 14. Evolução prevista

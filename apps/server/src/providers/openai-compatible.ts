@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { joinUrl, parseChunk, readLines, request, requestJson } from './http';
 import {
   type ChatEvent,
+  type ChatMessage,
   type ChatRequest,
   type ConnectionResult,
   type ModelInfo,
@@ -19,7 +20,22 @@ const chunkSchema = z.object({
   choices: z
     .array(
       z.object({
-        delta: z.object({ content: z.string().nullish() }).optional(),
+        delta: z
+          .object({
+            content: z.string().nullish(),
+            tool_calls: z
+              .array(
+                z.object({
+                  index: z.number().int().nonnegative().optional(),
+                  id: z.string().nullish(),
+                  function: z
+                    .object({ name: z.string().nullish(), arguments: z.string().nullish() })
+                    .optional(),
+                }),
+              )
+              .nullish(),
+          })
+          .optional(),
         finish_reason: z.string().nullish(),
       }),
     )
@@ -32,7 +48,38 @@ const chunkSchema = z.object({
 const STOP_REASONS: Record<string, StopReason> = {
   length: 'max_tokens',
   content_filter: 'refusal',
+  tool_calls: 'tool_use',
 };
+
+/** A message in the shape the chat-completions protocol expects. */
+function toOpenAiMessage(message: ChatMessage): Record<string, unknown> {
+  if (message.role === 'tool') {
+    return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+  }
+  if (message.role === 'assistant' && message.toolCalls?.length) {
+    return {
+      role: 'assistant',
+      content: message.content === '' ? null : message.content,
+      tool_calls: message.toolCalls.map((call) => ({
+        id: call.id,
+        type: 'function',
+        // The protocol carries arguments as a JSON string.
+        function: { name: call.name, arguments: JSON.stringify(call.arguments ?? {}) },
+      })),
+    };
+  }
+  return { role: message.role, content: message.content };
+}
+
+/** Arguments arrive as pieces of a JSON string; what does not parse is kept as text. */
+function parseArguments(text: string): unknown {
+  if (text.trim() === '') return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
 
 /**
  * OpenAI's own API replaced `max_tokens` with `max_completion_tokens` and
@@ -90,8 +137,20 @@ export class OpenAiCompatibleProvider implements ModelProvider {
         stream_options: { include_usage: true },
         messages: [
           ...(chat.system ? [{ role: 'system', content: chat.system }] : []),
-          ...chat.messages,
+          ...chat.messages.map(toOpenAiMessage),
         ],
+        ...(chat.tools?.length
+          ? {
+              tools: chat.tools.map((tool) => ({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              })),
+            }
+          : {}),
         temperature: chat.temperature,
         [maxTokensField(this.settings.baseUrl)]: chat.maxOutputTokens,
       },
@@ -102,6 +161,8 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     let stopReason: StopReason = 'end';
     let usage = { inputTokens: 0, outputTokens: 0 };
     let finished = false;
+    // Tool calls are streamed in fragments, keyed by their position.
+    const calls = new Map<number, { id: string; name: string; arguments: string }>();
 
     for await (const line of readLines(response, signal)) {
       // Server-sent events: only "data:" lines carry payload.
@@ -114,6 +175,14 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       const chunk = parseChunk(data, chunkSchema);
       const choice = chunk.choices?.[0];
       if (choice?.delta?.content) yield { type: 'text_delta', text: choice.delta.content };
+      for (const fragment of choice?.delta?.tool_calls ?? []) {
+        const index = fragment.index ?? 0;
+        const call = calls.get(index) ?? { id: '', name: '', arguments: '' };
+        if (fragment.id) call.id = fragment.id;
+        if (fragment.function?.name) call.name += fragment.function.name;
+        if (fragment.function?.arguments) call.arguments += fragment.function.arguments;
+        calls.set(index, call);
+      }
       if (choice?.finish_reason) {
         finished = true;
         stopReason = STOP_REASONS[choice.finish_reason] ?? 'end';
@@ -129,7 +198,20 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     if (!finished) {
       throw new ProviderError('invalid_response', undefined, 'stream ended without a finish');
     }
+    const ordered = [...calls.entries()].sort(([a], [b]) => a - b);
+    for (const [index, call] of ordered) {
+      yield {
+        type: 'tool_call',
+        id: call.id || `call_${index + 1}`,
+        name: call.name,
+        arguments: parseArguments(call.arguments),
+      };
+    }
     yield { type: 'usage', ...usage };
-    yield { type: 'done', stopReason };
+    // Some servers finish with "stop" even when they asked for tools.
+    yield {
+      type: 'done',
+      stopReason: ordered.length > 0 && stopReason === 'end' ? 'tool_use' : stopReason,
+    };
   }
 }

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
   type ChatEvent,
+  type ChatMessage,
   type ChatRequest,
   type ConnectionResult,
   errorKindForStatus,
@@ -18,7 +19,46 @@ const DETAIL_LIMIT = 500;
 const STOP_REASONS: Record<string, StopReason> = {
   max_tokens: 'max_tokens',
   refusal: 'refusal',
+  tool_use: 'tool_use',
 };
+
+/**
+ * Messages in the shape of the Messages API: tool calls are blocks of the
+ * assistant turn, and tool results are blocks of the user turn that follows,
+ * all results of one round in the same turn.
+ */
+export function toAnthropicMessages(messages: readonly ChatMessage[]): Anthropic.MessageParam[] {
+  const result: Anthropic.MessageParam[] = [];
+  for (const message of messages) {
+    if (message.role === 'tool') {
+      const block: Anthropic.ToolResultBlockParam = {
+        type: 'tool_result',
+        tool_use_id: message.toolCallId,
+        content: message.content,
+        ...(message.isError ? { is_error: true } : {}),
+      };
+      const last = result.at(-1);
+      if (last?.role === 'user' && Array.isArray(last.content)) last.content.push(block);
+      else result.push({ role: 'user', content: [block] });
+    } else if (message.role === 'assistant' && message.toolCalls?.length) {
+      result.push({
+        role: 'assistant',
+        content: [
+          ...(message.content ? [{ type: 'text' as const, text: message.content }] : []),
+          ...message.toolCalls.map((call) => ({
+            type: 'tool_use' as const,
+            id: call.id,
+            name: call.name,
+            input: call.arguments ?? {},
+          })),
+        ],
+      });
+    } else {
+      result.push({ role: message.role, content: message.content });
+    }
+  }
+  return result;
+}
 
 function toProviderError(error: unknown, signal?: AbortSignal): ProviderError {
   if (error instanceof ProviderError) return error;
@@ -95,7 +135,16 @@ export class AnthropicProvider implements ModelProvider {
           model: chat.model,
           max_tokens: chat.maxOutputTokens,
           ...(chat.system ? { system: chat.system } : {}),
-          messages: chat.messages.map(({ role, content }) => ({ role, content })),
+          messages: toAnthropicMessages(chat.messages),
+          ...(chat.tools?.length
+            ? {
+                tools: chat.tools.map((tool) => ({
+                  name: tool.name,
+                  description: tool.description,
+                  input_schema: { type: 'object' as const, ...tool.parameters },
+                })),
+              }
+            : {}),
         },
         { timeout: CHAT_TIMEOUT_MS, ...(signal ? { signal } : {}) },
       );
@@ -107,6 +156,11 @@ export class AnthropicProvider implements ModelProvider {
       }
 
       const message = await stream.finalMessage();
+      for (const block of message.content) {
+        if (block.type === 'tool_use') {
+          yield { type: 'tool_call', id: block.id, name: block.name, arguments: block.input };
+        }
+      }
       yield {
         type: 'usage',
         inputTokens: message.usage.input_tokens,

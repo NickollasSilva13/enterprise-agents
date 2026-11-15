@@ -25,7 +25,7 @@ import {
 import { ExternalNotice } from './ExternalNotice';
 import { ProviderDialog } from './ProviderDialog';
 
-function ModelRow({ model }: { model: ProviderModel }) {
+function ModelRow({ model, manualTools }: { model: ProviderModel; manualTools: boolean }) {
   const update = useUpdateModel();
   const notify = useToast();
 
@@ -34,6 +34,18 @@ function ModelRow({ model }: { model: ProviderModel }) {
       { id: model.id, patch: { enabled } },
       {
         onSuccess: () => notify(`${model.displayName} ${enabled ? 'habilitado' : 'desabilitado'}.`),
+        onError: (error) => notify(errorMessage(error), 'fail'),
+      },
+    );
+
+  const markTools = (supportsTools: boolean) =>
+    update.mutate(
+      { id: model.id, patch: { supportsTools } },
+      {
+        onSuccess: () =>
+          notify(
+            `${model.displayName} marcado como ${supportsTools ? 'capaz de usar' : 'incapaz de usar'} ferramentas.`,
+          ),
         onError: (error) => notify(errorMessage(error), 'fail'),
       },
     );
@@ -49,6 +61,17 @@ function ModelRow({ model }: { model: ProviderModel }) {
           {model.agentCount > 0 && `, usado por ${plural(model.agentCount, 'agente', 'agentes')}`}
         </p>
       </div>
+      {manualTools && (
+        // This kind of provider does not say what its models can do: the user tells us.
+        <Switch
+          checked={model.supportsTools}
+          onChange={markTools}
+          disabled={update.isPending}
+          label={`${model.displayName} aceita ferramentas`}
+        >
+          <span className="text-left text-dim">Ferramentas</span>
+        </Switch>
+      )}
       <Switch
         checked={model.enabled}
         onChange={toggle}
@@ -86,7 +109,11 @@ function ModelList({ provider }: { provider: Provider }) {
   return (
     <ul className="divide-y divide-line" aria-label={`Modelos de ${provider.name}`}>
       {models.map((model) => (
-        <ModelRow key={model.id} model={model} />
+        <ModelRow
+          key={model.id}
+          model={model}
+          manualTools={provider.kind === 'openai_compatible'}
+        />
       ))}
     </ul>
   );

@@ -2,6 +2,7 @@ import type { ApiError } from '@ea/shared';
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { z, type ZodType } from 'zod';
 import { AppError, ValidationError } from '../core/errors';
+import { redactSecrets } from '../security/redact';
 
 /** Validates untrusted input at the HTTP boundary (SECURITY C-06). */
 export function parseInput<T>(schema: ZodType<T>, input: unknown): T {
@@ -50,6 +51,17 @@ export function errorHandler(
     return;
   }
 
-  request.log.error({ err: error }, 'unhandled error');
+  // The text of an unexpected error is not ours: anything shaped like a
+  // credential is removed before it reaches the log (C-10).
+  request.log.error(
+    {
+      err: {
+        type: error.name,
+        message: redactSecrets(error.message),
+        stack: error.stack ? redactSecrets(error.stack) : undefined,
+      },
+    },
+    'unhandled error',
+  );
   void reply.status(500).send(INTERNAL_ERROR);
 }

@@ -31,6 +31,10 @@ const envSchema = z.object({
     emptyToUndefined,
     z.coerce.number().int().min(1).max(32).default(4),
   ),
+  MAX_DELEGATION_DEPTH: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().min(1).max(10).default(3),
+  ),
 });
 
 export interface AppConfig {
@@ -42,6 +46,10 @@ export interface AppConfig {
   readonly webDistDir: string;
   readonly logLevel: string;
   readonly maxConcurrentRuns: number;
+  /** How many agents deep a delegation chain may go (RN-10). */
+  readonly maxDelegationDepth: number;
+  /** Parent of every agent's working folder (SECURITY C-17). */
+  readonly workspacesDir: string;
   /** 'os': the system credential vault. 'memory': lost on exit; for tests only. */
   readonly secretStore: 'os' | 'memory';
   /** Accepted values of the Host header (SECURITY C-02). */
@@ -88,6 +96,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     webDistDir: WEB_DIST_DIR,
     logLevel: values.LOG_LEVEL,
     maxConcurrentRuns: values.MAX_CONCURRENT_RUNS,
+    maxDelegationDepth: values.MAX_DELEGATION_DEPTH,
+    workspacesDir: join(dataDir, 'workspaces'),
     secretStore: values.SECRET_STORE,
     allowedHosts,
     allowedOrigins,

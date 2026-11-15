@@ -38,7 +38,7 @@ async function openSession(): Promise<void> {
 }
 
 /** The server issues an HttpOnly session cookie; every other API call needs it. */
-function ensureSession(renew = false): Promise<void> {
+export function ensureSession(renew = false): Promise<void> {
   if (!session || renew) {
     session = openSession().catch((error: unknown) => {
       session = null;
@@ -84,7 +84,7 @@ export async function apiFetch<T>(
 
 /** Sends a JSON body (or none) and validates the JSON answer. */
 export function apiSend<T>(
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'PUT',
   path: string,
   schema: ZodType<T>,
   body?: unknown,
