@@ -21,6 +21,7 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 
 - `drizzle/` tem migrações geradas; nunca editar à mão, e nunca editar migração já aplicada.
 - Migração com SQL escrito à mão (gatilhos, por exemplo): `npx drizzle-kit generate --custom --name <nome>` nesta pasta, depois preencher o arquivo gerado.
+- `PRAGMA foreign_keys=OFF` dentro de uma migração não faz nada (o migrador roda tudo numa transação). Quem desliga as chaves durante as migrações é `runMigrations`, que confere com `foreign_key_check` no fim. Migração que reconstrói tabela referenciada precisa de teste sobre dados existentes, como em `test/db.test.ts`: banco vazio não revela cascata.
 - Agente excluído tem `deleted_at` preenchido e some de toda listagem; use `listAgentsWithState`/`listAgents`, nunca leia a tabela `agents` sem filtrar.
 - A auditoria se grava com `recordAudit()`; a tabela recusa `UPDATE` e `DELETE`.
 

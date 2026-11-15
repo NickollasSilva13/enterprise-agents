@@ -1,6 +1,8 @@
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { MIGRATIONS_DIR } from '../src/config/paths';
 import { type Database, openDatabase, runMigrations } from '../src/db/client';
 import { newId } from '../src/db/ids';
 import {
@@ -83,6 +85,64 @@ describe('migrations', () => {
     runMigrations(database);
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
     expect(database.db.select().from(agents).all()).toHaveLength(1);
+  });
+});
+
+describe('migrations over existing data', () => {
+  /** A database migrated only up to `last`, as an earlier version left it. */
+  function databaseUpTo(last: number): Database {
+    const folder = makeTempDir();
+    cleanups.push(folder.remove);
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: { idx: number; tag: string }[] };
+    const entries = journal.entries.filter((entry) => entry.idx <= last);
+    mkdirSync(join(folder.path, 'meta'));
+    writeFileSync(
+      join(folder.path, 'meta', '_journal.json'),
+      JSON.stringify({ ...journal, entries }),
+    );
+    for (const { tag } of entries) {
+      copyFileSync(join(MIGRATIONS_DIR, `${tag}.sql`), join(folder.path, `${tag}.sql`));
+    }
+    const database = openDatabase(':memory:');
+    cleanups.push(() => database.close());
+    runMigrations(database, folder.path);
+    return database;
+  }
+
+  // Defect found when the real database first met migration 0002: rebuilding
+  // `providers` dropped it with foreign keys on, which cascaded to `models`.
+  // With an agent on a model the start failed; with none, every model went.
+  it.each([
+    ['an agent uses one of the models', true],
+    ['no agent uses the models', false],
+  ])('rebuild providers without touching its models when %s (0002)', (_label, withAgent) => {
+    const database = databaseUpTo(1);
+    database.sqlite.exec(`
+      INSERT INTO providers (id, name, kind, base_url, is_external)
+        VALUES ('p1', 'Ollama local', 'ollama', 'http://127.0.0.1:11434', 0);
+      INSERT INTO models (id, provider_id, name, display_name)
+        VALUES ('m1', 'p1', 'llama3', 'Llama 3'), ('m2', 'p1', 'phi', 'Phi');
+    `);
+    if (withAgent) {
+      database.sqlite.exec("INSERT INTO agents (id, name, model_id) VALUES ('a1', 'Agente', 'm1')");
+    }
+
+    runMigrations(database);
+
+    expect(database.db.select({ id: models.id }).from(models).all()).toEqual([
+      { id: 'm1' },
+      { id: 'm2' },
+    ]);
+    expect(database.db.select().from(providers).get()).toMatchObject({
+      id: 'p1',
+      baseUrl: 'http://127.0.0.1:11434',
+      command: null,
+    });
+    if (withAgent) expect(database.db.select().from(agents).get()?.modelId).toBe('m1');
+    // The keys are back on for everything that runs after the migrations.
+    expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1);
   });
 });
 
