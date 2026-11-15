@@ -13,3 +13,4 @@ data/
 playwright-report/
 test-results/
 .e2e-data/
+.claude/settings.local.json

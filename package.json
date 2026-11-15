@@ -23,6 +23,8 @@
     "test:perf": "npm run test:perf -w @ea/server",
     "test:e2e": "npm run build && npm run test:e2e -w @ea/web",
     "check": "npm run typecheck && npm run lint && npm test",
+    "check:full": "npm run check && npm run test:coverage && npm run test:e2e",
+    "clean": "node scripts/clean.mjs",
     "db:generate": "npm run db:generate -w @ea/server",
     "db:migrate": "npm run db:migrate -w @ea/server"
   },

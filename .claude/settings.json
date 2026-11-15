@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run check*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run format*)",
+      "Bash(npm test*)",
+      "Bash(npm run test*)",
+      "Bash(npm run db:generate*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(npx drizzle-kit generate*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git stash list*)"
+    ],
+    "deny": [
+      "Read(node_modules/**)",
+      "Read(apps/web/dist/**)",
+      "Read(apps/web/test-results/**)",
+      "Read(apps/web/playwright-report/**)",
+      "Read(apps/web/e2e/.e2e-data/**)",
+      "Read(apps/server/drizzle/meta/**)",
+      "Read(coverage/**)",
+      "Read(data/**)",
+      "Read(package-lock.json)",
+      "Read(**/*.db)",
+      "Read(**/*.db-shm)",
+      "Read(**/*.db-wal)",
+      "Read(**/*.log)",
+      "Read(.env)",
+      "Edit(data/**)",
+      "Edit(.env)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/guard-migrations.mjs"],
+            "timeout": 15,
+            "statusMessage": "Verificando migrações"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/format-fix.mjs"],
+            "timeout": 90,
+            "statusMessage": "Formatando o arquivo"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/remind-check.mjs"],
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

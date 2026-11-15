@@ -10,6 +10,9 @@ export default tseslint.config(
       '**/drizzle/**',
       '**/*.config.{js,ts}',
       '**/e2e/*.mjs',
+      // Scripts soltos de Node, fora de qualquer tsconfig (como os de e2e).
+      '.claude/hooks/*.mjs',
+      'scripts/*.mjs',
       'coverage/**',
       'data/**',
     ],
