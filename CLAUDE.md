@@ -9,7 +9,7 @@ Documentos de referência, sempre mais detalhados que este:
 
 ## Regras de processo (obrigatórias)
 
-0. **São onze fases** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11). A fonte da numeração é `ROADMAP.md`.
+0. **São treze fases** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11; a 12 e a 13 trazem o harness local como provedor, com as ferramentas da plataforma). A fonte da numeração é `ROADMAP.md`.
 1. **Desenvolvimento por fases.** Trabalhe apenas na fase em curso segundo `ROADMAP.md`. Não adiante itens de fases futuras.
 2. **Parada entre fases.** Ao concluir uma fase, apresente: o que foi feito; arquivos criados ou modificados; decisões técnicas; testes executados e resultados; problemas e pendências; resumo; o que vem na próxima fase. Depois pergunte explicitamente se pode prosseguir e **aguarde**.
 3. **Decisão arquitetural não coberta:** apresente alternativas e peça aprovação antes de implementar.
@@ -74,8 +74,8 @@ Fatos da fundação que valem para todo o repositório e não são óbvios pelo 
 
 | Item | Convenção |
 |---|---|
-| Código, identificadores, tabelas, commits | Inglês |
-| Textos da interface e documentação | Português |
+| Código, identificadores, tabelas | Inglês |
+| Textos da interface, documentação e mensagens de commit | Português |
 | Arquivos TypeScript | `kebab-case.ts` |
 | Componentes React | `PascalCase.tsx` |
 | Tipos e classes | `PascalCase` |

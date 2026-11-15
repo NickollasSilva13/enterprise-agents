@@ -1,11 +1,12 @@
 import {
   type ConnectionTest,
-  isExternalUrl,
+  isCommandProvider,
   type ModelSyncResult,
   type ModelUpdate,
   type Provider,
   PROVIDER_KIND_INFO,
   type ProviderCreate,
+  providerIsExternal,
   type ProviderModel,
   type ProviderUpdate,
 } from '@ea/shared';
@@ -79,6 +80,7 @@ function toProvider(deps: ProviderDeps, row: ProviderRow, usage: Map<string, num
     name: row.name,
     kind: row.kind,
     baseUrl: row.baseUrl,
+    command: row.command,
     isExternal: row.isExternal,
     hasApiKey: secret !== null,
     apiKeyHint: secret === null ? null : secretHint(secret),
@@ -125,8 +127,9 @@ export function createProviderRecord(deps: ProviderDeps, input: ProviderCreate):
         id,
         name: input.name,
         kind: input.kind,
-        baseUrl: input.baseUrl,
-        isExternal: isExternalUrl(input.baseUrl),
+        baseUrl: input.baseUrl ?? null,
+        command: input.command ?? null,
+        isExternal: providerIsExternal(input.kind, input.baseUrl ?? null),
         secretRef,
       })
       .run();
@@ -142,8 +145,9 @@ export function createProviderRecord(deps: ProviderDeps, input: ProviderCreate):
     details: {
       name: input.name,
       kind: input.kind,
-      baseUrl: input.baseUrl,
-      external: isExternalUrl(input.baseUrl),
+      ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+      ...(input.command !== undefined ? { command: input.command } : {}),
+      external: providerIsExternal(input.kind, input.baseUrl ?? null),
       apiKeyStored: secretRef !== null,
     },
   });
@@ -164,6 +168,12 @@ export function updateProviderRecord(
   if (typeof patch.apiKey === 'string' && info.apiKey === 'none') {
     throw fieldError('apiKey', `${info.label} não usa chave de API.`);
   }
+  if (isCommandProvider(row.kind) && patch.baseUrl !== undefined) {
+    throw fieldError('baseUrl', `${info.label} não usa endereço.`);
+  }
+  if (!isCommandProvider(row.kind) && patch.command !== undefined) {
+    throw fieldError('command', `${info.label} não usa comando.`);
+  }
 
   let secretRef = row.secretRef;
   if (typeof patch.apiKey === 'string') {
@@ -175,12 +185,14 @@ export function updateProviderRecord(
   }
 
   const baseUrl = patch.baseUrl ?? row.baseUrl;
+  const command = patch.command ?? row.command;
   deps.db
     .update(providers)
     .set({
       name: patch.name ?? row.name,
       baseUrl,
-      isExternal: isExternalUrl(baseUrl),
+      command,
+      isExternal: providerIsExternal(row.kind, baseUrl),
       secretRef,
       updatedAt: new Date().toISOString(),
     })
@@ -194,8 +206,9 @@ export function updateProviderRecord(
     details: {
       ...(patch.name !== undefined && patch.name !== row.name ? { name: patch.name } : {}),
       ...(patch.baseUrl !== undefined && patch.baseUrl !== row.baseUrl
-        ? { baseUrl, external: isExternalUrl(baseUrl) }
+        ? { baseUrl, external: providerIsExternal(row.kind, baseUrl) }
         : {}),
+      ...(patch.command !== undefined && patch.command !== row.command ? { command } : {}),
       // Which way the key changed, never the key.
       ...(patch.apiKey === undefined
         ? {}
@@ -231,7 +244,12 @@ function adapterFor(
 ): { adapter: ModelProvider; secret: string | null } {
   const secret = readSecret(deps, row);
   return {
-    adapter: deps.createProvider({ kind: row.kind, baseUrl: row.baseUrl, apiKey: secret }),
+    adapter: deps.createProvider({
+      kind: row.kind,
+      baseUrl: row.baseUrl,
+      command: row.command,
+      apiKey: secret,
+    }),
     secret,
   };
 }

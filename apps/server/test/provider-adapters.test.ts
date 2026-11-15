@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AnthropicProvider, toAnthropicMessages } from '../src/providers/anthropic';
+import { ClaudeCodeProvider } from '../src/providers/claude-code';
+import { CodexProvider } from '../src/providers/codex';
 import { createProvider } from '../src/providers/factory';
 import { OllamaProvider } from '../src/providers/ollama';
 import { maxTokensField, OpenAiCompatibleProvider } from '../src/providers/openai-compatible';
@@ -96,7 +98,7 @@ async function failure(promise: Promise<unknown>): Promise<ProviderError> {
 
 describe('Ollama adapter', () => {
   const provider = (baseUrl: string) =>
-    new OllamaProvider({ kind: 'ollama', baseUrl, apiKey: null });
+    new OllamaProvider({ kind: 'ollama', baseUrl, command: null, apiKey: null });
 
   it('reports the server version', async () => {
     const stub = await track(ollamaStub());
@@ -254,7 +256,7 @@ describe('tool calls (RF-50)', () => {
       }),
     );
     const events = await collect(
-      new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, apiKey: null }),
+      new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, command: null, apiKey: null }),
       undefined,
       toolRequest,
     );
@@ -292,7 +294,9 @@ describe('tool calls (RF-50)', () => {
 
   it('Ollama: sends no tools field for a plain conversation', async () => {
     const stub = await track(ollamaStub());
-    await collect(new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, apiKey: null }));
+    await collect(
+      new OllamaProvider({ kind: 'ollama', baseUrl: stub.url, command: null, apiKey: null }),
+    );
     expect(stub.requests.at(-1)?.body).not.toHaveProperty('tools');
   });
 
@@ -323,6 +327,7 @@ describe('tool calls (RF-50)', () => {
       new OpenAiCompatibleProvider({
         kind: 'openai_compatible',
         baseUrl: `${stub.url}/v1`,
+        command: null,
         apiKey: null,
       }),
       undefined,
@@ -365,7 +370,12 @@ describe('tool calls (RF-50)', () => {
       }),
     );
     const events = await collect(
-      new AnthropicProvider({ kind: 'anthropic', baseUrl: stub.url, apiKey: 'sk-ant-test-key' }),
+      new AnthropicProvider({
+        kind: 'anthropic',
+        baseUrl: stub.url,
+        command: null,
+        apiKey: 'sk-ant-test-key',
+      }),
       undefined,
       toolRequest,
     );
@@ -429,7 +439,7 @@ describe('tool calls (RF-50)', () => {
 
 describe('OpenAI-compatible adapter', () => {
   const provider = (baseUrl: string, apiKey: string | null = 'sk-test-key-123456') =>
-    new OpenAiCompatibleProvider({ kind: 'openai_compatible', baseUrl, apiKey });
+    new OpenAiCompatibleProvider({ kind: 'openai_compatible', baseUrl, command: null, apiKey });
 
   it('sends the key as a bearer token and lists models by name', async () => {
     const stub = await track(openAiStub({ requireKey: 'sk-test-key-123456' }));
@@ -497,7 +507,7 @@ describe('OpenAI-compatible adapter', () => {
 
 describe('Anthropic adapter', () => {
   const provider = (baseUrl: string, apiKey: string | null = 'sk-ant-test-key') =>
-    new AnthropicProvider({ kind: 'anthropic', baseUrl, apiKey });
+    new AnthropicProvider({ kind: 'anthropic', baseUrl, command: null, apiKey });
 
   it('authenticates with the key and lists models with their display names', async () => {
     const stub = await track(anthropicStub({ requireKey: 'sk-ant-test-key' }));
@@ -568,11 +578,37 @@ describe('Anthropic adapter', () => {
 
 describe('createProvider', () => {
   it('builds the adapter for each kind', () => {
-    const settings = { baseUrl: 'http://127.0.0.1:1', apiKey: 'k' };
+    const settings = { baseUrl: 'http://127.0.0.1:1', command: null, apiKey: 'k' };
     expect(createProvider({ ...settings, kind: 'ollama' })).toBeInstanceOf(OllamaProvider);
     expect(createProvider({ ...settings, kind: 'openai_compatible' })).toBeInstanceOf(
       OpenAiCompatibleProvider,
     );
     expect(createProvider({ ...settings, kind: 'anthropic' })).toBeInstanceOf(AnthropicProvider);
+
+    const harness = { baseUrl: null, command: 'claude', apiKey: null };
+    expect(createProvider({ ...harness, kind: 'claude_code' })).toBeInstanceOf(ClaudeCodeProvider);
+    expect(createProvider({ ...harness, kind: 'codex' })).toBeInstanceOf(CodexProvider);
+  });
+
+  it('refuses a row that lacks the field its kind needs', () => {
+    const noAddress = failureOf(() =>
+      createProvider({ kind: 'ollama', baseUrl: null, command: null, apiKey: null }),
+    );
+    expect(noAddress.kind).toBe('invalid_response');
+
+    const noCommand = failureOf(() =>
+      createProvider({ kind: 'codex', baseUrl: null, command: null, apiKey: null }),
+    );
+    expect(noCommand.kind).toBe('program_missing');
   });
 });
+
+function failureOf(run: () => unknown): ProviderError {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof ProviderError) return error;
+    throw error;
+  }
+  throw new Error('esperava uma falha');
+}

@@ -1,6 +1,6 @@
 import {
-  isExternalUrl,
   type Provider,
+  providerIsExternal,
   PROVIDER_KIND_INFO,
   PROVIDER_KINDS,
   PROVIDER_LIMITS,
@@ -17,7 +17,7 @@ import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useCreateProvider, useSyncModels, useUpdateProvider } from '../../lib/provider-queries';
 import { ExternalNotice } from './ExternalNotice';
 
-type Errors = Partial<Record<'name' | 'baseUrl' | 'apiKey', string>>;
+type Errors = Partial<Record<'name' | 'baseUrl' | 'command' | 'apiKey', string>>;
 
 interface ProviderDialogProps {
   /** The provider being edited; absent to add a new one. */
@@ -30,6 +30,9 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
   const info = PROVIDER_KIND_INFO[kind];
   const [name, setName] = useState(provider?.name ?? info.defaultName);
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? info.defaultBaseUrl);
+  const [command, setCommand] = useState(provider?.command ?? info.defaultCommand);
+  /** A harness is run as a program; the other kinds answer at an address. */
+  const isCommand = info.transport === 'command';
   const [apiKey, setApiKey] = useState('');
   const [removeKey, setRemoveKey] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
@@ -49,6 +52,7 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
     setKind(next);
     setName(PROVIDER_KIND_INFO[next].defaultName);
     setBaseUrl(PROVIDER_KIND_INFO[next].defaultBaseUrl);
+    setCommand(PROVIDER_KIND_INFO[next].defaultCommand);
     setApiKey('');
     setErrors({});
   };
@@ -59,7 +63,7 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
     const parsed = providerCreateSchema.safeParse({
       name,
       kind,
-      baseUrl,
+      ...(isCommand ? { command } : { baseUrl }),
       ...(typedKey ? { apiKey: typedKey } : {}),
     });
     const problems: Errors = {};
@@ -79,7 +83,9 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
     const onError = (error: unknown) => setErrors(fieldErrors(error));
 
     if (provider) {
-      const patch: ProviderUpdate = { name: parsed.data.name, baseUrl: parsed.data.baseUrl };
+      const patch: ProviderUpdate = isCommand
+        ? { name: parsed.data.name, command: parsed.data.command }
+        : { name: parsed.data.name, baseUrl: parsed.data.baseUrl };
       if (typedKey) patch.apiKey = typedKey;
       else if (removeKey) patch.apiKey = null;
       update.mutate(
@@ -156,17 +162,40 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
           }}
         />
 
-        <TextField
-          label="Endereço"
-          value={baseUrl}
-          inputMode="url"
-          maxLength={PROVIDER_LIMITS.baseUrl}
-          error={errors.baseUrl}
-          onChange={(event) => {
-            setBaseUrl(event.target.value);
-            setErrors((current) => ({ ...current, baseUrl: undefined }));
-          }}
-        />
+        {isCommand ? (
+          <TextField
+            label="Comando"
+            value={command}
+            maxLength={PROVIDER_LIMITS.command}
+            error={errors.command}
+            hint="Programa do harness, já instalado e conectado neste computador. Só o nome ou o caminho, sem argumentos."
+            onChange={(event) => {
+              setCommand(event.target.value);
+              setErrors((current) => ({ ...current, command: undefined }));
+            }}
+          />
+        ) : (
+          <TextField
+            label="Endereço"
+            value={baseUrl}
+            inputMode="url"
+            maxLength={PROVIDER_LIMITS.baseUrl}
+            error={errors.baseUrl}
+            onChange={(event) => {
+              setBaseUrl(event.target.value);
+              setErrors((current) => ({ ...current, baseUrl: undefined }));
+            }}
+          />
+        )}
+
+        {isCommand && (
+          <p className="text-sm text-dim">
+            Agentes deste provedor usam a sua assinatura do harness, sem chave de API e sem custo
+            por token. Eles usam as ferramentas da plataforma conforme as permissões de cada agente,
+            nunca as do próprio harness. Cada passo com ferramenta executa o programa de novo, então
+            a resposta demora mais que a de um provedor de API.
+          </p>
+        )}
 
         {info.apiKey !== 'none' && (
           <TextField
@@ -199,7 +228,9 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
           </label>
         )}
 
-        {isExternalUrl(baseUrl) && <ExternalNotice />}
+        {providerIsExternal(kind, isCommand ? null : baseUrl) && (
+          <ExternalNotice harness={isCommand} />
+        )}
 
         {generalError && (
           <p role="alert" className="text-sm text-fail">

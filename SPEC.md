@@ -8,7 +8,7 @@
 Plataforma **local** para criar, configurar, executar, monitorar e orquestrar agentes de IA por meio de uma interface gráfica, sem depender de serviços em nuvem para as funções essenciais.
 
 - O usuário tem controle total: dados, agentes e credenciais ficam na própria máquina.
-- Os agentes funcionam com modelos locais (Ollama) ou externos (OpenAI, Anthropic, compatíveis).
+- Os agentes funcionam com modelos locais (Ollama), externos (OpenAI, Anthropic, compatíveis) ou por um harness de linha de comando que o usuário já tem instalado e conectado (Claude Code, Codex), pela assinatura dele e sem chave de API.
 - Toda ação potencialmente perigosa de um agente é controlada por permissões aplicadas no backend.
 - A arquitetura permite evoluir para múltiplos agentes cooperando, sem reescrita.
 
@@ -29,7 +29,7 @@ Plataforma **local** para criar, configurar, executar, monitorar e orquestrar ag
 | Termo | Significado |
 |---|---|
 | Agente | Entidade persistida: nome, objetivo, prompt de sistema, modelo, parâmetros, ferramentas e limites. |
-| Provedor | Serviço que expõe modelos (Ollama, OpenAI-compatível, Anthropic). |
+| Provedor | Serviço que expõe modelos (Ollama, OpenAI-compatível, Anthropic) ou harness de linha de comando já instalado (Claude Code, Codex). |
 | Conversa | Sequência de mensagens entre o usuário e um agente. |
 | Execução (`run`) | Uma rodada de trabalho do agente, disparada por uma mensagem ou por delegação. |
 | Passo (`run_step`) | Evento dentro de uma execução: chamada ao modelo, chamada de ferramenta, aprovação, erro. |
@@ -89,7 +89,7 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 
 | ID | Requisito | Fase |
 |---|---|---|
-| RF-40 | Cadastrar, editar e remover provedores (Ollama, OpenAI-compatível, Anthropic). | 6 |
+| RF-40 | Cadastrar, editar e remover provedores (Ollama, OpenAI-compatível, Anthropic e harness local: Claude Code, Codex). | 6 / 12 |
 | RF-41 | Armazenar a credencial no cofre do sistema; nunca exibi-la de volta. | 6 |
 | RF-42 | Testar a conexão de um provedor. | 6 |
 | RF-43 | Listar os modelos disponíveis no provedor e habilitá-los para uso. | 6 |
@@ -210,6 +210,7 @@ Coincidem com os critérios de conclusão do projeto:
 - **Temperatura com a Anthropic.** Os modelos atuais da Anthropic recusam parâmetros de amostragem, então a temperatura configurada no agente não é enviada a esse provedor.
 - **Suporte a ferramentas em serviços compatíveis com OpenAI.** O protocolo não informa quais modelos aceitam ferramentas; eles aparecem como "só conversa" até que o usuário marque, na tela Modelos, que o modelo aceita ferramentas.
 - **Chamada de ferramentas em modelos locais.** Nem todo modelo do Ollama suporta ferramentas; nesses casos o agente funciona apenas como chat.
+- **Agentes de harness e ferramentas.** Um provedor de harness roda o programa com as ferramentas dele desligadas. As ferramentas da plataforma são descritas no prompt e o pedido volta escrito na resposta; por isso cada passo com ferramenta executa o programa de novo, com a conversa inteira, o que é mais lento e consome mais da cota da assinatura que um provedor de API, e um pedido escrito fora do formato aparece como texto, sem executar nada. Não há custo por token para mostrar, porque o harness cobra pela assinatura, e não há sessão guardada no harness entre turnos.
 - **Scripts só em Node.js.** A ferramenta de script executa arquivos `.js`, `.mjs` e `.cjs`; scripts Python não são suportados.
 - **Memória de ferramentas entre mensagens.** Dentro de uma mesma resposta o agente vê os resultados das ferramentas que usou; nas mensagens seguintes ele vê só o que escreveu, não os resultados brutos.
 - **Execução manual.** Executar um agente é enviar uma mensagem no chat; não há botão de execução sem conversa.

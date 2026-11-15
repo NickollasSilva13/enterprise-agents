@@ -1,5 +1,6 @@
 import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { join } from 'node:path';
 import {
   conversationDetailSchema,
   conversationListSchema,
@@ -166,6 +167,8 @@ describe('chat', () => {
         messages: [{ role: 'user', content: 'Qual a capital da França?' }],
         temperature: 0.2,
         maxOutputTokens: 512,
+        // Only a harness provider uses it; it is the agent own folder.
+        workspaceDir: join(s.dataDir, 'workspaces', s.agentId),
       },
     ]);
   });

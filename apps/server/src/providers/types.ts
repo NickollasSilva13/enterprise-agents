@@ -54,6 +54,11 @@ export interface ChatRequest {
   readonly maxOutputTokens: number;
   /** Tools the model may ask for. Omitted or empty: plain conversation. */
   readonly tools?: readonly ToolSpec[];
+  /**
+   * The agent's working folder. Only harness providers use it, as the working
+   * directory of the process they run; HTTP providers ignore it.
+   */
+  readonly workspaceDir?: string;
 }
 
 export type StopReason = 'end' | 'max_tokens' | 'refusal' | 'tool_use';
@@ -77,10 +82,21 @@ export interface ModelProvider {
 
 export interface ProviderSettings {
   readonly kind: ProviderKind;
-  readonly baseUrl: string;
+  /** Address of an HTTP provider; null for a harness. */
+  readonly baseUrl: string | null;
+  /** Program of a harness provider; null for an HTTP one. */
+  readonly command: string | null;
   /** From the SecretStore; never logged, never sent anywhere but the provider. */
   readonly apiKey: string | null;
 }
+
+/** Settings of a provider reached over HTTP, with the address known present. */
+export type HttpProviderSettings = Omit<ProviderSettings, 'baseUrl'> & { readonly baseUrl: string };
+
+/** Settings of a harness provider, with the program known present. */
+export type CommandProviderSettings = Omit<ProviderSettings, 'command'> & {
+  readonly command: string;
+};
 
 export type ProviderErrorKind =
   | 'unreachable'
@@ -91,7 +107,9 @@ export type ProviderErrorKind =
   | 'rejected'
   | 'server_error'
   | 'invalid_response'
-  | 'cancelled';
+  | 'cancelled'
+  | 'program_missing'
+  | 'not_signed_in';
 
 const MESSAGES: Record<ProviderErrorKind, string> = {
   unreachable:
@@ -104,6 +122,10 @@ const MESSAGES: Record<ProviderErrorKind, string> = {
   server_error: 'O provedor respondeu com um erro interno.',
   invalid_response: 'O provedor respondeu em um formato inesperado.',
   cancelled: 'A requisição ao provedor foi cancelada.',
+  program_missing:
+    'Não foi possível executar o programa do harness. Verifique o comando informado e se ele está instalado neste computador.',
+  not_signed_in:
+    'O harness não está conectado a uma conta. Abra um terminal, execute o programa dele e entre na sua conta.',
 };
 
 /**

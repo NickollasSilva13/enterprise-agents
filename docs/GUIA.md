@@ -49,6 +49,8 @@ Um agente só responde se tiver um modelo, e os modelos vêm de um provedor. Na 
    | Ollama | `http://127.0.0.1:11434` | Não usa |
    | Compatível com OpenAI | o endereço do serviço | Opcional |
    | Anthropic | o endereço da API da Anthropic | Obrigatória |
+   | Claude Code (harness) | o comando `claude` | Não usa |
+   | Codex (harness) | o comando `codex` | Não usa |
 
 3. Salve. Os modelos do provedor são buscados e aparecem **desabilitados**.
 4. Habilite, na chave ao lado de cada um, os modelos que quer usar. Só modelos habilitados podem ser escolhidos em um agente.
@@ -58,11 +60,13 @@ Um agente só responde se tiver um modelo, e os modelos vêm de um provedor. Na 
 
 **Provedor externo.** Qualquer endereço que não seja desta máquina é tratado como externo, inclusive outro computador da sua rede. A tela avisa disso ao cadastrar, no cartão do provedor e ao escolher o modelo no agente, porque as suas conversas passam a sair da máquina (veja a seção 10).
 
+**Harness que você já tem.** Nos tipos de harness, em vez do endereço você informa o **comando** do programa (só o nome, se ele estiver no `PATH`, ou o caminho completo; nunca argumentos). O agente responde pela sua assinatura do Claude Code ou do Codex, sem chave de API e sem custo por token. Para isso o programa precisa estar instalado e com a conta conectada: se não estiver, a aplicação avisa que "o harness não está conectado a uma conta" — abra um terminal, execute o programa e entre na sua conta. A aplicação roda o harness com as ferramentas, os comandos, os ganchos e as configurações dele desligados, e oferece a ele só as ferramentas da plataforma que o agente tem permissão de usar, com aprovação quando for o caso, como em qualquer outro provedor. Cada passo com ferramenta executa o programa de novo, então esses agentes respondem mais devagar. Se você cadastrou o provedor de harness antes desta versão, use **Atualizar modelos** no cartão dele para que os modelos passem a aceitar ferramentas. O harness roda nesta máquina, mas responde pelo serviço do fornecedor dele, então conta como provedor externo.
+
 **Ferramentas.** No Ollama, a aplicação detecta quais modelos aceitam ferramentas. Em serviços compatíveis com OpenAI isso não é informado: marque o modelo, na própria tela Modelos, como capaz de usar ferramentas.
 
 Um provedor ou modelo em uso por algum agente não pode ser excluído nem desabilitado; troque o modelo do agente antes.
 
-> Validado com o serviço real: apenas o Ollama. Os adaptadores de OpenAI e Anthropic foram testados contra servidores simulados que seguem cada protocolo.
+> Validado com o serviço real: apenas o Ollama. Os adaptadores de OpenAI e Anthropic foram testados contra servidores simulados que seguem cada protocolo. Os dois harness foram testados contra um programa simulado: o Codex não estava instalado na máquina de desenvolvimento, e a conta do Claude Code não pôde ser usada de fora do aplicativo dele.
 
 ## 3. Criar e configurar agentes
 

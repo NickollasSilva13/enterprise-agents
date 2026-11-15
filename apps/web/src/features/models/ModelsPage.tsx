@@ -192,8 +192,8 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
       </header>
 
       <dl className="grid gap-x-6 gap-y-2 px-4 py-3 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-dim">Endereço</dt>
-        <dd className="break-all">{provider.baseUrl}</dd>
+        <dt className="text-dim">{provider.command === null ? 'Endereço' : 'Comando'}</dt>
+        <dd className="break-all">{provider.command ?? provider.baseUrl}</dd>
         <dt className="text-dim">Chave de API</dt>
         <dd>
           {provider.hasApiKey
@@ -212,7 +212,7 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
 
       {provider.isExternal && (
         <div className="px-4 pb-3">
-          <ExternalNotice />
+          <ExternalNotice harness={provider.command !== null} />
         </div>
       )}
 

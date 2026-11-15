@@ -1,6 +1,12 @@
 // Domain vocabularies shared by the database schema, the API and the UI.
 
-export const PROVIDER_KINDS = ['ollama', 'openai_compatible', 'anthropic'] as const;
+export const PROVIDER_KINDS = [
+  'ollama',
+  'openai_compatible',
+  'anthropic',
+  'claude_code',
+  'codex',
+] as const;
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
 
 export const TOOL_PERMISSIONS = ['deny', 'ask', 'allow'] as const;

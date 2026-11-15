@@ -15,6 +15,7 @@ import { auditLog, models, providers } from '../src/db/schema';
 import { recordAudit } from '../src/modules/audit/service';
 import { redactSecrets, secretHint } from '../src/security/redact';
 import { KeyringSecretStore, MemorySecretStore } from '../src/security/secret-store';
+import { type ModelProvider, ProviderError, type ProviderSettings } from '../src/providers/types';
 import { makeApp, type TestApp } from './helpers';
 import { anthropicStub, ollamaStub, openAiStub, type StubServer, unusedUrl } from './stub-servers';
 
@@ -603,5 +604,184 @@ describe('protection of the provider routes', () => {
       headers: { ...t.trusted, origin: 'https://evil.example' },
     });
     expect(foreign.statusCode).toBe(403);
+  });
+});
+
+describe('harness providers (Fase 12)', () => {
+  it('adds a harness with a command, no address and no key', async () => {
+    const provider = await addProvider({
+      name: 'Claude Code',
+      kind: 'claude_code',
+      command: 'claude',
+    });
+    expect(provider).toMatchObject({
+      kind: 'claude_code',
+      command: 'claude',
+      baseUrl: null,
+      // The program runs here, but it answers through its vendor's service.
+      isExternal: true,
+      hasApiKey: false,
+      apiKeyHint: null,
+    });
+    const row = t.database.db.select().from(providers).get();
+    expect(row).toMatchObject({ command: 'claude', baseUrl: null, secretRef: null });
+  });
+
+  it.each([
+    ['an address on a harness', { name: 'P', kind: 'claude_code', baseUrl: 'http://127.0.0.1:1' }],
+    ['a harness with no command', { name: 'P', kind: 'codex' }],
+    ['a command with arguments', { name: 'P', kind: 'claude_code', command: 'claude --bare' }],
+    ['a command that is a shell line', { name: 'P', kind: 'codex', command: 'codex && rm -rf .' }],
+    ['a command that starts with a dash', { name: 'P', kind: 'codex', command: '-rf' }],
+    ['a key for a harness', { name: 'P', kind: 'claude_code', command: 'claude', apiKey: KEY }],
+  ])('rejects %s', async (_label, input) => {
+    const { status, body } = await call('POST', '/api/providers', input);
+    expect(status, JSON.stringify(body)).toBe(400);
+    expect(t.database.db.select().from(providers).all()).toEqual([]);
+  });
+
+  it('rejects a command on a provider reached over HTTP', async () => {
+    const { status, body } = await call('POST', '/api/providers', {
+      name: 'P',
+      kind: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+      command: 'claude',
+    });
+    expect(status).toBe(400);
+    expect(fieldsOf(body)).toContain('command');
+  });
+
+  it('changes the command, and refuses to give the harness an address', async () => {
+    const provider = await addProvider({ name: 'CC', kind: 'claude_code', command: 'claude' });
+
+    const changed = await call('PATCH', `/api/providers/${provider.id}`, {
+      command: 'C:\\Program Files\\claude\\claude.exe',
+    });
+    expect(changed.status).toBe(200);
+    expect(providerSchema.parse(changed.body).command).toBe(
+      'C:\\Program Files\\claude\\claude.exe',
+    );
+
+    const withAddress = await call('PATCH', `/api/providers/${provider.id}`, {
+      baseUrl: 'http://127.0.0.1:1',
+    });
+    expect(withAddress.status).toBe(400);
+    expect(fieldsOf(withAddress.body)).toEqual(['baseUrl']);
+
+    expect(auditActions()).toEqual(['provider.created', 'provider.updated']);
+    expect(t.database.db.select().from(auditLog).all()[1]?.details).toEqual({
+      command: 'C:\\Program Files\\claude\\claude.exe',
+    });
+  });
+
+  it('refuses a command on an HTTP provider that already exists', async () => {
+    const provider = await addProvider({
+      name: 'Ollama',
+      kind: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+    });
+    const { status, body } = await call('PATCH', `/api/providers/${provider.id}`, {
+      command: 'claude',
+    });
+    expect(status).toBe(400);
+    expect(fieldsOf(body)).toEqual(['command']);
+  });
+});
+
+describe('harness providers in use (Fase 12)', () => {
+  /** An app whose factory records the settings and answers like a harness. */
+  async function appWithHarness(adapter: Partial<ModelProvider> = {}) {
+    const seen: ProviderSettings[] = [];
+    const app = await makeApp({
+      createProvider: (settings) => {
+        seen.push(settings);
+        return {
+          testConnection: async () => ({ detail: 'Claude Code 2.1.301' }),
+          listModels: async () => [
+            { name: 'default', displayName: 'Padrão da conta', supportsTools: false },
+          ],
+          chat: async function* () {
+            yield { type: 'done', stopReason: 'end' } as const;
+          },
+          ...adapter,
+        };
+      },
+    });
+    const post = async (url: string, payload?: unknown) => {
+      const response = await app.app.inject({
+        method: 'POST',
+        url,
+        headers: app.trusted,
+        ...(payload === undefined ? {} : { payload: payload as object }),
+      });
+      return { status: response.statusCode, body: response.json<unknown>() };
+    };
+    const created = await post('/api/providers', {
+      name: 'Claude Code',
+      kind: 'claude_code',
+      command: 'claude',
+    });
+    expect(created.status).toBe(201);
+    return { app, seen, post, provider: providerSchema.parse(created.body) };
+  }
+
+  it('hands the adapter the command and no address or key', async () => {
+    const harness = await appWithHarness();
+    try {
+      const { status, body } = await harness.post(`/api/providers/${harness.provider.id}/test`);
+      expect(status).toBe(200);
+      expect(connectionTestSchema.parse(body)).toMatchObject({
+        ok: true,
+        message: 'Conexão bem-sucedida: Claude Code 2.1.301.',
+      });
+      expect(harness.seen[0]).toEqual({
+        kind: 'claude_code',
+        command: 'claude',
+        baseUrl: null,
+        apiKey: null,
+      });
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('says the harness is not signed in, without the harness own words', async () => {
+    const harness = await appWithHarness({
+      testConnection: async () => {
+        throw new ProviderError('not_signed_in', undefined, 'OAuth session expired');
+      },
+    });
+    try {
+      const { status, body } = await harness.post(`/api/providers/${harness.provider.id}/test`);
+      expect(status).toBe(200);
+      const result = connectionTestSchema.parse(body);
+      expect(result.ok).toBe(false);
+      expect(result.message).toBe(
+        'O harness não está conectado a uma conta. Abra um terminal, execute o programa dele e entre na sua conta.',
+      );
+      expect(JSON.stringify(result)).not.toContain('OAuth');
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('syncs models that only converse, and does not let that be overridden', async () => {
+    const harness = await appWithHarness();
+    try {
+      const synced = await harness.post(`/api/providers/${harness.provider.id}/models/sync`);
+      const result = modelSyncResultSchema.parse(synced.body);
+      expect(result.models).toMatchObject([{ name: 'default', supportsTools: false }]);
+
+      const marking = await harness.app.app.inject({
+        method: 'PATCH',
+        url: `/api/models/${result.models[0]!.id}`,
+        headers: harness.app.trusted,
+        payload: { supportsTools: true },
+      });
+      expect(marking.statusCode).toBe(409);
+      expect(errorOf(marking.json()).code).toBe('tools_support_detected');
+    } finally {
+      await harness.app.close();
+    }
   });
 });

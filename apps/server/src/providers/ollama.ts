@@ -8,7 +8,7 @@ import {
   type ModelInfo,
   type ModelProvider,
   ProviderError,
-  type ProviderSettings,
+  type HttpProviderSettings,
 } from './types';
 
 /** A message in the shape Ollama's chat API expects. */
@@ -53,7 +53,7 @@ const chatChunkSchema = z.object({
 
 /** Adapter for a local or remote Ollama server (native API). */
 export class OllamaProvider implements ModelProvider {
-  constructor(private readonly settings: ProviderSettings) {}
+  constructor(private readonly settings: HttpProviderSettings) {}
 
   private url(path: string): string {
     return joinUrl(this.settings.baseUrl, path);
