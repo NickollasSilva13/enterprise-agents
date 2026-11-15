@@ -74,8 +74,8 @@ Fatos da fundação que valem para todo o repositório e não são óbvios pelo 
 
 | Item | Convenção |
 |---|---|
-| Código, identificadores, tabelas, commits | Inglês |
-| Textos da interface e documentação | Português |
+| Código, identificadores, tabelas | Inglês |
+| Textos da interface, documentação e mensagens de commit | Português |
 | Arquivos TypeScript | `kebab-case.ts` |
 | Componentes React | `PascalCase.tsx` |
 | Tipos e classes | `PascalCase` |
