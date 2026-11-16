@@ -16,9 +16,9 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 8 | Orquestração e ferramentas | Concluída em 2026-11-13 |
 | 9 | Escritório vivo | Concluída em 2026-11-14 |
 | 10 | Segurança e qualidade | Concluída em 2026-11-14 |
-| 11 | Finalização e documentação | Concluída em 2026-11-15 (aguardando aprovação) |
-| 12 | Harness local como provedor | Planejada (2026-11-15) |
-| 13 | Ferramentas da plataforma para agentes de harness | Planejada |
+| 11 | Finalização e documentação | Concluída em 2026-11-15 |
+| 12 | Harness local como provedor | Concluída em 2026-11-15 |
+| 13 | Ferramentas da plataforma para agentes de harness | Concluída em 2026-11-15 |
 | 14 | Escritório isométrico personalizável | Concluída em 2026-11-16 |
 | 15 | Personagens 16 bits e entorno do escritório | Concluída em 2026-11-16 |
 
