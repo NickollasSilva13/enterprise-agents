@@ -26,8 +26,39 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 
 export const ACTIVE_RUN_STATUSES: RunStatus[] = ['queued', 'running', 'waiting_approval'];
 
-export const RUN_TRIGGERS = ['chat', 'manual', 'delegation'] as const;
+export const RUN_TRIGGERS = ['chat', 'manual', 'delegation', 'task'] as const;
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
+
+/** What an agent may do in its area's shared folder (Phase 16, D6). */
+export const AREA_ACCESS = ['none', 'read', 'write'] as const;
+export type AreaAccess = (typeof AREA_ACCESS)[number];
+
+/** A stage is worked by an agent, waits for the user, or ends the flow. */
+export const STAGE_KINDS = ['agent', 'human', 'done'] as const;
+export type StageKind = (typeof STAGE_KINDS)[number];
+
+/** Who may move a task along a transition. */
+export const TRANSITION_ACTORS = ['agent', 'human', 'both'] as const;
+export type TransitionActor = (typeof TRANSITION_ACTORS)[number];
+
+export const TASK_STATES = ['open', 'done', 'cancelled'] as const;
+export type TaskState = (typeof TASK_STATES)[number];
+
+export const TASK_PRIORITIES = ['normal', 'high'] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_EVENT_KINDS = [
+  'created',
+  'edited',
+  'moved',
+  'commented',
+  'run_started',
+  'run_finished',
+  'stopped',
+  'resumed',
+  'cancelled',
+] as const;
+export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 
 export const MESSAGE_ROLES = ['user', 'assistant', 'tool'] as const;
 export type MessageRole = (typeof MESSAGE_ROLES)[number];

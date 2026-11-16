@@ -4,6 +4,7 @@ import { delegateTool } from './delegate';
 import { createFetchUrlTool } from './fetch-url';
 import { listDirTool, readFileTool, writeFileTool } from './files';
 import { createRunScriptTool } from './run-script';
+import { commentTaskTool, moveTaskTool } from './tasks';
 
 export const DELEGATE_TOOL_NAME = delegateTool.name;
 
@@ -15,5 +16,7 @@ export function createBuiltinRegistry(options: { net?: NetGuardOptions } = {}): 
     .register(writeFileTool)
     .register(createFetchUrlTool(options.net))
     .register(delegateTool)
-    .register(createRunScriptTool());
+    .register(createRunScriptTool())
+    .register(moveTaskTool)
+    .register(commentTaskTool);
 }

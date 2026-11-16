@@ -20,6 +20,8 @@ const context = (signal = new AbortController().signal): ToolContext => ({
   agentId: 'agent-1',
   runId: 'run-1',
   workspaceDir: workspace,
+  area: null,
+  task: null,
   signal,
   delegate: async () => ({ content: '' }),
 });

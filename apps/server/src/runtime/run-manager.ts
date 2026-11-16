@@ -109,6 +109,8 @@ const DENIAL_MESSAGES: Partial<Record<PermissionReason, (tool: string) => string
   not_granted: (tool) => `A ferramenta "${tool}" não está liberada para este agente.`,
   denied: (tool) => `A ferramenta "${tool}" não está liberada para este agente.`,
   tool_disabled: (tool) => `A ferramenta "${tool}" está desligada nesta instalação.`,
+  not_in_task: (tool) =>
+    `A ferramenta "${tool}" só existe quando você trabalha numa tarefa do quadro.`,
 };
 
 /** How much of a tool result is kept and handed to the model. */
@@ -583,6 +585,7 @@ export class RunManager {
       toolName: call.name,
       grants: plan.grants,
       enabledTools: plan.enabledTools,
+      inTask: plan.task !== null,
     });
     const tool = decision.permission === 'deny' ? undefined : this.deps.registry.get(call.name);
     const rawArguments = asRecord(call.arguments);
@@ -673,6 +676,8 @@ export class RunManager {
             agentId,
             runId,
             workspaceDir: plan.workspaceDir,
+            area: plan.area,
+            task: plan.task,
             signal,
             delegate: (agentName, task) => this.delegate(active, agentName, task),
           }),

@@ -43,9 +43,14 @@ function toInfo(tool: ToolDefinition, enabled: ReadonlySet<string>): ToolInfo {
   };
 }
 
+/** Tools granted per agent. Task-board tools are not: they exist only in task runs. */
+function grantableTools(registry: ToolRegistry): ToolDefinition[] {
+  return registry.list().filter((tool) => tool.scope !== 'task');
+}
+
 export function listTools(deps: ToolsDeps): ToolInfo[] {
   const enabled = enabledToolNames(deps.db);
-  return deps.registry.list().map((tool) => toInfo(tool, enabled));
+  return grantableTools(deps.registry).map((tool) => toInfo(tool, enabled));
 }
 
 /** Switches an off-by-default tool on or off for the whole installation. */
@@ -103,7 +108,7 @@ export function getAgentTools(deps: ToolsDeps, agentId: string): AgentTools {
         .where(eq(models.id, agent.modelId))
         .get()
     : undefined;
-  const known = new Set(deps.registry.list().map((tool) => tool.name));
+  const known = new Set(grantableTools(deps.registry).map((tool) => tool.name));
   const grants: ToolGrant[] = [...grantsOf(deps.db, agentId)]
     .filter(([toolName]) => known.has(toolName))
     .map(([toolName, permission]) => ({ toolName, permission }))
@@ -129,6 +134,11 @@ export function setAgentTools(
     const tool = deps.registry.get(grant.toolName);
     if (!tool) {
       problems.push({ path: `grants.${index}.toolName`, message: 'Ferramenta desconhecida.' });
+    } else if (tool.scope === 'task') {
+      problems.push({
+        path: `grants.${index}.toolName`,
+        message: `"${tool.title}" faz parte do quadro de tarefas e não é liberada por agente.`,
+      });
     } else if (wanted.has(grant.toolName)) {
       problems.push({ path: `grants.${index}.toolName`, message: 'Ferramenta repetida.' });
     } else if (grant.permission === 'allow' && maxPermission(tool.risk) !== 'allow') {
@@ -153,7 +163,7 @@ export function setAgentTools(
   });
 
   const changes: Record<string, { from: ToolPermission; to: ToolPermission }> = {};
-  for (const tool of deps.registry.list()) {
+  for (const tool of grantableTools(deps.registry)) {
     const from = before.get(tool.name) ?? 'deny';
     const to = wanted.get(tool.name) ?? 'deny';
     if (from !== to) changes[tool.name] = { from, to };

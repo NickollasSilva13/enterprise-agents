@@ -9,16 +9,37 @@ export interface ToolResult {
   readonly isError?: boolean;
 }
 
+/** The shared folder of the agent's area, as far as this agent may use it (Phase 16, D6). */
+export interface AreaFolder {
+  readonly dir: string;
+  readonly canWrite: boolean;
+}
+
+/**
+ * What a run working on a task may do to it (Phase 16). Supplied by the
+ * tasks module, which checks every move against the workflow: the model
+ * asks, the server decides (D4).
+ */
+export interface TaskPort {
+  /** Moves the task to the named stage, if the workflow allows it, with a note. */
+  move(stageName: string, note: string): ToolResult;
+  comment(text: string): ToolResult;
+}
+
 /**
  * Everything a tool may touch. It gets no database, no secret store and no
- * HTTP layer: only the agent's own folder, a cancellation signal and, for
- * delegation, a function supplied by the runtime.
+ * HTTP layer: only the agent's own folder (and its area's, if granted), a
+ * cancellation signal and functions supplied by the runtime.
  */
 export interface ToolContext {
   readonly agentId: string;
   readonly runId: string;
   /** The agent's working folder. File tools never leave it (SECURITY C-17). */
   readonly workspaceDir: string;
+  /** The area's shared folder, reached as "area/…"; null without access. */
+  readonly area: AreaFolder | null;
+  /** The task this run works on; null outside the task board. */
+  readonly task: TaskPort | null;
   readonly signal: AbortSignal;
   /** Hands a task to another agent and waits for its answer. */
   readonly delegate: (agentName: string, task: string) => Promise<ToolResult>;
@@ -41,6 +62,12 @@ export interface ToolDefinition<Input = unknown> {
    * whole installation, on top of granting it to an agent (C-20).
    */
   readonly offByDefault?: boolean;
+  /**
+   * 'task': part of the task board. Never granted per agent: allowed in a run
+   * that works on a task and denied everywhere else (Phase 16). What it may
+   * do is bounded by the workflow, checked by the server.
+   */
+  readonly scope?: 'task';
   execute(input: Input, context: ToolContext): Promise<ToolResult>;
 }
 

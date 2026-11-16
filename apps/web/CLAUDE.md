@@ -19,6 +19,10 @@ O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/o
 - Personagem (Fase 15): sprites de 20 × 40 montados com `place(linha, linhas)` em `character.tsx`; linha 0 é o alto da cabeça e há 4 linhas acima para cabelo alto. Só as vistas `sw` e `nw` são desenhadas; `se` e `ne` são espelho. O teste `pixels.test.tsx` confere o tamanho de todo sprite (`ALL_SPRITES`).
 - Entorno novo: `SURROUNDINGS` em `packages/shared/src/office.ts` e um caso em cada camada de `art/surroundings.tsx`. Nada do entorno é navegável.
 
+## Quadro de tarefas (Fase 16)
+
+Telas em `src/features/tasks/` (quadro em `/tarefas?area=<id>`, tarefa em `/tarefas/:taskId`, fluxo em `/tarefas/fluxo/:areaId`); consultas em `src/lib/task-queries.ts`, com atualização a cada 3 s enquanto agentes trabalham. Texto de tarefa, nota e comentário vêm de pessoas e modelos: só pelo `Markdown`. O editor de fluxo valida com `workflowUpdateSchema` antes de enviar.
+
 ## Testes de componente
 
 - Use `renderApp()` de `src/test/render.tsx`, que monta as rotas reais sobre uma API simulada.

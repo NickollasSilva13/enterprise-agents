@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { agentStateSchema } from './api';
 import { appearanceSchema } from './appearance';
-import { TOOL_PERMISSIONS } from './enums';
+import { AREA_ACCESS, TOOL_PERMISSIONS } from './enums';
 
 const id = z.string().min(1).max(40);
 const count = z.number().int().nonnegative();
@@ -75,6 +75,7 @@ export const AGENT_DEFAULTS = {
   maxTotalTokens: null,
   enabled: true,
   appearance: null,
+  areaAccess: 'none',
 } as const;
 
 const between = (label: string, range: { min: number; max: number }) =>
@@ -108,6 +109,8 @@ const agentFields = {
   enabled: z.boolean(),
   /** Null: the look drawn from the agent's id. */
   appearance: appearanceSchema.nullable(),
+  /** What the agent may do in its area's shared folder (Phase 16). */
+  areaAccess: z.enum(AREA_ACCESS),
 };
 
 export const agentCreateSchema = z.strictObject({
@@ -124,6 +127,7 @@ export const agentCreateSchema = z.strictObject({
   maxTotalTokens: agentFields.maxTotalTokens.default(AGENT_DEFAULTS.maxTotalTokens),
   enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
   appearance: agentFields.appearance.default(AGENT_DEFAULTS.appearance),
+  areaAccess: agentFields.areaAccess.default(AGENT_DEFAULTS.areaAccess),
 });
 export type AgentCreate = z.infer<typeof agentCreateSchema>;
 /** What a client may send: everything but the name is optional. */
@@ -149,6 +153,7 @@ export const agentSchema = z.object({
   maxTotalTokens: z.number().int().nullable(),
   enabled: z.boolean(),
   appearance: appearanceSchema.nullable(),
+  areaAccess: z.enum(AREA_ACCESS),
   state: agentStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -195,6 +200,7 @@ export const exportedAgentSchema = z.strictObject({
   maxTotalTokens: agentFields.maxTotalTokens.default(AGENT_DEFAULTS.maxTotalTokens),
   enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
   appearance: agentFields.appearance.default(AGENT_DEFAULTS.appearance),
+  areaAccess: agentFields.areaAccess.default(AGENT_DEFAULTS.areaAccess),
   /** Name of the project, or null for none. */
   project: z.string().trim().min(1).max(PROJECT_LIMITS.name).nullable().default(null),
   model: z

@@ -3,7 +3,7 @@ import { statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { z } from 'zod';
 import { type ToolDefinition, toolError, type ToolResult } from '../types';
-import { ensureWorkspace, PATH_LIMIT, resolveInWorkspace } from '../workspace';
+import { AREA_PREFIX, ensureWorkspace, PATH_LIMIT, resolveInWorkspace } from '../workspace';
 
 export const SCRIPT_LIMITS = {
   timeoutMs: 30_000,
@@ -123,6 +123,16 @@ export function createRunScriptTool(
       args: z.array(z.string().max(SCRIPT_LIMITS.argChars)).max(SCRIPT_LIMITS.args).optional(),
     }),
     async execute(input, context) {
+      // Scripts run confined to the agent's own folder (Node permission model),
+      // so one from the area's shared folder could not even read its neighbours.
+      const first = input.path
+        .replace(/\\/g, '/')
+        .trim()
+        .split('/')
+        .find((part) => part !== '' && part !== '.');
+      if (first?.toLowerCase() === AREA_PREFIX) {
+        return toolError('O script só roda arquivos da sua pasta pessoal, não da pasta da área.');
+      }
       const script = resolveInWorkspace(context.workspaceDir, input.path);
       if (!SCRIPT_EXTENSIONS.has(extname(script).toLowerCase())) {
         return toolError('Só scripts Node.js (.js, .mjs ou .cjs) podem ser executados.');

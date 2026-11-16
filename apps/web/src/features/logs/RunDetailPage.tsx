@@ -16,6 +16,7 @@ const TRIGGERS: Record<RunSummary['trigger'], string> = {
   chat: 'Mensagem no chat',
   manual: 'Execução manual',
   delegation: 'Delegação de outro agente',
+  task: 'Tarefa do quadro',
 };
 
 function Facts({ run }: { run: RunSummary }) {

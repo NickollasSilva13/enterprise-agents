@@ -31,7 +31,11 @@ const EXPECTED_TABLES = [
   'run_steps',
   'runs',
   'settings',
+  'task_events',
+  'tasks',
   'tool_calls',
+  'workflow_stages',
+  'workflow_transitions',
 ];
 
 const cleanups: (() => void)[] = [];
@@ -179,6 +183,52 @@ describe('migrations over existing data', () => {
     });
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
     expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1);
+  });
+
+  it('give existing agents no area access and existing runs no task (0004)', () => {
+    const database = databaseUpTo(3);
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Site');
+      INSERT INTO providers (id, name, kind, base_url, is_external)
+        VALUES ('p1', 'Ollama local', 'ollama', 'http://127.0.0.1:11434', 0);
+      INSERT INTO models (id, provider_id, name, display_name) VALUES ('m1', 'p1', 'llama3', 'Llama 3');
+      INSERT INTO agents (id, name, model_id, project_id) VALUES ('a1', 'Agente', 'm1', 'pr1');
+      INSERT INTO runs (id, agent_id, trigger) VALUES ('r1', 'a1', 'chat');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select().from(agents).get()).toMatchObject({
+      projectId: 'pr1',
+      areaAccess: 'none',
+    });
+    expect(database.db.select().from(runs).get()).toMatchObject({ id: 'r1', taskId: null });
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+});
+
+describe('task history (Phase 16)', () => {
+  it('cannot be changed or erased, even directly in the database (0005)', () => {
+    const database = memoryDatabase();
+    const { agentId } = seedAgent(database);
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Site');
+      INSERT INTO workflow_stages (id, project_id, position, name, kind, agent_id)
+        VALUES ('s1', 'pr1', 0, 'Fazer', 'agent', '${agentId}');
+      INSERT INTO tasks (id, project_id, title, stage_id) VALUES ('t1', 'pr1', 'Tarefa', 's1');
+      INSERT INTO task_events (id, task_id, kind, actor, text) VALUES ('e1', 't1', 'created', 'user', 'oi');
+    `);
+    expect(() => database.sqlite.prepare("UPDATE task_events SET text = 'outro'").run()).toThrow(
+      /append-only/,
+    );
+    expect(() => database.sqlite.prepare('DELETE FROM task_events').run()).toThrow(/append-only/);
+    // A stage with tasks in it, and an area with tasks, cannot be removed.
+    expect(() =>
+      database.sqlite.prepare("DELETE FROM workflow_stages WHERE id = 's1'").run(),
+    ).toThrow(/FOREIGN KEY/);
+    expect(() => database.sqlite.prepare("DELETE FROM projects WHERE id = 'pr1'").run()).toThrow(
+      /FOREIGN KEY/,
+    );
   });
 });
 

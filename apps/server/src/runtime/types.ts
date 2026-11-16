@@ -1,6 +1,6 @@
 import type { ApprovalStatus, RunEndReason, ToolCallStatus, ToolPermission } from '@ea/shared';
 import type { ChatMessage, ModelProvider } from '../providers/types';
-import type { ToolDefinition } from '../tools/types';
+import type { AreaFolder, TaskPort, ToolDefinition } from '../tools/types';
 
 /** Hard limits of one run (SECURITY C-13). */
 export interface RunLimits {
@@ -33,6 +33,10 @@ export interface RunPlan {
   readonly enabledTools: ReadonlySet<string>;
   /** The agent's own folder; file tools never leave it (SECURITY C-17). */
   readonly workspaceDir: string;
+  /** The area's shared folder, as far as the agent may use it; null without access. */
+  readonly area: AreaFolder | null;
+  /** The task the run works on; null for a run outside the task board. */
+  readonly task: TaskPort | null;
 }
 
 export type FinalRunStatus = 'completed' | 'failed' | 'cancelled' | 'timed_out' | 'interrupted';

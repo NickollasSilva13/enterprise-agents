@@ -18,6 +18,8 @@ import { createRunsContext } from '../modules/runs/service';
 import { registerHealthRoutes } from '../modules/health/routes';
 import { registerOfficeRoutes } from '../modules/office/routes';
 import { registerSystemRoutes } from '../modules/system/routes';
+import { registerTaskRoutes } from '../modules/tasks/routes';
+import { createTasksContext } from '../modules/tasks/service';
 import { registerToolRoutes } from '../modules/tools/routes';
 import { createBuiltinRegistry } from '../tools/builtin';
 import type { ToolRegistry } from '../tools/registry';
@@ -151,6 +153,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     createProvider: providerFactory,
     registry,
     workspacesDir: config.workspacesDir,
+    areasDir: config.areasDir,
+    tasks: { port: null },
     maxConcurrentRuns: config.maxConcurrentRuns,
     maxDelegationDepth: config.maxDelegationDepth,
     logWarning,
@@ -160,6 +164,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerRunRoutes(app, { runs, sse });
   registerToolRoutes(app, { db: deps.database.db, registry, workspacesDir: config.workspacesDir });
   registerApprovalRoutes(app, { runs });
+  const tasks = createTasksContext(runs, registry);
+  registerTaskRoutes(app, { tasks });
 
   // Before the server stops accepting connections: interrupt what is running
   // (the runs are recorded as such) and end the event streams, which would

@@ -87,6 +87,7 @@ export function listAgents(db: Db): Agent[] {
     maxTotalTokens: agent.maxTotalTokens,
     enabled: agent.enabled,
     appearance: storedAppearance(agent.appearance),
+    areaAccess: agent.areaAccess,
     state,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
@@ -155,6 +156,7 @@ export function duplicateAgent(db: Db, id: string): Agent {
         maxTotalTokens: source.maxTotalTokens,
         enabled: source.enabled,
         appearance: source.appearance,
+        areaAccess: source.areaAccess,
       })
       .run();
     const tools = tx.select().from(agentTools).where(eq(agentTools.agentId, id)).all();

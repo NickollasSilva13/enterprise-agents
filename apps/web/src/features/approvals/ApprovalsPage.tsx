@@ -5,7 +5,9 @@ import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { formatDateTime, plural } from '../../lib/format';
+import { useWaitingTasks } from '../../lib/task-queries';
 import { useApprovals } from '../../lib/tool-queries';
+import { TaskStatus } from '../tasks/TaskBadges';
 
 const OUTCOME: Record<Approval['status'], { label: string; tone: string }> = {
   pending: { label: 'Pendente', tone: 'text-wait' },
@@ -41,6 +43,40 @@ function DecidedList({ approvals }: { approvals: readonly Approval[] }) {
   );
 }
 
+/** Board tasks that wait for the user: in a stage of theirs, or stopped (Phase 16). */
+function WaitingTasks() {
+  const waiting = useWaitingTasks();
+  if (!waiting.data || waiting.data.length === 0) return null;
+  return (
+    <Panel
+      title="Tarefas esperando você"
+      aside={plural(waiting.data.length, 'tarefa', 'tarefas')}
+      className="mb-6"
+    >
+      <ul className="divide-y divide-line">
+        {waiting.data.map((task) => (
+          <li key={task.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5">
+            <p className="min-w-0 flex-1 basis-56">
+              <Link
+                to={`/tarefas/${task.id}`}
+                className="font-semibold text-info underline underline-offset-4"
+              >
+                {task.title}
+              </Link>
+              <span className="text-dim">
+                {' '}
+                · {task.areaName} · {task.stageName}
+              </span>
+              {task.attention && <span className="block text-sm text-dim">{task.attention}</span>}
+            </p>
+            <TaskStatus task={task} />
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
 /** The queue of actions waiting for the user, and what was decided before (RF-54). */
 export function ApprovalsPage() {
   const pending = useApprovals('pending');
@@ -52,6 +88,8 @@ export function ApprovalsPage() {
         title="Aprovações"
         description="Ações que um agente quer fazer e que esperam a sua decisão. A execução fica parada até você responder."
       />
+
+      <WaitingTasks />
 
       {pending.isPending && <LoadingState label="Carregando as aprovações…" />}
       {pending.error && !pending.data && (

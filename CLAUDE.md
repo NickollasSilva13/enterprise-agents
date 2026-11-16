@@ -9,7 +9,7 @@ Documentos de referência, sempre mais detalhados que este:
 
 ## Regras de processo (obrigatórias)
 
-0. **São catorze fases** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11; a 12 e a 13 trazem o harness local como provedor, com as ferramentas da plataforma; a 14 é o Escritório isométrico personalizável). A fonte da numeração é `ROADMAP.md`.
+0. **São dezesseis fases concluídas, e as Fases 17 e 18 estão propostas** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11; a 12 e a 13 trazem o harness local como provedor, com as ferramentas da plataforma; a 14 é o Escritório isométrico personalizável e a 15, os personagens 16 bits e o entorno; a 16, a 17 e a 18 transformam a plataforma numa empresa de agentes, com áreas, quadro de tarefas e fluxos configuráveis). A fonte da numeração é `ROADMAP.md`.
 1. **Desenvolvimento por fases.** Trabalhe apenas na fase em curso segundo `ROADMAP.md`. Não adiante itens de fases futuras.
 2. **Parada entre fases.** Ao concluir uma fase, apresente: o que foi feito; arquivos criados ou modificados; decisões técnicas; testes executados e resultados; problemas e pendências; resumo; o que vem na próxima fase. Depois pergunte explicitamente se pode prosseguir e **aguarde**.
 3. **Decisão arquitetural não coberta:** apresente alternativas e peça aprovação antes de implementar.

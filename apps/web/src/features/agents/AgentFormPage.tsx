@@ -54,7 +54,9 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const text = (field: Exclude<keyof AgentFormValues, 'enabled' | 'appearance'>) => ({
+  const text = (
+    field: Exclude<keyof AgentFormValues, 'enabled' | 'appearance' | 'areaAccess'>,
+  ) => ({
     value: values[field],
     error: errors[field],
     onChange: (event: { target: { value: string } }) => set(field, event.target.value),
@@ -127,6 +129,23 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
               {project.name}
             </option>
           ))}
+        </SelectField>
+        <SelectField
+          label="Pasta compartilhada da área"
+          value={values.projectId === '' ? 'none' : values.areaAccess}
+          disabled={values.projectId === ''}
+          onChange={(event) =>
+            set('areaAccess', event.target.value as AgentFormValues['areaAccess'])
+          }
+          hint={
+            values.projectId === ''
+              ? 'Escolha um projeto: a pasta compartilhada é da área (o projeto).'
+              : 'Onde os agentes da área trocam arquivos, pelo prefixo "area/". Ler e escrever ainda dependem das ferramentas de arquivo liberadas.'
+          }
+        >
+          <option value="none">Sem acesso</option>
+          <option value="read">Só ler</option>
+          <option value="write">Ler e escrever</option>
         </SelectField>
         <Switch
           checked={values.enabled}

@@ -11,7 +11,7 @@ import {
 import { and, asc, desc, eq, inArray, max, notInArray } from 'drizzle-orm';
 import { ValidationError } from '../../core/errors';
 import type { Db } from '../../db/client';
-import { approvals, messages, projects, runs, toolCalls } from '../../db/schema';
+import { approvals, messages, projects, runs, tasks, toolCalls } from '../../db/schema';
 import type { ToolRegistry } from '../../tools/registry';
 import { listAgentsWithState, storedAppearance } from '../agents/repository';
 import { messageText } from '../runs/service';
@@ -35,6 +35,16 @@ function promptOf(db: Db, runId: string): string | null {
     : text;
 }
 
+/** "Tarefa: <title>", shortened like a prompt, for a run working on a board task (Phase 16). */
+function taskTitleOf(db: Db, taskId: string): string | null {
+  const task = db.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) return null;
+  const text = `Tarefa: ${task.title}`;
+  return text.length > PROMPT_PREVIEW_LENGTH
+    ? `${text.slice(0, PROMPT_PREVIEW_LENGTH - 1)}…`
+    : text;
+}
+
 /** Per agent, its most recent run in progress. */
 function currentRuns(db: Db): Map<string, CurrentRun> {
   const result = new Map<string, CurrentRun>();
@@ -50,7 +60,8 @@ function currentRuns(db: Db): Map<string, CurrentRun> {
       id: run.id,
       conversationId: run.conversationId,
       status: run.status,
-      prompt: promptOf(db, run.id),
+      // A run on a board task opens with the whole brief: the task's title says more.
+      prompt: run.taskId ? taskTitleOf(db, run.taskId) : promptOf(db, run.id),
     });
   }
   return result;
