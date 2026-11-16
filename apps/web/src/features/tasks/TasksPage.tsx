@@ -1,5 +1,5 @@
 import type { Board, TaskSummary, WorkflowStage } from '@ea/shared';
-import { ArrowLeftRight, LayoutTemplate, Plus, Workflow } from 'lucide-react';
+import { ArrowLeftRight, CalendarClock, LayoutTemplate, Plus, Workflow } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, buttonClass } from '../../components/Button';
@@ -120,6 +120,10 @@ export function TasksPage() {
             <Link to="/tarefas/pedidos" className={buttonClass()}>
               <ArrowLeftRight className="size-4.5" aria-hidden />
               Pedidos entre áreas
+            </Link>
+            <Link to="/tarefas/agendamentos" className={buttonClass()}>
+              <CalendarClock className="size-4.5" aria-hidden />
+              Agendamentos
             </Link>
             <Link to="/tarefas/modelos" className={buttonClass()}>
               <LayoutTemplate className="size-4.5" aria-hidden />

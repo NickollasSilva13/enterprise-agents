@@ -11,6 +11,8 @@ import {
   PROVIDER_KINDS,
   RUN_STATUSES,
   RUN_TRIGGERS,
+  SCHEDULE_OUTCOMES,
+  type ScheduleRule,
   SIDES,
   STAGE_KINDS,
   TASK_EVENT_KINDS,
@@ -378,6 +380,12 @@ export const tasks = sqliteTable(
     parentTaskId: text('parent_task_id').references((): AnySQLiteColumn => tasks.id, {
       onDelete: 'restrict',
     }),
+    /**
+     * The schedule that created it (Phase 19). SQLite cannot add a column with
+     * ON DELETE SET NULL, so deleting a schedule clears this first, in the same
+     * transaction (`deleteSchedule`).
+     */
+    scheduleId: text('schedule_id').references((): AnySQLiteColumn => schedules.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -417,6 +425,36 @@ export const workflowTemplates = sqliteTable('workflow_templates', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Tasks created at set times (Phase 19). `rule` is checked with
+ * `scheduleRuleSchema` on the way in and out; `next_run_at` is when it is due
+ * next, null while paused or after a single time has passed.
+ */
+export const schedules = sqliteTable(
+  'schedules',
+  {
+    id: id(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    acceptance: text('acceptance').notNull().default(''),
+    priority: text('priority', { enum: TASK_PRIORITIES }).notNull().default('normal'),
+    rule: text('rule', { mode: 'json' }).notNull().$type<ScheduleRule>(),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    nextRunAt: text('next_run_at'),
+    lastRunAt: text('last_run_at'),
+    lastOutcome: text('last_outcome', { enum: SCHEDULE_OUTCOMES }),
+    lastTaskId: text('last_task_id').references((): AnySQLiteColumn => tasks.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index('schedules_next_idx').on(table.enabled, table.nextRunAt)],
+);
 
 /** What happened to a task. Insert only, like the audit trail. */
 export const taskEvents = sqliteTable(

@@ -60,6 +60,7 @@ import {
   readWorkflow,
   replaceWorkflow,
   runMovedTask,
+  scheduleNameOf,
   type StageRow,
   stagesOf,
   summarize,
@@ -157,6 +158,7 @@ export function getTaskDetail(db: Db, taskId: string): TaskDetail {
     parent: task.parentTaskId ? linkedOf(db, findTask(db, task.parentTaskId)) : null,
     children: childrenOf(db, taskId).flatMap((child) => linkedOf(db, child) ?? []),
     requestTargets: requestTargetsOf(db, task),
+    schedule: task.scheduleId ? (scheduleNameOf(db, task.scheduleId) ?? null) : null,
   };
 }
 
@@ -279,7 +281,21 @@ export function saveWorkflow(ctx: TasksContext, areaId: string, input: WorkflowU
 
 // ---- Tasks ---------------------------------------------------------------------
 
-export function createTask(ctx: TasksContext, areaId: string, input: TaskCreate): TaskSummary {
+/** Who made a task other than the user: a schedule (Phase 19). */
+export interface TaskOrigin {
+  readonly scheduleId: string;
+  /** "system" when the clock made it, "user" when asked for now. */
+  readonly actor: 'system' | 'user';
+  /** Goes to the history as the text of the "created" event. */
+  readonly note: string;
+}
+
+export function createTask(
+  ctx: TasksContext,
+  areaId: string,
+  input: TaskCreate,
+  origin?: TaskOrigin,
+): TaskSummary {
   const { db } = ctx;
   requireArea(db, areaId);
   const stages = stagesOf(db, areaId);
@@ -304,8 +320,15 @@ export function createTask(ctx: TasksContext, areaId: string, input: TaskCreate)
       priority: input.priority,
       stageId: stage.id,
       state: stage.kind === 'done' ? 'done' : 'open',
+      scheduleId: origin?.scheduleId ?? null,
     });
-    insertEvent(tx, { taskId: id, kind: 'created', actor: 'user', toStage: stage.name });
+    insertEvent(tx, {
+      taskId: id,
+      kind: 'created',
+      actor: origin?.actor ?? 'user',
+      toStage: stage.name,
+      text: origin?.note ?? '',
+    });
   });
   pump(ctx);
   return summaryOf(db, requireTask(db, id));

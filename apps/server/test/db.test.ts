@@ -35,6 +35,7 @@ const EXPECTED_TABLES = [
   'providers',
   'run_steps',
   'runs',
+  'schedules',
   'settings',
   'task_events',
   'tasks',
@@ -258,6 +259,25 @@ describe('migrations over existing data', () => {
       { id: 's2' },
     ]);
     expect(database.db.select().from(workflowTemplates).all()).toEqual([]);
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+
+  it('keep tasks, now with no schedule, when adding schedules (0008)', () => {
+    const database = databaseUpTo(7);
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Site');
+      INSERT INTO workflow_stages (id, project_id, position, name, kind)
+        VALUES ('s1', 'pr1', 0, 'Fila', 'human');
+      INSERT INTO tasks (id, project_id, title, stage_id) VALUES ('t1', 'pr1', 'Tarefa', 's1');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select().from(tasks).get()).toMatchObject({ id: 't1', scheduleId: null });
+    // A task cannot point at a schedule that does not exist.
+    expect(() =>
+      database.sqlite.prepare("UPDATE tasks SET schedule_id = 'nada' WHERE id = 't1'").run(),
+    ).toThrow(/FOREIGN KEY/);
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
   });
 });

@@ -13,6 +13,7 @@ import { OfficePage } from '../features/office/OfficePage';
 import { PlannedPage } from '../features/planned/PlannedPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { RequestsPage } from '../features/tasks/RequestsPage';
+import { SchedulesPage } from '../features/tasks/SchedulesPage';
 import { TaskPage } from '../features/tasks/TaskPage';
 import { TasksPage } from '../features/tasks/TasksPage';
 import { TemplatesPage } from '../features/tasks/TemplatesPage';
@@ -52,6 +53,7 @@ export const routes: RouteObject[] = [
       { path: 'tarefas/fluxo/:areaId', element: <WorkflowEditorPage /> },
       { path: 'tarefas/pedidos', element: <RequestsPage /> },
       { path: 'tarefas/modelos', element: <TemplatesPage /> },
+      { path: 'tarefas/agendamentos', element: <SchedulesPage /> },
       { path: 'tarefas/:taskId', element: <TaskPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'logs/:runId', element: <RunDetailPage /> },

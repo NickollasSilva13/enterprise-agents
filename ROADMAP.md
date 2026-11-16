@@ -24,6 +24,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 16 | Áreas, quadro de tarefas e fluxos configuráveis | Concluída em 2026-11-16 |
 | 17 | Pedidos entre áreas | Concluída em 2026-11-16 |
 | 18 | Catálogo de fluxos prontos | Concluída em 2026-11-16 |
+| 19 | Agendamento de tarefas | Concluída em 2026-11-16 |
 
 ## Fases concluídas
 
@@ -753,6 +754,50 @@ Produto, Conteúdo e documentação) só com ferramentas que já existem. D6: te
 - Nenhum modelo real percorreu os fluxos novos: as instruções dos papéis foram revisadas na escrita, não postas à prova com um modelo de verdade.
 - As telas novas não foram vistas em captura de tela.
 
+## Fase 19 — Agendamento de tarefas (concluída)
+
+**Objetivo.** Tirar "Agendamento de execuções" das melhorias futuras: que uma
+área receba trabalho em horários marcados, sem alguém criar a tarefa ou
+escrever no chat. Escolhida pelo usuário em 2026-11-16, entre as melhorias
+futuras, depois do fim da Fase 18.
+
+**Decisões aprovadas em 2026-11-16 (D1 a D6, todas como recomendadas).** D1: o
+que se agenda é uma tarefa no quadro de uma área (título, descrição, critérios,
+prioridade), que entra na primeira etapa e segue o fluxo; conversas de chat não
+são agendadas. D2: uma vez, todo dia, toda semana (dias escolhidos) ou todo mês
+(no dia 31, num mês mais curto, o último dia), sem expressão cron, no horário
+desta máquina. D3: com o servidor desligado na hora marcada, ao voltar cada
+agendamento cria uma tarefa só, com o horário marcado no histórico, e segue a
+partir de agora. D4: enquanto a tarefa anterior do agendamento está aberta, não
+cria outra e registra que pulou; até 50 agendamentos; só o usuário agenda,
+nenhuma ferramenta de agente; tudo na auditoria. D5: tabela `schedules` e um
+relógio no servidor (`setTimeout`, sem dependência nova). D6: tela
+"Agendamentos" (`/tarefas/agendamentos`) e "Criada pelo agendamento" na tarefa.
+
+### O que foi feito
+
+- Contrato: regra de repetição (`scheduleRuleSchema`), `nextOccurrence` (função pura, testada sem relógio), esquemas de criar, editar e listar; `schedule` no detalhe da tarefa.
+- Banco: migração `0008_schedules` (tabela `schedules`; coluna `tasks.schedule_id`), testada sobre dados existentes.
+- Servidor: `modules/schedules` (repositório, serviço, rotas e o relógio em `scheduler.ts`); rotas `GET`/`POST /api/schedules`, `PATCH`/`DELETE /api/schedules/:id` e `POST /api/schedules/:id/run` ("criar agora"); `createTask` aceita a origem (agendamento, quem pediu, texto do histórico).
+- Interface: tela "Agendamentos" com criar, editar, pausar, retomar, "criar agora" e excluir, a repetição por extenso, a próxima vez e o último resultado; painel "Agendamento" na página da tarefa.
+- E2E novo (`schedules.spec.ts`): agendamento criado pela tela, tarefa criada agora com a origem no histórico, pedido de novo com a anterior aberta, pausa, exclusão, e a tarefa que fica no quadro.
+
+### Decisões tomadas durante a implementação
+
+- **No máximo uma tarefa por horário, em vez de "mesma transação" (D5).** Criar a tarefa já abre a própria transação e chama o despachante; por isso o relógio grava primeiro a próxima vez e só depois cria a tarefa. Um horário nunca vira duas tarefas; se o processo cair entre os dois passos, aquele horário se perde, o que é mais seguro que repetir.
+- **`tasks.schedule_id` sem cascata no banco.** O SQLite não aceita `ON DELETE SET NULL` numa coluna acrescentada por `ALTER`; excluir um agendamento limpa essa coluna na mesma transação.
+- **Pausar e retomar contam a partir de agora**: o que passou durante a pausa não é recuperado (D3 é para o servidor desligado).
+- **"Criar agora" não muda a próxima vez**, e segue a regra de não empilhar.
+- **Área sem fluxo**: o agendamento registra que não conseguiu criar a tarefa e o relógio segue com os outros. Excluir a área exclui os agendamentos dela.
+- **O relógio nunca espera mais de uma hora** de cada vez, para notar um relógio mudado à mão ou a volta de uma suspensão.
+- **A tela relê os agendamentos a cada 30 s**, para o último resultado aparecer sem recarregar.
+
+### Não validado
+
+- O disparo pelo relógio foi testado com horários já vencidos (ao ligar e ao reprogramar), não esperando um horário futuro chegar.
+- A troca de horário de verão não foi testada: a conta usa o horário local do JavaScript, e o Brasil não tem horário de verão hoje.
+- As telas novas não foram vistas em captura de tela.
+
 ## Pendências ao final do projeto
 
 - OpenAI e Anthropic nunca foram validados com o serviço real (não há chave); só contra servidores simulados.
@@ -776,6 +821,5 @@ Todos os requisitos funcionais de `SPEC.md`: infraestrutura (RNF-02 a RNF-12), R
 - Instalador desktop (Tauri ou Electron).
 - Agentes baseados no Claude Agent SDK.
 - Suporte a servidores MCP como fonte de ferramentas.
-- Agendamento de execuções.
 - Memória de longo prazo e base de conhecimento por agente.
 - Interface em outros idiomas.

@@ -56,6 +56,7 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - Pasta da área: `resolveToolPath` (`tools/workspace.ts`) com o prefixo `area/`; o resto passa por `resolveInWorkspace`.
 - Pedidos entre áreas (Fase 17): um pedido é uma tarefa com `parent_task_id`, criada só por `requestWork` (regra em `area_links`, sem laço, profundidade até 3). Tarefa com pedido aberto (`pending` ou `open`) não recebe execução, e o fim de uma execução sem mover não a para. Arquivos entre áreas só por `modules/tasks/area-files.ts` (cópia, links ignorados, limite conferido antes); uma área nunca lê a pasta da outra.
 - Modelos de fluxo (Fase 18): `modules/tasks/templates.ts`. O conteúdo é sempre conferido com `templateContentSchema`, ao gravar e ao ler; o que um modelo pode levar é decidido por esse esquema estrito, então campo novo de papel precisa entrar nele de propósito. Aplicar um modelo (`createAreaFromTemplate`) grava toda ferramenta como `ask` e pula as de `scope: 'task'`.
+- Agendamentos (Fase 19): `modules/schedules`. O relógio (`scheduler.ts`) começa no `onReady` e para no `preClose`; `fireDue` grava a próxima vez antes de criar a tarefa (no máximo uma por horário) e cria por `createTask` com `TaskOrigin`. `tasks.schedule_id` não tem cascata no banco: exclua agendamento só por `deleteScheduleRow`, que limpa a coluna antes. Nos testes, um agendamento vencido gravado antes de `makeApp({ database })` é disparado na partida; depois dela, qualquer `PATCH` reprograma o relógio.
 
 ## Exportar e importar agentes
 

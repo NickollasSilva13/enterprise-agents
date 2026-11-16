@@ -15,6 +15,7 @@ import {
   areaLinks,
   projects,
   runs,
+  schedules,
   taskEvents,
   tasks,
   workflowStages,
@@ -230,6 +231,18 @@ export function updateTask(db: Tx, taskId: string, patch: Partial<TaskRow>): voi
     .set({ ...patch, updatedAt: new Date().toISOString() })
     .where(eq(tasks.id, taskId))
     .run();
+}
+
+/** The schedule that made a task (Phase 19), by name. */
+export function scheduleNameOf(
+  db: Tx,
+  scheduleId: string,
+): { id: string; title: string } | undefined {
+  return db
+    .select({ id: schedules.id, title: schedules.title })
+    .from(schedules)
+    .where(eq(schedules.id, scheduleId))
+    .get();
 }
 
 export function insertTask(db: Tx, row: typeof tasks.$inferInsert): void {
