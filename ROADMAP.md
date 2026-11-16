@@ -19,6 +19,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 11 | Finalização e documentação | Concluída em 2026-11-15 (aguardando aprovação) |
 | 12 | Harness local como provedor | Planejada (2026-11-15) |
 | 13 | Ferramentas da plataforma para agentes de harness | Planejada |
+| 14 | Escritório isométrico personalizável | Concluída em 2026-11-16 |
 
 ## Fases concluídas
 
@@ -283,6 +284,145 @@ defeito na contagem de tokens de entrada (`SECURITY.md`, seção 10).
 
 **Não validado.** O Codex não está instalado: segue só contra o programa
 simulado.
+
+## Fase 14 — Escritório isométrico personalizável (concluída)
+
+**Objetivo.** Redesenhar o Escritório e o visual geral da interface no estilo da
+imagem de referência do usuário (escritório isométrico em pixel art, salas
+nomeadas, plantas, balões, painel lateral de presença, barra de ações, minimapa)
+e tornar **personalizável pelo usuário** tanto o escritório (salas, layout,
+móveis, decoração) quanto a aparência de cada agente. A imagem é só referência de
+estilo: nome de marca, pessoas e dados dela não entram no produto.
+
+**O que não muda.** O lugar de cada agente continua decidido só por `placeOf` a
+partir de `/api/office` (mesa, copa, fora, visita); nada de posição de personagem
+é gravado. `SceneEngine` continua sem tocar o DOM. CSP intacta: sem `style`,
+sem recurso de outro domínio, posição de personagem pelo atributo `transform`.
+O que passa a ser gravado é o **layout** (onde ficam salas, mesas e móveis) e a
+**aparência** dos agentes — configuração, não estado.
+
+### Decisões (aprovadas pelo usuário em 2026-11-15, todas as recomendações)
+
+**D1 — Como guardar a personalização.**
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | Tabelas novas `office_areas` (id, tipo, nome, retângulo na grade, `project_id` opcional com `on delete set null`, piso) e `office_items` (id, tipo do catálogo, posição na grade, orientação, `area_id`, `agent_id` opcional para mesa, com `on delete set null`); coluna nova `agents.appearance` (JSON validado por Zod, nula = aparência derivada do id, como hoje). Grade e limites em `packages/shared/src/office.ts`. | Integridade pelo banco: projeto excluído deixa a sala sem vínculo, agente excluído libera a mesa. Acesso pelos repositórios como o resto. | Duas tabelas e um repositório novos. |
+| B | Um documento JSON no `settings` (`office.layout`) e a mesma coluna `agents.appearance`. | Menos código. | Referências soltas a projeto e agente que o banco não protege; cada leitura precisa "limpar" ids mortos. |
+| C | Tabela `office_layouts` com vários documentos JSON nomeados (presets do usuário). | Troca de layout salvo em um clique. | Mesmos contras de B; mais de um layout ainda não tem uso claro. |
+
+A migração de A só cria tabelas e acrescenta uma coluna anulável
+(`ALTER TABLE ADD COLUMN`): não reconstrói tabela, logo não depende da correção
+de `runMigrations` do PR #2 (o trabalho parte da ponta desta branch de qualquer
+forma). Salvar o layout é um `PUT /api/office/layout` que troca tudo numa
+transação; a aparência vai no `PATCH` do agente e no arquivo de exportação
+(RF-20).
+
+**D2 — Como desenhar personagens e mobiliário.**
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | Pixel art própria em **SVG por camadas**, descrita em código como matrizes de pixels com paleta indexada (corpo/tom de pele, cabelo, roupa, calça, acessório; cada móvel em 2 orientações). Uma função pura converte a matriz em `<path>` por cor (um traço por sequência horizontal), com `shape-rendering="crispEdges"`. Trocar cor = trocar a paleta. | Personalização por camada sem multiplicar arquivos; testável como função; nada externo; o atributo `transform` continua movendo o personagem. | Autoria da arte em código (matrizes), mais trabalhosa que desenhar num editor. |
+| B | Folhas de sprites PNG em `apps/web/public`, desenhadas com `<image>`. | Arte mais rica. | Recolorir exige uma folha por variação ou filtro CSS; arte em binário, sem revisão em diff; precisaria de ferramenta de desenho. |
+| C | Canvas 2D para a cena inteira. | Desempenho com centenas de objetos. | Perde o DOM que os testes leem (`data-place`, `data-seated`, `data-walker`), perde links clicáveis e acessíveis; reescreve a Fase 9. |
+
+**D3 — Projeção e geometria.** Recomendado: **isométrica 2:1 sobre uma grade de
+ladrilhos**, com a geometria calculada do layout (função pura: ladrilho → ponto
+na tela) em vez de medida do DOM (`measure` sai de `Walkers.tsx`). As rotas do
+motor passam do esquema "porta → corredor → porta" para busca de caminho (A\*)
+na grade, atravessando só piso e portas. Alternativa: visão de cima em 3/4 sem
+isometria — editor e cliques mais simples, mas foge da referência.
+No celular a cena ganha arrastar e aproximar, e o painel lateral vira gaveta.
+
+**D4 — Como editar o layout.**
+
+| | Alternativa |
+|---|---|
+| **A (recomendada)** | **Presets + editor em grade.** Na primeira abertura o layout é gerado a partir dos projetos existentes (nada some para quem já usa). Modelos prontos (pequeno, médio, aberto) como ponto de partida, e um modo "Editar escritório" com: desenhar e redimensionar áreas na grade, escolher tipo e nome, vincular a um projeto, pôr portas na parede, arrastar móveis do catálogo, girar, excluir, desfazer, e validação antes de salvar (sobreposição, área sem porta, piso inalcançável, recepção e copa obrigatórias). Teclado para tudo o que o mouse faz. |
+| B | Só presets, com nomes e cores editáveis. Muito menos trabalho, mas não cumpre "tudo personalizável". |
+| C | Só editor livre, sem presets. Cumpre, mas deixa o usuário diante de uma grade vazia. |
+
+Mesa e agente: uma mesa do layout pode ter dono. Agente sem mesa senta na
+primeira mesa livre da sala do seu projeto (decidido por função pura, sem
+gravar); se não houver, aparece no painel como "Sem mesa" e o editor avisa.
+
+**D5 — O que da imagem vira funcionalidade e o que não entra.**
+
+| Elemento da referência | Na Fase 14 |
+|---|---|
+| Salas nomeadas | Real: tipos de área com comportamento. **Sala de projeto** (mesas dos agentes), **Recepção** (entrada; inativo fica fora — RF-80), **Copa** (ocioso há 2 min — RF-80). |
+| Sala de Reunião | Real, se aprovado: durante uma delegação, quem delegou e quem recebeu se encontram nela (no lugar da visita à mesa); sem sala de reunião no layout, a visita continua como hoje. |
+| Descompressão | Real, se aprovado: ocioso há mais tempo (proposta: 10 min) vai da copa para a área de descompressão. |
+| Sala de Foco | Sala de projeto com outra decoração: o usuário pode pôr mesas de agentes nela. Sem regra própria. |
+| Mural "Boas ideias!", plantas, sofás, estantes | Decoração do catálogo de móveis. Texto do mural editável pelo usuário. |
+| Placas com nome das salas e balões de fala | Real: nome da área e o texto que `balloonText` já produz, em HTML dentro de `<foreignObject>` posicionado por atributo (sem `<text>`, sem `style`). |
+| Painel "Pessoas Online" | Real, como **"Agentes no escritório (n)"**: rosto, nome, estado e onde está ("Na mesa", "Na copa", "Fora", "Na mesa de …"); clique abre a conversa; "Ver todos" leva a Agentes. É também a leitura acessível da cena. |
+| Sino com contador | Real: aprovações pendentes, leva a Aprovações. |
+| Minimapa | Real: o layout em miniatura com um ponto por agente; clicar centraliza a cena. |
+| Barra inferior (microfone, câmera, tela, emoji, mais) | **Não entra**: chamada de voz, vídeo, compartilhamento de tela e reações não existem nem estão planejados. No lugar, ações reais: Editar escritório, Novo agente, Aprovações (n), Centralizar, Aproximar/afastar. |
+| Usuário no rodapé à esquerda ("Disponível") | **Não entra** como presença: a plataforma é de usuário único e não tem estado de pessoa; um "Disponível" seria fictício. O rodapé da barra lateral mostra o estado real do servidor (o que a faixa de resumo já mostra). |
+| Marca "WorkHub" e pessoas de exemplo | Não entram. A marca continua "Enterprise Agents". |
+
+**D6 — Aparência dos agentes e visual do site.**
+
+- Personagem humano em pixel art com camadas escolhidas no formulário do agente
+  (nova seção "Aparência", com prévia ao vivo e "Sortear"): tom de pele,
+  penteado e cor do cabelo, roupa e cor, calça, acessório (óculos, fone, boné,
+  nenhum). Opção de manter o **robô** atual como um dos "tipos" de personagem,
+  para quem preferir. Agente sem aparência gravada continua derivado do id, logo
+  ninguém muda de cara na atualização. O avatar das listas, do chat e do painel
+  usa a mesma aparência.
+- Visual geral: novo tema escuro lilás/violeta inspirado na referência (barra
+  lateral com item ativo em pílula, painéis arredondados, tipografia atual). A
+  regra "cor saturada significa estado" se mantém nos indicadores. Alternativa:
+  manter o tema atual como opção "Planta azul" e oferecer os dois nas
+  Configurações (mais um item personalizável, custo pequeno).
+
+### Escopo proposto (depois de aprovado)
+
+1. Contrato e banco: `packages/shared/src/office.ts` (catálogo de tipos de área e
+   móvel, limites da grade e do layout, esquemas `z.strictObject`), migração,
+   repositório e rotas `GET/PUT /api/office/layout`, aparência no agente e na
+   exportação; testes de integração.
+2. Arte: gerador de SVG a partir de matrizes, personagens por camada, móveis e
+   pisos isométricos; testes da função geradora.
+3. Cena: projeção isométrica, A\* na grade, `SceneEngine` alimentado pela
+   geometria do layout; testes puros do motor (os da Fase 9 adaptados).
+4. Escritório: cena nova, placas, balões, painel de agentes, sino, minimapa,
+   barra de ações, pan e zoom, celular.
+5. Editor de layout com presets e validação; formulário de aparência.
+6. Tema geral novo.
+7. E2E (desktop e celular, incluindo editar e salvar layout, mudar aparência,
+   desempenho com 30 agentes andando), `npm run check:full`, documentação viva
+   (`SPEC.md` com RF novos, `ARCHITECTURE.md` seção 13, `SECURITY.md` seção 9,
+   `TESTING.md` seção 7, `docs/GUIA.md`, `apps/web/CLAUDE.md`).
+
+**Fora do escopo.** Voz, vídeo, tela compartilhada, reações; perfil ou presença
+do usuário; vários andares; layouts salvos com nome além dos presets;
+exportar/importar o layout do escritório (pode ser fase futura); arte
+importada pelo usuário (imagens enviadas).
+
+### O que foi feito
+
+- Contrato em `packages/shared`: `appearance.ts` (opções enumeradas, robô derivado do id, sorteio), `office.ts` (catálogo de áreas, pisos e 18 móveis, limites, esquemas estritos), `office-grid.ts` (grade navegável, busca de caminho, validação com mensagens em português, distribuição de mesas) e `office-presets.ts` (modelos completo, compacto e amplo). O pacote ganhou testes próprios (`npm test` roda neles).
+- Banco: migração `0003_office_layout.sql` com `office_areas`, `office_items` e `agents.appearance`. Ela também reconstrói `providers`: a migração manual 0002 tinha deixado o retrato do esquema do Drizzle para trás, e a próxima gerada carregou a reconstrução. Como `runMigrations` desliga as chaves estrangeiras, os dados passam intactos, com teste sobre banco existente.
+- API: `/api/office` passou a trazer `layout`, `customized`, `projects` e `agents` (com `projectId` e `appearance`) no lugar de `rooms`; `PUT /api/office/layout` (tudo ou nada, revalidado no servidor) e `DELETE /api/office/layout` (volta ao automático). A aparência vai no agente, na duplicação e no arquivo de exportação. Mudar só a aparência não zera o tempo de ócio (não conta como atividade).
+- Interface: Escritório isométrico em pixel art (`OfficeScene.tsx`, `art/`, `components/pixel-art/`), com paredes, portas, placas, balões, painel "Agentes no escritório", sino de aprovações, barra de ações e minimapa; arrastar e aproximar pelo `viewBox`. Motor em coordenadas de ladrilho, com reunião na sala de reunião e descanso na descompressão. Editor em `/escritorio/editar` com ferramentas, formulários, lista de problemas, desfazer/refazer, teclado e modelos prontos. Seção "Aparência" no formulário do agente, com prévia, amostras de cor e "Sortear"; avatares em pixel art em todas as telas. Tema lilás com item de menu ativo em pílula violeta.
+- Removidos `DeskScene.tsx`, `Walkers.tsx` e `CommonAreas.tsx` da Fase 9.
+
+### Decisões tomadas durante a implementação
+
+- Móveis feitos de caixas isométricas geradas em código, mais sprites de pixel para plantas e folhagens; personagens inteiramente em matrizes de pixels por camadas (12 × 24). Continua sendo arte própria em SVG por camadas (D2), só que a matriz ficou para o que é orgânico.
+- Agente novo criado pelo formulário começa como pessoa sorteada; criado pela API sem aparência, continua robô.
+- Agente sem mesa no layout espera na recepção (lugar `lobby`), e o painel diz "Sem mesa no layout".
+- Os nomes de sala, balões e mural ficam em `<foreignObject>`: a cena inteira é `aria-hidden`, e o painel é a leitura acessível dela.
+
+### Não validado
+
+- O movimento e a arte foram vistos por mim em capturas do navegador embutido, num servidor à parte com dados descartáveis; ninguém olhou a cena em movimento.
+- O editor foi exercitado por testes de componente e E2E (selecionar, renomear, apagar, desfazer, salvar, voltar ao automático); desenhar área arrastando o ponteiro e mover móvel arrastando foram testados só como função pura e por evento sintético, não por um ponteiro real.
+- Telas de toque reais (arrastar e aproximar com dois dedos) não foram testadas; o perfil de celular do Playwright usa clique.
+- A porta 4317 estava ocupada por um `npm start` de outra conversa durante a fase; a verificação no navegador usou portas 4327/5183 e uma pasta de dados temporária, com uma configuração de pré-visualização provisória que já foi removida.
 
 ## Pendências ao final do projeto
 

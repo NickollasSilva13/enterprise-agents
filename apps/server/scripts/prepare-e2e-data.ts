@@ -55,7 +55,7 @@ if (process.argv.includes('--seed')) {
     finishedAt: minutesAgo(29),
   });
 
-  // Idle for an hour: long enough to be found at the pantry (RF-80).
+  // Idle for an hour: long enough to be found resting in the lounge (RF-80).
   const summarizer = addAgent(database, {
     name: 'Resumidor',
     projectId: research,

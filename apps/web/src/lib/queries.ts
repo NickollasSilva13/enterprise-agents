@@ -8,6 +8,8 @@ import {
   type AgentUpdate,
   dashboardSummarySchema,
   modelListSchema,
+  type OfficeLayoutInput,
+  officeLayoutSchema,
   officeSchema,
   type ProjectCreate,
   projectListSchema,
@@ -163,5 +165,24 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: (id: string) => apiDelete(projectPath(id)),
     onSuccess: refresh,
+  });
+}
+
+/** Saves the office layout made in the editor (Phase 14); the server refuses it whole if it has problems. */
+export function useSaveLayout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (layout: OfficeLayoutInput) =>
+      apiSend('PUT', '/api/office/layout', officeLayoutSchema, layout),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['office'] }),
+  });
+}
+
+/** Goes back to the automatic layout, rebuilt from the projects. */
+export function useResetLayout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete('/api/office/layout'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['office'] }),
   });
 }

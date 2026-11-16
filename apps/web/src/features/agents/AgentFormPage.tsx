@@ -17,6 +17,7 @@ import {
   useProjects,
   useUpdateAgent,
 } from '../../lib/queries';
+import { AppearanceFields } from './AppearanceFields';
 import { type AgentFormErrors, type AgentFormValues, parseForm, toFormValues } from './agent-form';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -53,7 +54,7 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const text = (field: Exclude<keyof AgentFormValues, 'enabled'>) => ({
+  const text = (field: Exclude<keyof AgentFormValues, 'enabled' | 'appearance'>) => ({
     value: values[field],
     error: errors[field],
     onChange: (event: { target: { value: string } }) => set(field, event.target.value),
@@ -134,6 +135,14 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
         >
           {values.enabled ? 'Ativo: pode ser executado' : 'Inativo: não pode ser executado'}
         </Switch>
+      </Section>
+
+      <Section title="Aparência">
+        <AppearanceFields
+          agentId={agent?.id ?? 'novo-agente'}
+          value={values.appearance}
+          onChange={(appearance) => set('appearance', appearance)}
+        />
       </Section>
 
       <Section title="Instruções">
@@ -257,7 +266,12 @@ export function AgentFormPage() {
         description={
           agent.data ? (
             <span className="flex items-center gap-3">
-              <AgentAvatar agentId={agent.data.id} size={28} dimmed={!agent.data.enabled} />
+              <AgentAvatar
+                agentId={agent.data.id}
+                appearance={agent.data.appearance}
+                size={28}
+                dimmed={!agent.data.enabled}
+              />
               <StateLamp state={agent.data.state} />
             </span>
           ) : (

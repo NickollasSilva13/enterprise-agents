@@ -12,7 +12,10 @@ Carregado quando a tarefa toca a interface. As regras gerais estão em `CLAUDE.m
 
 ## Escritório vivo
 
-O lugar de cada agente é decidido só por `placeOf` (`src/features/office/scene.ts`) a partir de `/api/office`; não guarde posição em lugar nenhum. O motor (`SceneEngine`) não toca o DOM e se testa como função pura; os personagens se movem pelo atributo `transform`, nunca por `style`. Os testes leem `data-place` e `data-seated` (na mesa) e `data-walker`/`data-moving` (no personagem).
+O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/office/scene.ts`) a partir de `/api/office`; não guarde posição de personagem em lugar nenhum (o layout, sim, é gravado: é configuração). O motor (`SceneEngine`) não toca o DOM, trabalha em coordenadas de ladrilho e se testa como função pura; `geometry.ts` liga ele ao layout. Os personagens se movem pelo atributo `transform`, nunca por `style`; a vista é o atributo `viewBox`. A cena é desenhada por bandas de profundidade (`x + y`): um personagem que muda de banda força um novo desenho. Texto na cena (placas, balões, mural) vai em `<foreignObject>`, nunca em `<text>`. Os testes leem, no painel, `data-agent`, `data-place` e `data-seated`; na cena, `data-sitter` (sentado), `data-walker`/`data-moving` (em pé) e `data-area-floor` (piso de cada área).
+
+- Pixel art em `src/components/pixel-art/`: sprite é lista de linhas, um caractere por pixel, cor pela paleta (`palette.ts`). Opção nova de aparência entra no enum de `packages/shared/src/appearance.ts`, na paleta e no teste `pixels.test.tsx`, que desenha toda opção.
+- Móvel novo: `ITEM_KINDS`/`ITEM_KIND_INFO` em `packages/shared/src/office.ts` e um caso em `art/furniture.tsx`.
 
 ## Testes de componente
 

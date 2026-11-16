@@ -68,6 +68,8 @@ describe('creating an agent', () => {
           maxDurationSeconds: 300,
           maxTotalTokens: null,
           enabled: true,
+          // A new agent starts as a person drawn at random (Phase 14).
+          appearance: expect.objectContaining({ kind: 'person' }) as unknown,
         },
       },
     ]);
@@ -94,6 +96,7 @@ describe('creating an agent', () => {
     await type(/Tempo por execução/, '60');
     await type('Tokens por execução', '9000');
     fireEvent.click(screen.getByRole('switch', { name: 'Agente ativo' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Robô' }));
     fireEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
 
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -110,7 +113,38 @@ describe('creating an agent', () => {
       maxDurationSeconds: 60,
       maxTotalTokens: 9000,
       enabled: false,
+      appearance: null,
     });
+  });
+
+  it('chooses how the agent looks: kind, colours and options, with a preview (Phase 14)', async () => {
+    const { writes } = renderApp('/agentes/novo', {
+      ...base,
+      'POST /api/agents': () => json(201, makeAgent({ id: 'a1', name: 'Leitor' })),
+    });
+    await type('Nome', 'Leitor');
+    fireEvent.click(screen.getByRole('radio', { name: 'Robô' }));
+    expect(screen.getByText(/O robô tem cor e rosto/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Pessoa' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Escura' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Ruivo' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Cabelo' }), {
+      target: { value: 'bun' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Acessório' }), {
+      target: { value: 'glasses' },
+    });
+    expect(screen.getByRole('radio', { name: 'Escura' }).getAttribute('aria-checked')).toBe('true');
+    // "Sortear" draws another person, still from the lists.
+    fireEvent.click(screen.getByRole('button', { name: 'Sortear' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Escura' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect((writes()[0]?.body as { appearance: unknown }).appearance).toMatchObject({
+      kind: 'person',
+      skin: 'deep',
+    });
+    expect(document.querySelector('form [style]')).toBeNull();
   });
 
   it('points out invalid fields and sends nothing', async () => {

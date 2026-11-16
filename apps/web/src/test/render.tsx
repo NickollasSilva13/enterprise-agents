@@ -52,6 +52,7 @@ export function makeAgent(overrides: Partial<Agent> & { id: string; name: string
     maxDurationSeconds: 300,
     maxTotalTokens: null,
     enabled: true,
+    appearance: null,
     state: 'idle',
     createdAt: '2026-11-12T12:00:00.000Z',
     updatedAt: '2026-11-12T12:00:00.000Z',

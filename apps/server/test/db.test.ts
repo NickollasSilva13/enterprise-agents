@@ -24,6 +24,8 @@ const EXPECTED_TABLES = [
   'conversations',
   'messages',
   'models',
+  'office_areas',
+  'office_items',
   'projects',
   'providers',
   'run_steps',
@@ -142,6 +144,40 @@ describe('migrations over existing data', () => {
     });
     if (withAgent) expect(database.db.select().from(agents).get()?.modelId).toBe('m1');
     // The keys are back on for everything that runs after the migrations.
+    expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1);
+  });
+
+  // 0003 adds the office layout and also rebuilds `providers`: the hand-written
+  // 0002 left drizzle's snapshot behind, so the next generated migration
+  // carried the rebuild. Data must come through untouched.
+  it('keep providers, models and agents when adding the office layout (0003)', () => {
+    const database = databaseUpTo(2);
+    database.sqlite.exec(`
+      INSERT INTO providers (id, name, kind, base_url, command, is_external)
+        VALUES ('p1', 'Ollama local', 'ollama', 'http://127.0.0.1:11434', NULL, 0),
+               ('p2', 'Claude Code', 'claude_code', NULL, 'claude', 1);
+      INSERT INTO models (id, provider_id, name, display_name)
+        VALUES ('m1', 'p1', 'llama3', 'Llama 3'), ('m2', 'p2', 'haiku', 'Haiku');
+      INSERT INTO agents (id, name, model_id) VALUES ('a1', 'Agente', 'm2');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select({ id: models.id }).from(models).all()).toEqual([
+      { id: 'm1' },
+      { id: 'm2' },
+    ]);
+    expect(
+      database.db.select({ id: providers.id, command: providers.command }).from(providers).all(),
+    ).toEqual([
+      { id: 'p1', command: null },
+      { id: 'p2', command: 'claude' },
+    ]);
+    expect(database.db.select().from(agents).get()).toMatchObject({
+      modelId: 'm2',
+      appearance: null,
+    });
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
     expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1);
   });
 });

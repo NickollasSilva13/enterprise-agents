@@ -172,14 +172,26 @@ Nos Logs, a execução mostra a **árvore de execução**, com um link para a de
 | Ocioso | Nada em andamento. |
 | Inativo | Desativado por você. |
 
-**Escritório.** Cada projeto é uma sala e cada agente tem uma mesa. O que cada um faz aparece em um balão e na animação. Além das salas há a Recepção e a Copa:
+**Escritório.** Uma planta isométrica em pixel art: cada projeto tem uma sala e cada agente, uma mesa. O que cada um faz aparece num balão sobre a cabeça e na animação. Além das salas dos projetos há a Recepção, a Copa, a Sala de reunião e a Descompressão:
 
-- quem está ocioso há 2 minutos vai à copa;
-- agente inativo fica fora do escritório, e a Recepção lista quem está fora;
-- quem delega vai até a mesa do colega;
-- a mesa mostra em texto onde o agente está ("Na copa", "Na mesa de …").
+- quem está ocioso há 2 minutos vai à copa, e há 10 minutos, à descompressão (se o layout tiver uma);
+- agente inativo fica fora do escritório;
+- quem delega se reúne com quem recebeu a tarefa na sala de reunião; sem sala de reunião, vai até a mesa do colega;
+- o painel "Agentes no escritório", ao lado, diz em texto onde cada um está e o que está fazendo, e tem o botão "Decidir" de quem espera a sua aprovação. O sino no alto conta as aprovações pendentes.
 
-Clicar em um agente abre a conversa. Se o seu sistema estiver com "reduzir movimento" ligado, os agentes mudam de lugar sem caminhar.
+Arraste o chão para andar pela planta, use a roda do mouse ou os botões da barra para aproximar e afastar, e clique no minimapa para ir a um ponto. Clicar em um agente abre a conversa (ou o pedido de aprovação, se ele estiver esperando). Se o seu sistema estiver com "reduzir movimento" ligado, os agentes mudam de lugar sem caminhar.
+
+**Editar o escritório.** O botão "Editar escritório" abre o editor. Enquanto você não salvar nada, o layout é montado sozinho a partir dos projetos (e ganha uma sala a cada projeto novo). No editor:
+
+- "Nova área" desenha uma sala arrastando na grade; escolha o tipo, o nome, o projeto (para salas de projeto e de foco) e o piso no painel ao lado;
+- "Porta" abre ou fecha uma porta clicando na borda da sala; toda área precisa de ao menos uma porta para o corredor;
+- "Móvel" põe uma peça do catálogo (mesas, plantas, sofás, estantes, bancada, cafeteira, mural e outras); R gira, as setas movem, Delete apaga;
+- numa mesa, "De quem é a mesa" a reserva para um agente; mesa livre fica para o primeiro agente sem mesa do projeto da sala;
+- "Modelo pronto" troca tudo por um dos modelos (completo, compacto, amplo); Ctrl+Z desfaz.
+
+O editor só deixa salvar um layout sem problemas e lista o que corrigir (sala sem porta, móvel sobre móvel, cadeira sem acesso, falta de recepção ou copa). "Voltar ao automático" apaga o layout salvo. Agente sem mesa no layout espera na recepção, e o painel avisa.
+
+**Aparência dos agentes.** No formulário do agente, a seção "Aparência" escolhe entre pessoa e robô e, para pessoa, a pele, o cabelo, a roupa, a calça e um acessório, com prévia. "Sortear" escolhe tudo ao acaso. Agentes criados antes desta versão continuam como o robô de sempre até você escolher outra coisa. A aparência vai junto quando você exporta o agente.
 
 **Logs.** A lista de execuções, com filtros por agente, estado e período. Cada execução abre a linha do tempo dos passos: chamadas ao modelo com duração e tokens, ferramentas pedidas e seus resultados, aprovações, delegações e erros, em linguagem comum. As mensagens de erro são frases fixas; o detalhe técnico de uma falha de provedor fica só no log do servidor, sem a chave.
 

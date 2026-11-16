@@ -226,7 +226,9 @@ SQLite em `data/app.db`, modo WAL, chaves estrangeiras ativas. Migrações Drizz
 | `tool_calls` | Chamadas de ferramenta, argumentos, resultado, decisão de permissão. |
 | `approvals` | Pedidos de aprovação e decisões. |
 | `audit_log` | Operações sensíveis (somente inserção). |
-| `settings` | Preferências da aplicação. |
+| `settings` | Preferências da aplicação; `office.layout` guarda o tamanho da grade do layout salvo (sem essa entrada o layout é o automático). |
+| `office_areas` | Áreas do layout do escritório (Fase 14): tipo, nome, retângulo na grade, piso, portas, projeto (`set null` ao excluir o projeto). |
+| `office_items` | Móveis do layout: tipo do catálogo, posição, orientação, dono da mesa (`agent_id`), texto do mural. |
 
 Identificadores são ULIDs monotônicos gerados no servidor: o maior id é sempre a linha mais recente, e consultas dependem disso. Datas em UTC, ISO 8601.
 
@@ -288,6 +290,7 @@ Exportar e importar agentes (RF-20) vivem em `modules/agents/transfer.ts`. O arq
 - Atualização dos dados por eventos: `useLiveRefresh` (montado uma vez, no layout) escuta `/api/events` e invalida as consultas afetadas; `useRunStream` acompanha uma execução no chat. Consulta periódica lenta (15 s) fica só como salvaguarda.
 - Saída do modelo passa sempre pelo componente `Markdown` (`react-markdown`, sem HTML bruto, sem imagens); o que o usuário digitou é exibido como texto puro.
 - O Escritório é desenhado em SVG por `features/office/DeskScene.tsx`. As animações são classes `desk-*` em `app/theme.css`; a preferência "reduzir movimento" do sistema as desliga.
+- Escritório isométrico (Fase 14, RF-81 a RF-83). O layout é configuração do usuário, guardado em `office_areas`/`office_items` e validado no servidor pelas mesmas funções puras que a interface usa (`packages/shared/src/office-grid.ts`: grade navegável, caminho por busca em largura, validação, distribuição de mesas). Sem layout salvo, `/api/office` devolve o modelo "completo" gerado dos projetos (`office-presets.ts`). A cena (`OfficeScene.tsx`) desenha em SVG, por bandas de profundidade (`x + y` do ladrilho), o chão, as paredes (fundo altas, frente baixas, porta é vão), os móveis (`art/furniture.tsx`, caixas isométricas e sprites) e os personagens em pixel art por camadas (`components/pixel-art/`, matriz de pixels transformada em um `<path>` por cor). O motor (`scene.ts`) trabalha em coordenadas de ladrilho; `geometry.ts` dá a ele os pontos de cada lugar e o caminho entre dois pontos. Placas, balões e o texto do mural são HTML em `<foreignObject>` posicionado por atributo. A vista (arrastar e aproximar) é o atributo `viewBox`, escrito sem passar pelo React (`viewport.ts`). O editor (`editor/`) é um redutor puro com desfazer, mais a página que traduz ponteiro e teclado em ações. A aparência do agente é uma coluna JSON de opções enumeradas; sem ela, o robô derivado do id.
 - Escritório vivo (RF-80), em `features/office/`: `scene.ts` não toca o DOM e tem duas partes, `placeOf` (onde o agente deve estar: mesa, copa, fora ou em visita, só a partir do que `/api/office` informa) e `SceneEngine` (leva cada personagem de onde está até lá, por porta, corredor e porta). `Walkers.tsx` mede a página (`data-area`, `data-door`, `data-floor`, `data-seat`, `data-entrance`), roda o motor com `requestAnimationFrame` e escreve a posição no atributo `transform` de cada personagem, sem passar pelo React. `CommonAreas.tsx` desenha portas, recepção e copa. Nada é gravado: recarregar a página dá a mesma cena.
 - Sem estilos inline e sem recursos externos, para cumprir a CSP. Cores vêm dos tokens em `app/theme.css`; cor saturada significa sempre estado.
 

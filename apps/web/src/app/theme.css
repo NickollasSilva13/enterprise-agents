@@ -2,20 +2,22 @@
 @import '@fontsource-variable/bricolage-grotesque';
 
 /*
- * Visual identity: an office floor plan at night.
- * Ink-blue sheet, chalk lines, and status lamps as the only saturated colors,
- * so colour always means "state" and never decoration.
+ * Visual identity (Phase 14): a lilac night office, after the user's
+ * reference. Violet marks where you are and the main action; the status lamps
+ * stay the only other saturated colours, so they still always mean "state".
  */
 @theme {
   --font-sans: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  --color-ink: #0f1826;
-  --color-sheet: #162238;
-  --color-sheet-raised: #1d2c48;
-  --color-line: #2a3c5c;
-  --color-line-strong: #46608c;
-  --color-chalk: #e8eef8;
-  --color-dim: #94a5c2;
+  --color-ink: #161127;
+  --color-sheet: #1f1836;
+  --color-sheet-raised: #2a2147;
+  --color-line: #392d5c;
+  --color-line-strong: #574a8c;
+  --color-chalk: #f1edff;
+  --color-dim: #a99fcc;
+  --color-accent: #6d4dff;
+  --color-accent-strong: #8467ff;
 
   /* Status lamps */
   --color-ok: #5fe3a1;
@@ -51,7 +53,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-info);
+    outline: 2px solid #b9a8ff;
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -68,31 +70,48 @@
 
 @layer components {
   /*
-   * The illustrated office (RF-08). Furniture colours live in DeskScene.tsx;
-   * here are the surfaces of a room and the movement of each agent state.
+   * The isometric office (Phase 14). Furniture and characters are pixel art
+   * drawn in SVG (features/office/art, components/pixel-art); here are the
+   * stage behind it, the signs, the balloons and the movement of walkers.
    */
-  .office-wall {
-    background-color: var(--color-sheet-raised);
-    border-bottom: 4px solid #7a5a3a;
+  .office-stage {
+    background-color: #241b3f;
+    background-image: radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent 70%
+    );
   }
 
-  /* Floorboards: long planks with staggered joints. */
-  .office-floor {
-    background-color: #2f2a33;
-    background-image:
-      linear-gradient(90deg, rgb(0 0 0 / 0.22) 1px, transparent 1px),
-      linear-gradient(rgb(0 0 0 / 0.28) 1px, transparent 1px);
-    background-size:
-      7rem 1.75rem,
-      100% 1.75rem;
+  /* The name over a room: a dark pill, as on a door. */
+  .office-sign {
+    display: inline-block;
+    border-radius: 999px;
+    background-color: rgb(29 21 48 / 0.88);
+    padding: 1px 7px;
+    color: #f4f1ff;
+    font-size: 7px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  /* What is written on a mural. */
+  .office-mural {
+    color: #fff3b0;
+    font-size: 6.5px;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.1;
+    text-shadow: 0 0 2px rgb(0 0 0 / 0.5);
   }
 
   /* What the agent is doing, said in a speech balloon above its head. */
   .office-balloon {
     position: relative;
-    border-radius: 0.5rem;
-    background-color: var(--color-chalk);
-    color: var(--color-ink);
+    border-radius: 0.4rem;
+    background-color: #f4f1ff;
+    color: #1d1530;
+    box-shadow: 0 1px 0 rgb(0 0 0 / 0.25);
   }
 
   .office-balloon::after {
@@ -100,43 +119,30 @@
     position: absolute;
     left: 50%;
     top: 100%;
-    margin-left: -0.3rem;
-    border: 0.3rem solid transparent;
-    border-top-color: var(--color-chalk);
+    margin-left: -3px;
+    border: 3px solid transparent;
+    border-top-color: #f4f1ff;
   }
 
-  /*
-   * The corridor that joins the rooms and the common areas (RF-80): a carpet
-   * seen in the gaps between them, where the characters walk.
-   */
-  .office-corridor {
-    border: 1px solid var(--color-line);
-    background-color: #17233a;
-    background-image:
-      linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px),
-      linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px);
-    background-size: 1.5rem 1.5rem;
+  /* A character on its way: the legs take turns, in two steps like pixel art, and the body bobs. */
+  .pixel-leg-a {
+    animation: pixel-step 0.32s steps(2, jump-none) infinite alternate;
   }
 
-  /* A character on its way: the legs take turns and the body bobs. */
-  .walker-leg-a {
-    animation: walker-step 0.28s ease-in-out infinite alternate;
-  }
-
-  .walker-leg-b {
-    animation: walker-step 0.28s ease-in-out infinite alternate-reverse;
+  .pixel-leg-b {
+    animation: pixel-step 0.32s steps(2, jump-none) infinite alternate-reverse;
   }
 
   .walker-bob {
-    animation: walker-bob 0.28s ease-in-out infinite alternate;
+    animation: walker-bob 0.32s steps(2, jump-none) infinite alternate;
   }
 
-  @keyframes walker-step {
+  @keyframes pixel-step {
     from {
       transform: translateY(0);
     }
     to {
-      transform: translateY(-4px);
+      transform: translateY(-2px);
     }
   }
 
@@ -145,7 +151,7 @@
       transform: translateY(0);
     }
     to {
-      transform: translateY(-1.5px);
+      transform: translateY(-1px);
     }
   }
 
@@ -272,18 +278,5 @@
     to {
       transform: translate(24px, 6px);
     }
-  }
-
-  /* Drafting grid behind the office floor plan. */
-  .plan-grid {
-    background-color: var(--color-ink);
-    background-image:
-      linear-gradient(color-mix(in srgb, var(--color-line) 55%, transparent) 1px, transparent 1px),
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--color-line) 55%, transparent) 1px,
-        transparent 1px
-      );
-    background-size: 1.5rem 1.5rem;
   }
 }

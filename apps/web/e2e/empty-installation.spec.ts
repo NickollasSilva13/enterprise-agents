@@ -27,7 +27,8 @@ test.describe('fresh installation', () => {
 
     await navigateTo(page, 'Escritório');
     await expect(page).toHaveURL(`${EMPTY_URL}/escritorio`);
-    await expect(page.getByText('O escritório ainda está vazio.')).toBeVisible();
+    await expect(page.getByText(/Ninguém ainda/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Criar o primeiro agente' })).toBeVisible();
 
     await navigateTo(page, 'Agentes');
     await expect(page.getByText('Nenhum agente ainda.')).toBeVisible();

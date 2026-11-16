@@ -1,10 +1,16 @@
 import {
+  type Appearance,
   APPROVAL_STATUSES,
+  AREA_KINDS,
   AUDIT_ACTORS,
+  type Door,
+  FLOORS,
+  ITEM_KINDS,
   MESSAGE_ROLES,
   PROVIDER_KINDS,
   RUN_STATUSES,
   RUN_TRIGGERS,
+  SIDES,
   TOOL_CALL_STATUSES,
   TOOL_PERMISSIONS,
 } from '@ea/shared';
@@ -84,6 +90,8 @@ export const agents = sqliteTable(
     maxDurationSeconds: integer('max_duration_seconds').notNull().default(300),
     maxTotalTokens: integer('max_total_tokens'),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** How the agent is drawn (Phase 14); null means drawn from its id. Validated on the way in and out. */
+    appearance: text('appearance', { mode: 'json' }).$type<Appearance>(),
     /** Soft delete keeps run history readable (RN-07). */
     deletedAt: text('deleted_at'),
     createdAt: createdAt(),
@@ -250,3 +258,42 @@ export const settings = sqliteTable('settings', {
   value: text('value', { mode: 'json' }).notNull(),
   updatedAt: updatedAt(),
 });
+
+// ---- Office layout (Phase 14) ----------------------------------------------
+// Only the layout is stored, never where a character stands (RF-80). The grid
+// size and whether the user has saved a layout live in `settings`
+// (`office.layout`); while there is no such entry the layout is the automatic one.
+
+export const officeAreas = sqliteTable('office_areas', {
+  id: id(),
+  /** Order in the layout, so a saved layout reads back the same. */
+  position: integer('position').notNull(),
+  kind: text('kind', { enum: AREA_KINDS }).notNull(),
+  name: text('name'),
+  x: integer('x').notNull(),
+  y: integer('y').notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  floor: text('floor', { enum: FLOORS }).notNull(),
+  // A project removed leaves its room without a project, like its agents.
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  doors: text('doors', { mode: 'json' }).$type<Door[]>().notNull(),
+  createdAt: createdAt(),
+});
+
+export const officeItems = sqliteTable(
+  'office_items',
+  {
+    id: id(),
+    position: integer('position').notNull(),
+    kind: text('kind', { enum: ITEM_KINDS }).notNull(),
+    x: integer('x').notNull(),
+    y: integer('y').notNull(),
+    facing: text('facing', { enum: SIDES }).notNull(),
+    // Agents are deleted softly, so the layout ignores desks of deleted agents when it is read.
+    agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+    label: text('label'),
+    createdAt: createdAt(),
+  },
+  (table) => [index('office_items_agent_idx').on(table.agentId)],
+);

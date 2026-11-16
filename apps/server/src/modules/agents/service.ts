@@ -10,7 +10,7 @@ import { ConflictError, NotFoundError, ValidationError } from '../../core/errors
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
 import { agents, agentTools, models, projects, runs } from '../../db/schema';
-import { listAgentsWithState } from './repository';
+import { listAgentsWithState, storedAppearance } from './repository';
 
 const sameName = (a: string, b: string) =>
   a.toLocaleLowerCase('pt-BR') === b.toLocaleLowerCase('pt-BR');
@@ -86,6 +86,7 @@ export function listAgents(db: Db): Agent[] {
     maxDurationSeconds: agent.maxDurationSeconds,
     maxTotalTokens: agent.maxTotalTokens,
     enabled: agent.enabled,
+    appearance: storedAppearance(agent.appearance),
     state,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
@@ -113,8 +114,12 @@ export function updateAgent(db: Db, id: string, patch: AgentUpdate): Agent {
   getAgent(db, id);
   if (patch.name !== undefined) assertNameIsFree(db, patch.name, id);
   assertReferences(db, patch);
+  // A new look is not a change of work: it must not reset how long the agent
+  // has been idle, which is counted from `updatedAt` (RF-80).
+  const keys = Object.keys(patch);
+  const lookOnly = keys.length > 0 && keys.every((key) => key === 'appearance');
   db.update(agents)
-    .set({ ...patch, updatedAt: new Date().toISOString() })
+    .set(lookOnly ? patch : { ...patch, updatedAt: new Date().toISOString() })
     .where(eq(agents.id, id))
     .run();
   return getAgent(db, id);
@@ -149,6 +154,7 @@ export function duplicateAgent(db: Db, id: string): Agent {
         maxDurationSeconds: source.maxDurationSeconds,
         maxTotalTokens: source.maxTotalTokens,
         enabled: source.enabled,
+        appearance: source.appearance,
       })
       .run();
     const tools = tx.select().from(agentTools).where(eq(agentTools.agentId, id)).all();

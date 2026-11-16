@@ -1,4 +1,10 @@
-import { dashboardSummarySchema, officeSchema, systemInfoSchema } from '@ea/shared';
+import {
+  assignDesks,
+  dashboardSummarySchema,
+  officeSchema,
+  systemInfoSchema,
+  validateLayout,
+} from '@ea/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { agents } from '../src/db/schema';
@@ -200,7 +206,15 @@ describe('office', () => {
   it('is empty when there are no projects or agents', async () => {
     const { app, trusted } = await start();
     const response = await app.inject({ url: '/api/office', headers: trusted });
-    expect(officeSchema.parse(response.json())).toEqual({ rooms: [] });
+    const office = officeSchema.parse(response.json());
+    expect(office).toMatchObject({ customized: false, projects: [], agents: [] });
+    // Even empty, the automatic office has its common areas.
+    expect(office.layout.areas.map((area) => area.kind)).toEqual([
+      'reception',
+      'pantry',
+      'meeting',
+      'lounge',
+    ]);
   });
 
   it('puts each agent in the room of its project (RF-07)', async () => {
@@ -213,19 +227,22 @@ describe('office', () => {
     addAgent(database, { name: 'Solto', enabled: false });
     addAgent(database, { name: 'Removido', projectId: support, deletedAt: hoursAgo(1) });
 
-    const { rooms } = getOffice(database.db, createBuiltinRegistry());
-    expect(rooms.map((room) => room.name)).toEqual(['Arquivo', 'Suporte', 'Sem projeto']);
-    expect(rooms[0]?.agents).toEqual([]);
-    expect(rooms[1]).toMatchObject({ id: support, description: 'Atende clientes' });
-    expect(rooms[1]?.agents.map((agent) => [agent.name, agent.state])).toEqual([
-      ['Ana', 'idle'],
-      ['Zeca', 'working'],
+    const office = getOffice(database.db, createBuiltinRegistry());
+    expect(office.projects.map((project) => project.name)).toEqual(['Arquivo', 'Suporte']);
+    expect(office.projects[1]).toMatchObject({ id: support, description: 'Atende clientes' });
+    expect(office.agents.map((agent) => [agent.name, agent.state, agent.projectId])).toEqual([
+      ['Ana', 'idle', support],
+      ['Solto', 'inactive', null],
+      ['Zeca', 'working', support],
     ]);
-    expect(rooms[1]?.agents[1]?.objective).toBe('Responder');
-    expect(rooms[2]).toMatchObject({ id: null });
-    expect(rooms[2]?.agents.map((agent) => [agent.name, agent.state])).toEqual([
-      ['Solto', 'inactive'],
-    ]);
+    expect(office.agents[2]?.objective).toBe('Responder');
+    // The automatic layout: a room per project, by name, and one for agents without a project.
+    const rooms = office.layout.areas.filter((area) => area.kind === 'project');
+    expect(rooms.map((room) => room.projectId)).toEqual([office.projects[0]?.id, support, null]);
+    // Every agent has a desk there: Ana and Zeca in Suporte, Solto in the last room.
+    const desks = assignDesks(office.layout, office.agents);
+    expect(desks.size).toBe(3);
+    expect(validateLayout(office.layout)).toEqual([]);
   });
 
   it('says since when an idle agent has had nothing to do, from what is already stored (RF-80)', async () => {
@@ -252,8 +269,8 @@ describe('office', () => {
     addRun(database, failed, { status: 'failed', finishedAt: hoursAgo(2) });
     addAgent(database, { name: 'F inativo', enabled: false, ...stamps });
 
-    const { rooms } = getOffice(database.db, createBuiltinRegistry());
-    expect(rooms[0]?.agents.map((agent) => [agent.name, agent.state, agent.idleSince])).toEqual([
+    const { agents } = getOffice(database.db, createBuiltinRegistry());
+    expect(agents.map((agent) => [agent.name, agent.state, agent.idleSince])).toEqual([
       ['A nova', 'idle', created],
       ['B rodou', 'idle', hoursAgo(2)],
       ['C editado', 'idle', hoursAgo(1)],
@@ -263,12 +280,14 @@ describe('office', () => {
     ]);
   });
 
-  it('has no "Sem projeto" room when every agent has a project', async () => {
+  it('has no room for agents without a project when every agent has one', async () => {
     const { database } = await start();
-    addAgent(database, { name: 'Ana', projectId: addProject(database, 'Suporte') });
-    expect(getOffice(database.db, createBuiltinRegistry()).rooms.map((room) => room.name)).toEqual([
-      'Suporte',
-    ]);
+    const support = addProject(database, 'Suporte');
+    addAgent(database, { name: 'Ana', projectId: support });
+    const { layout } = getOffice(database.db, createBuiltinRegistry());
+    expect(
+      layout.areas.filter((area) => area.kind === 'project').map((area) => area.projectId),
+    ).toEqual([support]);
   });
 });
 
