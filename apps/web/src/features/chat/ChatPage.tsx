@@ -442,7 +442,12 @@ function Chat({ agent, conversationId }: { agent: Agent; conversationId: string 
             {conversationId === undefined && (
               <div className="grid h-full place-items-center py-10 text-center">
                 <div>
-                  <AgentAvatar agentId={agent.id} size={64} dimmed={!agent.enabled} />
+                  <AgentAvatar
+                    agentId={agent.id}
+                    appearance={agent.appearance}
+                    size={64}
+                    dimmed={!agent.enabled}
+                  />
                   <p className="mt-3 font-semibold">Nova conversa com {agent.name}</p>
                   <p className="mt-1 max-w-prose text-sm text-dim">
                     {agent.objective || 'Envie a primeira mensagem para começar.'}
@@ -497,7 +502,9 @@ export function ChatPage() {
         >
           <ArrowLeft className="size-5" aria-hidden />
         </Link>
-        {agent && <AgentAvatar agentId={agent.id} dimmed={!agent.enabled} />}
+        {agent && (
+          <AgentAvatar agentId={agent.id} appearance={agent.appearance} dimmed={!agent.enabled} />
+        )}
         <div className="min-w-0 flex-1 basis-40">
           <h1 className="truncate text-2xl font-bold tracking-tight">
             {agent ? agent.name : 'Conversa'}

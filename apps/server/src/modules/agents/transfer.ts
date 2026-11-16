@@ -15,6 +15,7 @@ import { agents, agentTools, models, projects, providers } from '../../db/schema
 import type { ToolRegistry } from '../../tools/registry';
 import { maxPermission } from '../../tools/types';
 import { recordAudit } from '../audit/service';
+import { storedAppearance } from './repository';
 
 // Export and import of agents as JSON (RF-20). A file names things instead
 // of pointing at them: ids mean nothing in another installation. Nothing
@@ -68,6 +69,7 @@ export function exportAgents(db: Db, ids: readonly string[] | undefined): AgentE
       maxDurationSeconds: agent.maxDurationSeconds,
       maxTotalTokens: agent.maxTotalTokens,
       enabled: agent.enabled,
+      appearance: storedAppearance(agent.appearance),
       project: agent.projectId ? (projectNames.get(agent.projectId) ?? null) : null,
       model: agent.modelId ? (modelsById.get(agent.modelId) ?? null) : null,
       tools: grants
@@ -162,6 +164,7 @@ export function importAgents(
           maxDurationSeconds: entry.maxDurationSeconds,
           maxTotalTokens: entry.maxTotalTokens,
           enabled: entry.enabled,
+          appearance: entry.appearance,
         })
         .run();
       if (grants.length > 0) {

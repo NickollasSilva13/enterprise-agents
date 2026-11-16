@@ -305,7 +305,7 @@ describe('deleting agents (RF-10, RN-07)', () => {
 
     expect(await listAgents()).toEqual([]);
     expect((await call('GET', `/api/agents/${agent.id}`)).status).toBe(404);
-    expect(getOffice(t.database.db, createBuiltinRegistry()).rooms).toEqual([]);
+    expect(getOffice(t.database.db, createBuiltinRegistry()).agents).toEqual([]);
 
     const summary = getDashboardSummary(t.database.db);
     expect(summary.agents.total).toBe(0);
@@ -371,9 +371,11 @@ describe('projects', () => {
     expect(await listAgents()).toMatchObject([
       { id: agent.id, projectId: null, projectName: null },
     ]);
+    // The automatic office keeps a room for the remaining project and one for agents without any.
+    const { layout } = getOffice(t.database.db, createBuiltinRegistry());
     expect(
-      getOffice(t.database.db, createBuiltinRegistry()).rooms.map((room) => room.name),
-    ).toEqual(['Arquivo', 'Sem projeto']);
+      layout.areas.filter((area) => area.kind === 'project').map((area) => area.projectId),
+    ).toEqual([expect.any(String), null]);
   });
 
   it('rejects blank, long and duplicate names', async () => {

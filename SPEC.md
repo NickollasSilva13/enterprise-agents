@@ -130,7 +130,10 @@ Fluxos de trabalho declarativos (grafo de tarefas, paralelismo configurável) s�
 
 | ID | Requisito | Fase |
 |---|---|---|
-| RF-80 | Personagens andam entre as salas e as áreas comuns (recepção e copa) conforme o estado: ocioso vai à copa, inativo sai do escritório, delegação aparece como visita à mesa do outro agente. Respeita a preferência de reduzir movimento. | 9 |
+| RF-80 | Personagens andam entre as salas e as áreas comuns (recepção e copa) conforme o estado: ocioso vai à copa, inativo sai do escritório, delegação aparece como visita à mesa do outro agente. Respeita a preferência de reduzir movimento. Na Fase 14: com sala de reunião no layout, a delegação vira reunião nela; com área de descompressão, quem está ocioso há 10 minutos vai para lá. | 9, 14 |
+| RF-81 | Escritório isométrico em pixel art, com placas nas salas, balões, painel de agentes (estado e onde está), sino de aprovações pendentes, barra de ações (aproximar, afastar, ver tudo, novo agente, editar) e minimapa. | 14 |
+| RF-82 | O usuário edita o layout do escritório: áreas com tipo, nome, projeto, piso e portas; móveis de um catálogo, com posição, orientação, dono da mesa e texto do mural; modelos prontos; desfazer e refazer; validação antes de salvar; volta ao layout automático. | 14 |
+| RF-83 | O usuário escolhe a aparência de cada agente (pessoa ou robô; pele, cabelo, roupa, calça, acessório), vista no Escritório e nos avatares, e levada na exportação. | 14 |
 
 ## 5. Requisitos não funcionais
 

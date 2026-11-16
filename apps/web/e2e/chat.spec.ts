@@ -83,9 +83,10 @@ test('an agent answers in a chat, can be interrupted, and leaves a trail', async
   const officePage = await context.newPage();
   await officePage.goto(`${CRUD_URL}/escritorio`);
   const desk = officePage
-    .getByRole('region', { name: projectName })
+    .getByRole('region', { name: /^Agentes no escritório/ })
     .getByRole('listitem')
     .filter({ hasText: agentName });
+  await expect(desk).toContainText(`Na mesa, em ${projectName}`);
   await expect(desk).toContainText('Respondendo: “responda devagar”');
   await expect(desk).toContainText('Trabalhando');
   await expect(officePage.getByLabel('Resumo').getByRole('listitem').nth(1)).not.toHaveText(

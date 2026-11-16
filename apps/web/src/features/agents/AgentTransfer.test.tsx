@@ -21,6 +21,7 @@ const exported: AgentExport = {
       maxDurationSeconds: 300,
       maxTotalTokens: null,
       enabled: true,
+      appearance: null,
       project: null,
       model: null,
       tools: [],

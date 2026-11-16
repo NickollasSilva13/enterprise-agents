@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agentStateSchema } from './api';
+import { appearanceSchema } from './appearance';
 import { TOOL_PERMISSIONS } from './enums';
 
 const id = z.string().min(1).max(40);
@@ -73,6 +74,7 @@ export const AGENT_DEFAULTS = {
   maxDurationSeconds: 300,
   maxTotalTokens: null,
   enabled: true,
+  appearance: null,
 } as const;
 
 const between = (label: string, range: { min: number; max: number }) =>
@@ -104,6 +106,8 @@ const agentFields = {
   maxDurationSeconds: wholeBetween('Tempo por execução', AGENT_LIMITS.maxDurationSeconds),
   maxTotalTokens: wholeBetween('Tokens por execução', AGENT_LIMITS.maxTotalTokens).nullable(),
   enabled: z.boolean(),
+  /** Null: the look drawn from the agent's id. */
+  appearance: appearanceSchema.nullable(),
 };
 
 export const agentCreateSchema = z.strictObject({
@@ -119,6 +123,7 @@ export const agentCreateSchema = z.strictObject({
   maxDurationSeconds: agentFields.maxDurationSeconds.default(AGENT_DEFAULTS.maxDurationSeconds),
   maxTotalTokens: agentFields.maxTotalTokens.default(AGENT_DEFAULTS.maxTotalTokens),
   enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
+  appearance: agentFields.appearance.default(AGENT_DEFAULTS.appearance),
 });
 export type AgentCreate = z.infer<typeof agentCreateSchema>;
 /** What a client may send: everything but the name is optional. */
@@ -143,6 +148,7 @@ export const agentSchema = z.object({
   maxDurationSeconds: z.number().int(),
   maxTotalTokens: z.number().int().nullable(),
   enabled: z.boolean(),
+  appearance: appearanceSchema.nullable(),
   state: agentStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -188,6 +194,7 @@ export const exportedAgentSchema = z.strictObject({
   maxDurationSeconds: agentFields.maxDurationSeconds.default(AGENT_DEFAULTS.maxDurationSeconds),
   maxTotalTokens: agentFields.maxTotalTokens.default(AGENT_DEFAULTS.maxTotalTokens),
   enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
+  appearance: agentFields.appearance.default(AGENT_DEFAULTS.appearance),
   /** Name of the project, or null for none. */
   project: z.string().trim().min(1).max(PROJECT_LIMITS.name).nullable().default(null),
   model: z

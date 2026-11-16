@@ -388,7 +388,7 @@ describe('interrupting and failing', () => {
       'provider_unreachable',
     ]);
     const office = officeSchema.parse((await s.get('/api/office')).body);
-    expect(office.rooms[0]?.agents[0]).toMatchObject({
+    expect(office.agents[0]).toMatchObject({
       state: 'failed',
       currentRun: null,
       lastError: run.errorMessage,
@@ -498,7 +498,7 @@ describe('logs', () => {
       ['started', 'Triagem'],
     ]);
     let office = officeSchema.parse((await s.get('/api/office')).body);
-    expect(office.rooms[0]?.agents[0]).toMatchObject({
+    expect(office.agents[0]).toMatchObject({
       state: 'working',
       currentRun: {
         id: runId,
@@ -527,7 +527,7 @@ describe('logs', () => {
       ['started', null],
     ]);
     office = officeSchema.parse((await s.get('/api/office')).body);
-    expect(office.rooms[0]?.agents[0]).toMatchObject({ state: 'idle', currentRun: null });
+    expect(office.agents[0]).toMatchObject({ state: 'idle', currentRun: null });
   });
 });
 

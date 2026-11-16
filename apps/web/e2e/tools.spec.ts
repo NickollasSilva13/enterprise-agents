@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { expectNoHorizontalScroll, navigateTo, watchForProblems } from './helpers';
+import { api, expectNoHorizontalScroll, navigateTo, watchForProblems } from './helpers';
 import { FAKE_PROVIDER_URL, TOOLS_URL } from './servers';
 
 // The whole path of Phase 8 against a real server and the fake provider:
@@ -152,8 +152,8 @@ test('an agent uses tools only as granted, waits for approval and delegates', as
   await expect(page.getByRole('heading', { name: `Execução de ${reviewer}` })).toBeVisible();
   await expect(page.getByText('Delegação de outro agente')).toBeVisible();
 
-  // A delegation that lasts is seen in the office as a visit: whoever
-  // delegated stands at the desk of whoever is doing the task (RF-80).
+  // A delegation that lasts is seen in the office as a meeting: whoever
+  // delegated and whoever does the task meet in the meeting room (RF-80).
   await navigateTo(page, 'Agentes');
   await page.getByRole('link', { name: `Conversar com ${writer}` }).click();
   await composer(page).fill(`delegue devagar a "${reviewer}"`);
@@ -161,38 +161,50 @@ test('an agent uses tools only as granted, waits for approval and delegates', as
   await expect(page.getByRole('button', { name: 'Interromper' })).toBeVisible();
   const visitPage = await context.newPage();
   await visitPage.goto(`${TOOLS_URL}/escritorio`);
-  // The other Playwright project may have a visit of its own going on.
-  const visitor = visitPage
-    .locator('[data-place^="visit:"]')
-    .filter({ hasText: `Na mesa de ${reviewer}` });
-  await expect(visitor).toContainText(writer);
-  await expect(visitor).toContainText(`Na mesa de ${reviewer}`);
+  const people = visitPage.getByRole('region', { name: /^Agentes no escritório/ });
+  // A balloon may name the other agent too: match the name line itself.
+  const visitor = people
+    .getByRole('listitem')
+    .filter({ has: visitPage.getByText(writer, { exact: true }) });
+  const host = people
+    .getByRole('listitem')
+    .filter({ has: visitPage.getByText(reviewer, { exact: true }) });
+  await expect(visitor).toHaveAttribute('data-place', 'meeting');
+  await expect(visitor).toContainText('Na sala de reunião');
+  await expect(visitor).toContainText(`Pedi ajuda a ${reviewer}`);
+  await expect(host).toHaveAttribute('data-place', 'meeting');
   await expect(visitor).toHaveAttribute('data-seated', 'false');
-  const visitorId = (await visitor.getAttribute('data-desk')) ?? '';
-  const hostId = ((await visitor.getAttribute('data-place')) ?? '').replace('visit:', '');
-  const host = visitPage.locator(`[data-desk="${hostId}"]`);
-  await expect(host).toContainText(reviewer);
-  await expect(host).toHaveAttribute('data-seated', 'true');
-  // The page loaded in the middle of the visit: the visitor is already there, standing still.
+  const visitorId = (await visitor.getAttribute('data-agent')) ?? '';
+  // The page loaded in the middle of the meeting: the visitor is already there, standing still.
   const character = visitPage.locator(`[data-walker="${visitorId}"]`);
   await expect(character).toHaveAttribute('data-moving', 'false');
-  const [feet, hostBox] = await Promise.all([character.boundingBox(), host.boundingBox()]);
-  expect(feet && hostBox).toBeTruthy();
-  if (feet && hostBox) {
+  const office = await api<{ layout: { areas: { id: string; kind: string }[] } }>(
+    visitPage,
+    'GET',
+    '/api/office',
+  );
+  const meeting = office.layout.areas.find((area) => area.kind === 'meeting');
+  const [feet, room] = await Promise.all([
+    character.boundingBox(),
+    visitPage
+      .locator(`[data-office-scene] [data-area-floor="${meeting?.id}"] polygon`)
+      .boundingBox(),
+  ]);
+  expect(feet && room).toBeTruthy();
+  if (feet && room) {
     const x = feet.x + feet.width / 2;
-    expect(x).toBeGreaterThan(hostBox.x);
-    expect(x).toBeLessThan(hostBox.x + hostBox.width);
-    expect(feet.y + feet.height).toBeGreaterThan(hostBox.y);
-    expect(feet.y + feet.height).toBeLessThan(hostBox.y + hostBox.height);
+    expect(x).toBeGreaterThan(room.x);
+    expect(x).toBeLessThan(room.x + room.width);
+    expect(feet.y + feet.height).toBeGreaterThan(room.y);
+    expect(feet.y + feet.height).toBeLessThan(room.y + room.height + 4);
   }
   await expectNoHorizontalScroll(visitPage);
 
-  // The task is called off: the visitor walks back and sits down again.
+  // The task is called off: both walk back and sit down again.
   await page.getByRole('button', { name: 'Interromper' }).click();
   await expect(messages(page).getByText('Você interrompeu a execução.')).toBeVisible();
-  const backHome = visitPage.locator(`[data-desk="${visitorId}"]`);
-  await expect(backHome).toHaveAttribute('data-place', 'desk');
-  await expect(backHome).toHaveAttribute('data-seated', 'true');
+  await expect(visitor).toHaveAttribute('data-place', 'desk');
+  await expect(visitor).toHaveAttribute('data-seated', 'true');
   await expect(character).toHaveCount(0);
   await expect(host).toContainText('Ocioso');
   await visitPage.close();

@@ -56,8 +56,12 @@ test('an agent can be created, edited, duplicated, deactivated and deleted', asy
 
   // The office and the dashboard reflect the new agent.
   await navigateTo(page, 'Escritório');
-  const room = page.getByRole('region', { name: projectName });
-  await expect(room.getByRole('listitem')).toHaveText([`${agentName}Ocioso`]);
+  const desk = page
+    .getByRole('region', { name: /^Agentes no escritório/ })
+    .getByRole('listitem')
+    .filter({ hasText: agentName });
+  await expect(desk).toContainText(`${agentName}Ocioso`);
+  await expect(desk).toContainText(`Na mesa, em ${projectName}`);
   await navigateTo(page, 'Painel');
   await expect(page.getByText(/sem modelo e não/)).toBeVisible();
 
@@ -88,7 +92,13 @@ test('an agent can be created, edited, duplicated, deactivated and deleted', asy
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await expect(agentRow(page, renamed).first()).toContainText('Inativo');
   await navigateTo(page, 'Escritório');
-  await expect(room.getByRole('listitem').filter({ hasText: 'Inativo' })).toHaveCount(1);
+  await expect(
+    page
+      .getByRole('region', { name: /^Agentes no escritório/ })
+      .getByRole('listitem')
+      .filter({ hasText: 'Fora do escritório' })
+      .filter({ hasText: renamed }),
+  ).toHaveCount(1);
   await navigateTo(page, 'Agentes');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'true');

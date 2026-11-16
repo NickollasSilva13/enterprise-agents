@@ -8,6 +8,7 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { LogsPage } from '../features/logs/LogsPage';
 import { RunDetailPage } from '../features/logs/RunDetailPage';
 import { ModelsPage } from '../features/models/ModelsPage';
+import { OfficeEditorPage } from '../features/office/editor/OfficeEditorPage';
 import { OfficePage } from '../features/office/OfficePage';
 import { PlannedPage } from '../features/planned/PlannedPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'escritorio', element: <OfficePage /> },
+      { path: 'escritorio/editar', element: <OfficeEditorPage /> },
       { path: 'agentes', element: <AgentsPage /> },
       { path: 'agentes/novo', element: <AgentFormPage /> },
       { path: 'agentes/:id', element: <AgentFormPage /> },

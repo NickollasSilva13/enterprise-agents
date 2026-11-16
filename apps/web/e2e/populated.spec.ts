@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectNoHorizontalScroll, figure, navigateTo, watchForProblems } from './helpers';
+import { api, expectNoHorizontalScroll, figure, navigateTo, watchForProblems } from './helpers';
 import { SEEDED_URL } from './servers';
 
 // Sample data created by apps/server/scripts/prepare-e2e-data.ts:
@@ -7,7 +7,7 @@ import { SEEDED_URL } from './servers';
 //   when the "previous server" stopped. On start the server marks those runs
 //   as interrupted (RN-12), so both agents are idle.
 // Pesquisa: Leitor (last run failed), Resumidor (no model, idle for an hour:
-//   at the pantry)
+//   resting in the lounge)
 // Arquivo: empty. No project: Rascunho (inactive: outside the office).
 
 test.describe('installation with agents', () => {
@@ -67,37 +67,36 @@ test.describe('installation with agents', () => {
     await page.goto(SEEDED_URL);
     await navigateTo(page, 'Escritório');
 
-    const rooms = page.getByRole('region');
-    await expect(rooms).toHaveCount(6);
-    await expect(rooms.getByRole('heading')).toHaveText([
+    // The automatic layout: common areas and one room per project, each with its sign.
+    const scene = page.locator('[data-office-scene]');
+    for (const name of [
       'Recepção',
       'Copa',
+      'Sala de reunião',
+      'Descompressão',
       'Arquivo',
       'Atendimento',
       'Pesquisa',
       'Sem projeto',
+    ]) {
+      await expect(scene).toContainText(name);
+    }
+
+    // The same, in words: every agent, where it is and what it says.
+    const people = page.getByRole('region', { name: 'Agentes no escritório (4)' });
+    await expect(people.getByRole('listitem')).toHaveText([
+      /^LeitorCom falhaNa mesa, em PesquisaA última execução falhou/,
+      /^RascunhoInativoFora do escritório/,
+      // Idle since the server started: at their desks, until they go for a coffee.
+      /^RespostasOciosoNa mesa, em Atendimento/,
+      /^ResumidorOciosoNa descompressão/,
+      /^TriagemOciosoNa mesa, em Atendimento/,
     ]);
-
-    const support = page.getByRole('region', { name: 'Atendimento' });
-    // Idle since the server started: at their desks, until they go for a coffee.
-    await expect(support.getByRole('listitem')).toHaveText([/^RespostasOcioso/, /^TriagemOcioso/]);
-    await expect(support.getByText('Responde clientes')).toBeVisible();
-
-    const research = page.getByRole('region', { name: 'Pesquisa' });
-    await expect(research.getByRole('listitem')).toHaveText([
-      'A última execução falhouLeitorCom falha',
-      'ResumidorOciosoNa copa',
-    ]);
-
-    await expect(page.getByRole('region', { name: 'Arquivo' })).toContainText('Sala vazia.');
     // Clicking an agent opens its conversation.
-    await expect(research.getByRole('link').first()).toHaveAttribute(
+    await expect(people.getByRole('listitem').first().getByRole('link')).toHaveAttribute(
       'href',
       /\/agentes\/.+\/conversa$/,
     );
-    await expect(
-      page.getByRole('region', { name: 'Sem projeto' }).getByRole('listitem'),
-    ).toHaveText(['RascunhoInativo']);
 
     await expectNoHorizontalScroll(page);
     expect(problems).toEqual([]);
@@ -111,43 +110,46 @@ test.describe('installation with agents', () => {
       await page.emulateMedia({ reducedMotion: motion });
       await page.goto(`${SEEDED_URL}/escritorio`);
 
-      // Idle for an hour: having a coffee at the pantry, away from its chair (RF-80).
-      const pantry = page.getByRole('region', { name: 'Copa' });
-      await expect(pantry).toContainText(/Na copa: .*Resumidor/);
-      const resting = page
-        .getByRole('region', { name: 'Pesquisa' })
-        .getByRole('listitem')
-        .filter({ hasText: 'Resumidor' });
-      await expect(resting).toHaveAttribute('data-place', 'pantry');
+      // Idle for an hour: resting in the lounge, away from its chair (RF-80).
+      const people = page.getByRole('region', { name: /^Agentes no escritório/ });
+      const resting = people.getByRole('listitem').filter({ hasText: 'Resumidor' });
+      await expect(resting).toHaveAttribute('data-place', 'lounge');
       await expect(resting).toHaveAttribute('data-seated', 'false');
-      const id = await resting.getAttribute('data-desk');
+      const id = await resting.getAttribute('data-agent');
       const character = page.locator(`[data-walker="${id}"]`);
       await expect(character).toHaveAttribute('data-moving', 'false');
-      const [feet, floor] = await Promise.all([character.boundingBox(), pantry.boundingBox()]);
+      const office = await api<{ layout: { areas: { id: string; kind: string }[] } }>(
+        page,
+        'GET',
+        '/api/office',
+      );
+      const lounge = office.layout.areas.find((area) => area.kind === 'lounge');
+      const [feet, floor] = await Promise.all([
+        character.boundingBox(),
+        page.locator(`[data-office-scene] [data-area-floor="${lounge?.id}"] polygon`).boundingBox(),
+      ]);
       expect(feet && floor).toBeTruthy();
       if (feet && floor) {
         const x = feet.x + feet.width / 2;
         expect(x).toBeGreaterThan(floor.x);
         expect(x).toBeLessThan(floor.x + floor.width);
-        expect(feet.y).toBeGreaterThan(floor.y);
-        expect(feet.y + feet.height).toBeLessThan(floor.y + floor.height + 8);
+        expect(feet.y + feet.height).toBeGreaterThan(floor.y);
+        expect(feet.y + feet.height).toBeLessThan(floor.y + floor.height + 4);
       }
 
       // Failed: still at the desk. Inactive: outside, and not drawn anywhere.
-      const failed = page.getByRole('listitem').filter({ hasText: 'Leitor' });
+      const failed = people.getByRole('listitem').filter({ hasText: 'Leitor' });
       await expect(failed).toHaveAttribute('data-seated', 'true');
-      await expect(page.getByRole('region', { name: 'Recepção' })).toContainText(
-        'Fora do escritório: Rascunho.',
-      );
-      const away = page.getByRole('listitem').filter({ hasText: 'Rascunho' });
+      const away = people.getByRole('listitem').filter({ hasText: 'Rascunho' });
       await expect(away).toHaveAttribute('data-place', 'outside');
+      await expect(away).toContainText('Fora do escritório');
       await expect(
-        page.locator(`[data-walker="${await away.getAttribute('data-desk')}"]`),
+        page.locator(`[data-walker="${await away.getAttribute('data-agent')}"]`),
       ).toHaveCount(0);
 
       // The same after a reload: the place comes from the data, not from the page.
       await page.reload();
-      await expect(resting).toHaveAttribute('data-place', 'pantry');
+      await expect(resting).toHaveAttribute('data-place', 'lounge');
       await expect(character).toHaveAttribute('data-moving', 'false');
 
       await expectNoHorizontalScroll(page);

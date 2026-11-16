@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { appearanceSchema } from './appearance';
 import { RUN_STATUSES, RUN_TRIGGERS } from './enums';
+import { officeLayoutSchema } from './office';
 
 /** Every API error response has this shape (RNF-08). */
 export const apiErrorSchema = z.object({
@@ -109,6 +111,9 @@ export const officeAgentSchema = z.object({
   id: z.string(),
   name: z.string(),
   objective: z.string(),
+  projectId: z.string().nullable(),
+  /** Null: the look drawn from the id (`defaultAppearance`). */
+  appearance: appearanceSchema.nullable(),
   state: agentStateSchema,
   /** What the agent is doing now: its run in progress, if any. */
   currentRun: z
@@ -134,17 +139,20 @@ export const officeAgentSchema = z.object({
 });
 export type OfficeAgent = z.infer<typeof officeAgentSchema>;
 
-export const officeRoomSchema = z.object({
-  /** Project id; null for the room that holds agents without a project. */
-  id: z.string().nullable(),
+export const officeProjectSchema = z.object({
+  id: z.string(),
   name: z.string(),
   description: z.string(),
-  agents: z.array(officeAgentSchema),
 });
-export type OfficeRoom = z.infer<typeof officeRoomSchema>;
+export type OfficeProject = z.infer<typeof officeProjectSchema>;
 
 export const officeSchema = z.object({
-  rooms: z.array(officeRoomSchema),
+  layout: officeLayoutSchema,
+  /** False while the layout is the automatic one, rebuilt from the projects on every read. */
+  customized: z.boolean(),
+  projects: z.array(officeProjectSchema),
+  /** Every agent, by name. */
+  agents: z.array(officeAgentSchema),
 });
 export type Office = z.infer<typeof officeSchema>;
 

@@ -21,9 +21,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               end={to === '/'}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `flex min-h-10 items-center gap-3 rounded-md px-3 text-sm transition-colors ${
+                `flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm transition-colors ${
                   isActive
-                    ? 'bg-sheet-raised font-semibold text-chalk'
+                    ? 'bg-accent font-semibold text-white shadow-md'
                     : 'text-dim hover:bg-sheet hover:text-chalk'
                 }`
               }
@@ -99,7 +99,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-line p-4 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-line bg-sheet p-4 lg:flex">
         <Brand />
         <nav aria-label="Principal">
           <NavList />

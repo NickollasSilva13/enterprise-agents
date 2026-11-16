@@ -337,7 +337,7 @@ describe('approvals (RF-54, UC-05, C-16)', () => {
     );
     expect(dashboard).toMatchObject({ pendingApprovals: 1, agents: { waiting: 1 } });
     const office = officeSchema.parse((await s.call('GET', '/api/office')).body);
-    expect(office.rooms[0]?.agents[0]).toMatchObject({
+    expect(office.agents[0]).toMatchObject({
       state: 'waiting',
       pendingApproval: { id: approval.id, toolTitle: 'Escrever arquivo' },
     });
@@ -646,7 +646,7 @@ describe('delegation (RF-60 to RF-63, UC-06)', () => {
     expect(approval).toMatchObject({ agentId: specialistId, originRunId: runId });
     expect(approval.runId).not.toBe(runId);
     const office = officeSchema.parse((await s.call('GET', '/api/office')).body);
-    const desks = office.rooms.flatMap((room) => room.agents);
+    const desks = office.agents;
     expect(desks.find((desk) => desk.id === s.agentId)).toMatchObject({
       delegatingTo: [specialistId],
       pendingApproval: null,

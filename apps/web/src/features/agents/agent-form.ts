@@ -1,4 +1,11 @@
-import { type Agent, AGENT_DEFAULTS, type AgentCreate, agentCreateSchema } from '@ea/shared';
+import {
+  type Agent,
+  AGENT_DEFAULTS,
+  type AgentCreate,
+  agentCreateSchema,
+  type Appearance,
+  randomAppearance,
+} from '@ea/shared';
 
 /**
  * What the form holds while the user types. Numbers stay as text so a field
@@ -17,11 +24,14 @@ export interface AgentFormValues {
   maxDurationSeconds: string;
   maxTotalTokens: string;
   enabled: boolean;
+  /** Null: the robot drawn from the agent's id. */
+  appearance: Appearance | null;
 }
 
 export type AgentFormErrors = Partial<Record<keyof AgentFormValues, string>>;
 
-export function toFormValues(agent?: Agent): AgentFormValues {
+/** A new agent starts as a person drawn at random (`random` gives 0 to 1). */
+export function toFormValues(agent?: Agent, random: () => number = Math.random): AgentFormValues {
   const source = agent ?? { name: '', ...AGENT_DEFAULTS };
   return {
     name: source.name,
@@ -36,6 +46,7 @@ export function toFormValues(agent?: Agent): AgentFormValues {
     maxDurationSeconds: String(source.maxDurationSeconds),
     maxTotalTokens: source.maxTotalTokens === null ? '' : String(source.maxTotalTokens),
     enabled: source.enabled,
+    appearance: agent ? agent.appearance : randomAppearance(random),
   };
 }
 
@@ -62,6 +73,7 @@ export function parseForm(values: AgentFormValues): ParsedForm {
     maxDurationSeconds: toNumber(values.maxDurationSeconds),
     maxTotalTokens: values.maxTotalTokens.trim() === '' ? null : toNumber(values.maxTotalTokens),
     enabled: values.enabled,
+    appearance: values.appearance,
   });
   if (result.success) return { ok: true, agent: result.data };
 

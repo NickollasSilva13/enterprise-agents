@@ -55,7 +55,7 @@ function AgentRow({ agent, onDelete }: { agent: Agent; onDelete: (agent: Agent) 
 
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-      <AgentAvatar agentId={agent.id} dimmed={!agent.enabled} />
+      <AgentAvatar agentId={agent.id} appearance={agent.appearance} dimmed={!agent.enabled} />
       <div className="min-w-0 flex-1 basis-52">
         <Link
           to={`/agentes/${agent.id}`}

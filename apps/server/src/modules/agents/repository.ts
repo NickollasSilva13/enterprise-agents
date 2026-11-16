@@ -1,4 +1,10 @@
-import { ACTIVE_RUN_STATUSES, type AgentState, type RunStatus } from '@ea/shared';
+import {
+  ACTIVE_RUN_STATUSES,
+  type AgentState,
+  type Appearance,
+  appearanceSchema,
+  type RunStatus,
+} from '@ea/shared';
 import { asc, inArray, isNull, max, notInArray } from 'drizzle-orm';
 import type { Db } from '../../db/client';
 import { agents, runs } from '../../db/schema';
@@ -51,3 +57,11 @@ export function listAgentsWithState(db: Db): AgentWithState[] {
     }),
   }));
 }
+
+/**
+ * The appearance stored for an agent, if it is still a valid one. A column
+ * that no longer matches the schema (an option removed in a later version)
+ * reads as "none chosen", and the agent is drawn from its id.
+ */
+export const storedAppearance = (value: unknown): Appearance | null =>
+  appearanceSchema.safeParse(value).data ?? null;

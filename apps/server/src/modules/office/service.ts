@@ -1,10 +1,21 @@
-import { ACTIVE_RUN_STATUSES, type Office, type OfficeAgent, type OfficeRoom } from '@ea/shared';
+import {
+  ACTIVE_RUN_STATUSES,
+  buildPresetLayout,
+  type Office,
+  type OfficeAgent,
+  type OfficeLayout,
+  type OfficeLayoutInput,
+  type PresetRoom,
+  validateLayout,
+} from '@ea/shared';
 import { and, asc, desc, eq, inArray, max, notInArray } from 'drizzle-orm';
+import { ValidationError } from '../../core/errors';
 import type { Db } from '../../db/client';
 import { approvals, messages, projects, runs, toolCalls } from '../../db/schema';
 import type { ToolRegistry } from '../../tools/registry';
-import { listAgentsWithState } from '../agents/repository';
+import { listAgentsWithState, storedAppearance } from '../agents/repository';
 import { messageText } from '../runs/service';
+import { clearLayout, readStoredLayout, writeLayout } from './repository';
 
 const PROMPT_PREVIEW_LENGTH = 120;
 
@@ -119,50 +130,120 @@ function delegations(db: Db): Map<string, string[]> {
   return result;
 }
 
-export const UNASSIGNED_ROOM_NAME = 'Sem projeto';
+/** Desks of agents that no longer exist go back to being free desks. */
+function withoutDeletedOwners(layout: OfficeLayout, present: ReadonlySet<string>): OfficeLayout {
+  return {
+    ...layout,
+    items: layout.items.map((item) =>
+      item.agentId !== null && !present.has(item.agentId) ? { ...item, agentId: null } : item,
+    ),
+  };
+}
 
-/**
- * The office view: one room per project, with its agents. Agents that belong
- * to no project share a last room, which only exists when it is occupied.
- */
-export function getOffice(db: Db, registry: ToolRegistry): Office {
-  const rooms = new Map<string | null, OfficeRoom>();
-  for (const project of db.select().from(projects).orderBy(asc(projects.name)).all()) {
-    rooms.set(project.id, {
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      agents: [],
-    });
+/** The automatic layout: the "complete" preset with a room per project and one for agents without a project. */
+function automaticLayout(db: Db, agentProjects: readonly (string | null)[]): OfficeLayout {
+  const counts = new Map<string | null, number>();
+  for (const projectId of agentProjects) counts.set(projectId, (counts.get(projectId) ?? 0) + 1);
+  const rooms: PresetRoom[] = db
+    .select({ id: projects.id })
+    .from(projects)
+    .orderBy(asc(projects.name))
+    .all()
+    .map((project) => ({ projectId: project.id, agents: counts.get(project.id) ?? 0 }));
+  const homeless = counts.get(null) ?? 0;
+  if (homeless > 0) rooms.push({ projectId: null, agents: homeless });
+  return buildPresetLayout('complete', rooms);
+}
+
+/** The layout in use: the saved one, or the automatic one. */
+export function currentLayout(db: Db): { layout: OfficeLayout; customized: boolean } {
+  const agents = listAgentsWithState(db).map(({ agent }) => agent);
+  const stored = readStoredLayout(db);
+  if (stored) {
+    return {
+      layout: withoutDeletedOwners(stored, new Set(agents.map((agent) => agent.id))),
+      customized: true,
+    };
   }
+  return {
+    layout: automaticLayout(
+      db,
+      agents.map((agent) => agent.projectId),
+    ),
+    customized: false,
+  };
+}
 
+/** Saves a layout made by the user, refusing it whole when anything is wrong. */
+export function saveLayout(db: Db, input: OfficeLayoutInput): void {
+  const problems: { path: string; message: string }[] = validateLayout(input).map((issue) => ({
+    path:
+      issue.area !== undefined
+        ? `areas.${issue.area}`
+        : issue.item !== undefined
+          ? `items.${issue.item}`
+          : '',
+    message: issue.message,
+  }));
+  const projectIds = new Set(
+    db
+      .select({ id: projects.id })
+      .from(projects)
+      .all()
+      .map((row) => row.id),
+  );
+  input.areas.forEach((area, index) => {
+    if (area.projectId !== null && !projectIds.has(area.projectId)) {
+      problems.push({ path: `areas.${index}.projectId`, message: 'Projeto não encontrado.' });
+    }
+  });
+  const agentIds = new Set(listAgentsWithState(db).map(({ agent }) => agent.id));
+  input.items.forEach((item, index) => {
+    if (item.agentId !== null && !agentIds.has(item.agentId)) {
+      problems.push({ path: `items.${index}.agentId`, message: 'Agente não encontrado.' });
+    }
+  });
+  if (problems.length > 0) {
+    throw new ValidationError(problems, 'O layout tem problemas e não foi salvo.');
+  }
+  writeLayout(db, input);
+}
+
+export function resetLayout(db: Db): void {
+  clearLayout(db);
+}
+
+/** The office: its layout, its projects and every agent with what it is doing. */
+export function getOffice(db: Db, registry: ToolRegistry): Office {
   const running = currentRuns(db);
   const finished = lastFinishedRuns(db);
   const waiting = pendingApprovals(db, registry);
   const delegating = delegations(db);
-  const unassigned: OfficeAgent[] = [];
-  for (const { agent, state } of listAgentsWithState(db)) {
-    const occupant: OfficeAgent = {
-      id: agent.id,
-      name: agent.name,
-      objective: agent.objective,
-      state,
-      currentRun: running.get(agent.id) ?? null,
-      lastError: state === 'failed' ? (finished.get(agent.id)?.errorMessage ?? null) : null,
-      pendingApproval: waiting.get(agent.id) ?? null,
-      delegatingTo: delegating.get(agent.id) ?? [],
-      idleSince:
-        state === 'idle'
-          ? idleSinceOf(agent.updatedAt, finished.get(agent.id)?.finishedAt ?? null)
-          : null,
-    };
-    const room = agent.projectId === null ? undefined : rooms.get(agent.projectId);
-    (room ? room.agents : unassigned).push(occupant);
-  }
-
-  const result = [...rooms.values()];
-  if (unassigned.length > 0) {
-    result.push({ id: null, name: UNASSIGNED_ROOM_NAME, description: '', agents: unassigned });
-  }
-  return { rooms: result };
+  const agents: OfficeAgent[] = listAgentsWithState(db).map(({ agent, state }) => ({
+    id: agent.id,
+    name: agent.name,
+    objective: agent.objective,
+    projectId: agent.projectId,
+    appearance: storedAppearance(agent.appearance),
+    state,
+    currentRun: running.get(agent.id) ?? null,
+    lastError: state === 'failed' ? (finished.get(agent.id)?.errorMessage ?? null) : null,
+    pendingApproval: waiting.get(agent.id) ?? null,
+    delegatingTo: delegating.get(agent.id) ?? [],
+    idleSince:
+      state === 'idle'
+        ? idleSinceOf(agent.updatedAt, finished.get(agent.id)?.finishedAt ?? null)
+        : null,
+  }));
+  const { layout, customized } = currentLayout(db);
+  return {
+    layout,
+    customized,
+    projects: db
+      .select({ id: projects.id, name: projects.name, description: projects.description })
+      .from(projects)
+      .orderBy(asc(projects.name))
+      .all(),
+    agents,
+  };
 }
