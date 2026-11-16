@@ -12,9 +12,15 @@ import {
   useState,
 } from 'react';
 import { areaName, Ground, signPoint, wallsByBand } from './art/architecture';
-import { type Facing, PixelCharacter } from '../../components/pixel-art/character';
+import { type Direction, PixelCharacter } from '../../components/pixel-art/character';
 import { Chair, FlatItem, Furniture, isFlat, type Screen } from './art/furniture';
 import { project } from './art/iso';
+import {
+  PerimeterBack,
+  PerimeterFront,
+  SurroundingsBack,
+  SurroundingsFront,
+} from './art/surroundings';
 import type { OfficeGeometry, Seat } from './geometry';
 import { type ActorView, type Place, placeKey, SceneEngine } from './scene';
 
@@ -151,9 +157,8 @@ const SCREEN_OF: Record<OfficeAgent['state'], Screen> = {
   inactive: 'off',
 };
 
-/** A sitter faces away from its chair's side: north or west chairs look down the screen. */
-const sitterFacing = (seat: Seat): Facing =>
-  seat.side === 'n' || seat.side === 'w' ? 'front' : 'back';
+/** A sitter faces the desk, away from the chair's side. */
+const SITTER_FACING: Record<Seat['side'], Direction> = { n: 'sw', s: 'ne', w: 'se', e: 'nw' };
 
 const oppositeOf = { n: 's', s: 'n', e: 'w', w: 'e' } as const;
 
@@ -210,6 +215,26 @@ function useStaticBands(layout: OfficeLayout, screens: ReadonlyMap<number, Scree
     return { back, items, front, last };
   }, [layout, screens]);
 }
+
+/** What is around the office, behind it; drawn once per layout. */
+export const Around = memo(function Around({ layout }: { layout: OfficeLayout }) {
+  return <SurroundingsBack layout={layout} />;
+});
+
+/** The outer walls behind the office, standing on the edge of its floor. */
+export const Perimeter = memo(function Perimeter({ layout }: { layout: OfficeLayout }) {
+  return <PerimeterBack layout={layout} />;
+});
+
+/** The low outer walls, trees and lamps in front of the office. */
+export const AroundFront = memo(function AroundFront({ layout }: { layout: OfficeLayout }) {
+  return (
+    <>
+      <PerimeterFront layout={layout} />
+      <SurroundingsFront layout={layout} />
+    </>
+  );
+});
 
 export const Floor = memo(function Floor({ layout }: { layout: OfficeLayout }) {
   return (
@@ -315,7 +340,7 @@ export function OfficeDrawing({
           agentId={agent.id}
           appearance={agent.appearance}
           pose={seated ? 'sit' : view?.moving ? 'walk' : 'stand'}
-          facing={seated && seat ? sitterFacing(seat) : (view?.heading ?? 'front')}
+          facing={seated && seat ? SITTER_FACING[seat.side] : (view?.heading ?? 'sw')}
           holding={view?.carrying ? 'paper' : view?.resting ? 'cup' : null}
           headClass={seated ? motion.head : undefined}
           bodyClass={seated ? motion.body : view?.moving ? 'walker-bob' : undefined}
@@ -339,7 +364,9 @@ export function OfficeDrawing({
       data-office-scene
       preserveAspectRatio="xMidYMid meet"
     >
+      <Around layout={layout} />
       <Floor layout={layout} />
+      <Perimeter layout={layout} />
       {bands.map((band) => (
         <g key={band}>
           {back.get(band)}
@@ -348,6 +375,7 @@ export function OfficeDrawing({
           {front.get(band)}
         </g>
       ))}
+      <AroundFront layout={layout} />
       <Signs layout={layout} projects={projects} />
       {agents.map((agent) => {
         const balloon = balloons.get(agent.id);
@@ -356,7 +384,7 @@ export function OfficeDrawing({
         if (!balloon || !drawn) return null;
         return (
           <g key={agent.id} ref={scene.sprite(agent.id, 'balloon')}>
-            <foreignObject x="-70" y="-74" width="140" height="44" className="overflow-visible">
+            <foreignObject x="-70" y="-82" width="140" height="44" className="overflow-visible">
               <div className="flex h-full items-end justify-center">
                 <button
                   type="button"

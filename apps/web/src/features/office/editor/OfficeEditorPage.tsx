@@ -21,6 +21,9 @@ import {
   type PresetRoom,
   type Side,
   SIDES,
+  SURROUNDINGS,
+  SURROUNDINGS_INFO,
+  type Surroundings,
   type Tile,
   validateLayout,
 } from '@ea/shared';
@@ -61,7 +64,7 @@ import { useOffice, useResetLayout, useSaveLayout } from '../../../lib/queries';
 import { areaName, sceneBounds, wallsByBand } from '../art/architecture';
 import { Chair, Furniture, isFlat } from '../art/furniture';
 import { floorPoints, unproject } from '../art/iso';
-import { Floor, Signs } from '../OfficeScene';
+import { Around, AroundFront, Floor, Perimeter, Signs } from '../OfficeScene';
 import { useViewport } from '../viewport';
 import {
   areaAt,
@@ -669,6 +672,22 @@ function Editor({ office }: { office: Office }) {
               onChange={(height) => dispatch({ type: 'grid', width: layout.width, height })}
             />
           </div>
+          <div className="mt-4">
+            <SelectField
+              label="Entorno"
+              value={layout.surroundings}
+              hint={SURROUNDINGS_INFO[layout.surroundings].hint}
+              onChange={(event) =>
+                dispatch({ type: 'surroundings', value: event.target.value as Surroundings })
+              }
+            >
+              {SURROUNDINGS.map((each) => (
+                <option key={each} value={each}>
+                  {SURROUNDINGS_INFO[each].label}
+                </option>
+              ))}
+            </SelectField>
+          </div>
           <PresetPicker onApply={applyPreset} />
         </section>
 
@@ -778,7 +797,9 @@ function EditorPicture({
   for (let band = -1; band <= layout.width + layout.height; band += 1) bands.push(band);
   return (
     <g>
+      <Around layout={layout} />
       <Floor layout={layout} />
+      <Perimeter layout={layout} />
       {bands.map((band) => (
         <g key={band}>
           {back.get(band)}
@@ -786,6 +807,7 @@ function EditorPicture({
           {front.get(band)}
         </g>
       ))}
+      <AroundFront layout={layout} />
       <Signs layout={layout} projects={projects} />
     </g>
   );

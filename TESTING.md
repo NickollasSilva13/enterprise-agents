@@ -158,6 +158,12 @@ Se o Ollama não estiver instalado na máquina, o roteiro fica pendente e isso �
 | 2026-11-15 | 13 | `npm audit --omit=dev` | 0 vulnerabilidades. |
 | 2026-11-15 | 13 | Programa real (Claude Code 2.1.301), sem conta | Com `--safe-mode`, o evento de início listou `mcp_servers: []` e o servidor MCP de teste não recebeu nenhuma chamada; sem `--safe-mode`, o mesmo servidor foi conectado e a ferramenta dele apareceu. `--system-prompt-file` com arquivo inexistente responde "System prompt file not found", ou seja, a bandeira é aceita. As duas chamadas pararam em "OAuth session expired". |
 
+| 2026-11-16 | 15 | `npm run check:full` | Passou na primeira rodada. Compartilhado: 1 arquivo, 19 testes; servidor: 30 arquivos, 550 testes; interface: 15 arquivos, 168 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
+| 2026-11-16 | 15 | E2E: cena com 30 agentes | Com os personagens novos e o entorno de prédio: 55,9 quadros/s (desktop) e 59,0 (celular) durante 7 s de caminhada; maior intervalo entre quadros 133 e 67 ms. Chromium sem interface, nesta máquina. |
+| 2026-11-16 | 15 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): oito agentes de aparências diferentes; Escritório em prédio, casa e parque; prévia do personagem no formulário. |
+
+**Não verificado na Fase 15:** a caminhada nas quatro direções vista em movimento por uma pessoa; o desempenho caiu um pouco no desktop em relação à Fase 14 (59,4 para 55,9 quadros/s), ainda bem acima do limite de 20; outros navegadores.
+
 | 2026-11-16 | 14 | `npm run check:full` | Passou. Compartilhado: 1 arquivo, 17 testes; servidor: 30 arquivos, 548 testes; interface: 15 arquivos, 164 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
 | 2026-11-16 | 14 | E2E: cena com 30 agentes | Na cena isométrica, 30 agentes saindo juntos: 59,4 quadros/s (desktop) e 59,7 (celular) durante os 7,0 s de caminhada; maior intervalo entre quadros 67 e 33 ms. Chromium sem interface, nesta máquina. |
 | 2026-11-16 | 14 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): Escritório em 1500 px com seis agentes de aparências diferentes, aproximar, um agente desligado caminhando até a porta da rua, editor carregando o layout e selecionando uma mesa por evento de ponteiro. |

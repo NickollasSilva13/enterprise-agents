@@ -1,4 +1,4 @@
-import type { HairColor, OutfitColor, PantsColor, SkinTone } from '@ea/shared';
+import type { EyeColor, HairColor, OutfitColor, PantsColor, ShoeColor, SkinTone } from '@ea/shared';
 
 // Colours of the pixel art. Every option a user can pick for an agent is a
 // name in `@ea/shared`; only here does a name become a colour.
@@ -44,6 +44,35 @@ export const PANTS: Record<PantsColor, Shade> = {
   black: ['#2a2733', '#18161f'],
   khaki: ['#c4aa7a', '#a08a5e'],
   gray: ['#717588', '#575a6a'],
+};
+
+export const EYES: Record<EyeColor, Shade> = {
+  brown: ['#6b3e1f', '#3d2312'],
+  black: ['#26202e', '#120f17'],
+  blue: ['#3f86e0', '#1f4f99'],
+  green: ['#3f9a55', '#22663a'],
+  hazel: ['#a97a2c', '#6e4c16'],
+  gray: ['#8b93a6', '#5b6275'],
+};
+
+export const SHOES: Record<ShoeColor, Shade> = {
+  black: ['#2a2233', '#16121c'],
+  white: ['#eeeaf6', '#bdb6cf'],
+  brown: ['#6e4429', '#4b2d1a'],
+  red: ['#d94848', '#9c2c2c'],
+  blue: ['#3d63c9', '#273f8a'],
+};
+
+/** Highlight of the hair and of the skin: a light pixel or two, as 16-bit art does. */
+export const lighten = (hex: string, amount = 0.25): string => {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const channel = (shift: number) => {
+    const c = (value >> shift) & 0xff;
+    return Math.round(c + (255 - c) * amount)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
 };
 
 /** Fixed colours of the drawing. */

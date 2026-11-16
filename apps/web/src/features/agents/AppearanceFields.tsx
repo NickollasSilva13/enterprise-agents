@@ -3,19 +3,24 @@ import {
   type Appearance,
   APPEARANCE_LABELS,
   defaultAppearance,
+  EYE_COLORS,
+  FACIAL_HAIR,
   HAIR_COLORS,
   HAIR_STYLES,
   OUTFIT_COLORS,
   OUTFITS,
   PANTS_COLORS,
+  PATTERNS,
   randomAppearance,
+  SHOE_COLORS,
   SKIN_TONES,
 } from '@ea/shared';
 import { Dices } from 'lucide-react';
+import { useId } from 'react';
 import { Button } from '../../components/Button';
 import { SelectField } from '../../components/Form';
 import { PixelCharacter } from '../../components/pixel-art/character';
-import { HAIR, OUTFIT, PANTS, SKIN } from '../../components/pixel-art/palette';
+import { EYES, HAIR, OUTFIT, PANTS, SHOES, SKIN } from '../../components/pixel-art/palette';
 
 // How the agent looks in the office and in its avatar (Phase 14). Colours are
 // picked from swatches drawn in SVG (fill attribute, never inline style).
@@ -35,12 +40,14 @@ function Swatches<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  // An id from the label would break `aria-labelledby` on labels with spaces.
+  const id = useId();
   return (
     <div>
-      <p className="mb-1 text-sm font-semibold" id={`swatch-${label}`}>
+      <p className="mb-1 text-sm font-semibold" id={id}>
         {label}: <span className="font-normal text-dim">{labels[value]}</span>
       </p>
-      <div role="radiogroup" aria-labelledby={`swatch-${label}`} className="flex flex-wrap gap-1.5">
+      <div role="radiogroup" aria-labelledby={id} className="flex flex-wrap gap-1.5">
         {options.map((option) => (
           <button
             key={option}
@@ -68,7 +75,7 @@ function Swatches<T extends string>({
 function Preview({ agentId, appearance }: { agentId: string; appearance: Appearance }) {
   return (
     <svg
-      viewBox="-14 -28 28 30"
+      viewBox="-12 -34 24 36"
       className="h-44 w-36 shrink-0 rounded-lg bg-sheet-raised"
       shapeRendering="crispEdges"
       aria-hidden
@@ -182,6 +189,48 @@ export function AppearanceFields({
               colors={PANTS}
               value={look.pants}
               onChange={(v) => set('pants', v)}
+            />
+            <Swatches
+              label="Olhos"
+              options={EYE_COLORS}
+              labels={L.eyes}
+              colors={EYES}
+              value={look.eyes}
+              onChange={(v) => set('eyes', v)}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Barba"
+                value={look.facialHair}
+                onChange={(event) =>
+                  set('facialHair', event.target.value as Appearance['facialHair'])
+                }
+              >
+                {FACIAL_HAIR.map((option) => (
+                  <option key={option} value={option}>
+                    {L.facialHair[option]}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="Estampa"
+                value={look.pattern}
+                onChange={(event) => set('pattern', event.target.value as Appearance['pattern'])}
+              >
+                {PATTERNS.map((option) => (
+                  <option key={option} value={option}>
+                    {L.pattern[option]}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+            <Swatches
+              label="Calçado"
+              options={SHOE_COLORS}
+              labels={L.shoes}
+              colors={SHOES}
+              value={look.shoes}
+              onChange={(v) => set('shoes', v)}
             />
             <SelectField
               label="Acessório"

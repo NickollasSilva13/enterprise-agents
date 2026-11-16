@@ -13,7 +13,7 @@ import {
 } from '@ea/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { agents } from '../src/db/schema';
+import { agents, settings } from '../src/db/schema';
 import { makeApp, type TestApp } from './helpers';
 
 // Phase 14: the office layout the user edits and the look of each agent.
@@ -64,6 +64,10 @@ const LOOK: Appearance = {
   outfitColor: 'teal',
   pants: 'denim',
   accessory: 'headset',
+  eyes: 'green',
+  facialHair: 'beard',
+  shoes: 'white',
+  pattern: 'stripes',
 };
 
 describe('office layout', () => {
@@ -163,6 +167,21 @@ describe('office layout', () => {
     expect(room?.projectId).toBeNull();
   });
 
+  it('keeps the surroundings chosen, and reads a layout saved before them as a building', async () => {
+    const input = { ...inputOf(buildPresetLayout('compact', [])), surroundings: 'house' as const };
+    expect((await call('PUT', '/api/office/layout', input)).status).toBe(200);
+    expect((await office()).layout.surroundings).toBe('house');
+    // As Phase 14 saved it: the grid size alone.
+    t.database.db
+      .update(settings)
+      .set({ value: { width: input.width, height: input.height } })
+      .where(eq(settings.key, 'office.layout'))
+      .run();
+    expect((await office()).layout.surroundings).toBe('building');
+    const bad = await call('PUT', '/api/office/layout', { ...input, surroundings: 'moon' });
+    expect(bad.status).toBe(400);
+  });
+
   it('goes back to the automatic layout on request', async () => {
     const input = inputOf(buildPresetLayout('spacious', []));
     expect((await call('PUT', '/api/office/layout', input)).status).toBe(200);
@@ -195,6 +214,27 @@ describe('agent appearance', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     await call('PATCH', `/api/agents/${agent.id}`, { appearance: LOOK, objective: 'Novo' });
     expect((await office()).agents[0]?.idleSince).not.toBe(before);
+  });
+
+  it('accepts a look without the options added in Phase 15, filling them in', async () => {
+    const older = {
+      kind: LOOK.kind,
+      skin: LOOK.skin,
+      hair: LOOK.hair,
+      hairColor: LOOK.hairColor,
+      outfit: LOOK.outfit,
+      outfitColor: LOOK.outfitColor,
+      pants: LOOK.pants,
+      accessory: LOOK.accessory,
+    };
+    const agent = await createAgent({ name: 'Ana', appearance: older });
+    expect(agent.appearance).toEqual({
+      ...older,
+      eyes: 'brown',
+      facialHair: 'none',
+      shoes: 'black',
+      pattern: 'plain',
+    });
   });
 
   it('accepts only the options of the list', async () => {

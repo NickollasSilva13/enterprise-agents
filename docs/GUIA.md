@@ -189,9 +189,9 @@ Arraste o chão para andar pela planta, use a roda do mouse ou os botões da bar
 - numa mesa, "De quem é a mesa" a reserva para um agente; mesa livre fica para o primeiro agente sem mesa do projeto da sala;
 - "Modelo pronto" troca tudo por um dos modelos (completo, compacto, amplo); Ctrl+Z desfaz.
 
-O editor só deixa salvar um layout sem problemas e lista o que corrigir (sala sem porta, móvel sobre móvel, cadeira sem acesso, falta de recepção ou copa). "Voltar ao automático" apaga o layout salvo. Agente sem mesa no layout espera na recepção, e o painel avisa.
+O editor só deixa salvar um layout sem problemas e lista o que corrigir (sala sem porta, móvel sobre móvel, cadeira sem acesso, falta de recepção ou copa). Em "Entorno" você escolhe o que fica em volta do escritório: um andar de prédio (fachada de vidro e a cidade ao fundo), uma casa (quintal, cerca, árvores e rua) ou um parque (gramado, caminhos, lago e bancos). "Voltar ao automático" apaga o layout salvo. Agente sem mesa no layout espera na recepção, e o painel avisa.
 
-**Aparência dos agentes.** No formulário do agente, a seção "Aparência" escolhe entre pessoa e robô e, para pessoa, a pele, o cabelo, a roupa, a calça e um acessório, com prévia. "Sortear" escolhe tudo ao acaso. Agentes criados antes desta versão continuam como o robô de sempre até você escolher outra coisa. A aparência vai junto quando você exporta o agente.
+**Aparência dos agentes.** No formulário do agente, a seção "Aparência" escolhe entre pessoa e robô e, para pessoa, a pele, os olhos, o cabelo, a barba, a roupa e a estampa, a calça, o calçado e um acessório, com prévia. Os personagens são pixel art 16 bits vistos em 3/4 e olham para o lado em que andam. "Sortear" escolhe tudo ao acaso. Agentes criados antes desta versão continuam como o robô de sempre até você escolher outra coisa. A aparência vai junto quando você exporta o agente.
 
 **Logs.** A lista de execuções, com filtros por agente, estado e período. Cada execução abre a linha do tempo dos passos: chamadas ao modelo com duração e tokens, ferramentas pedidas e seus resultados, aprovações, delegações e erros, em linguagem comum. As mensagens de erro são frases fixas; o detalhe técnico de uma falha de provedor fica só no log do servidor, sem a chave.
 

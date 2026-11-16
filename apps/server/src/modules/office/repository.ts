@@ -1,4 +1,4 @@
-import { doorSchema, type OfficeLayout, type OfficeLayoutInput } from '@ea/shared';
+import { doorSchema, type OfficeLayout, type OfficeLayoutInput, SURROUNDINGS } from '@ea/shared';
 import { asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../../db/client';
@@ -8,7 +8,12 @@ import { officeAreas, officeItems, settings } from '../../db/schema';
 /** Grid size of the saved layout. Its presence means the user has saved one. */
 export const LAYOUT_KEY = 'office.layout';
 
-const layoutMetaSchema = z.object({ width: z.number().int(), height: z.number().int() });
+// Layouts saved before Phase 15 have no surroundings: they were in a building.
+const layoutMetaSchema = z.object({
+  width: z.number().int(),
+  height: z.number().int(),
+  surroundings: z.enum(SURROUNDINGS).catch('building'),
+});
 const doorsSchema = z.array(doorSchema);
 
 /** The layout the user saved, or null while the office uses the automatic one. */
@@ -66,7 +71,7 @@ export function writeLayout(db: Db, layout: OfficeLayoutInput): void {
         .values(layout.items.map((item, position) => ({ ...item, id: newId(), position })))
         .run();
     }
-    const value = { width: layout.width, height: layout.height };
+    const value = { width: layout.width, height: layout.height, surroundings: layout.surroundings };
     const updatedAt = new Date().toISOString();
     tx.insert(settings)
       .values({ key: LAYOUT_KEY, value, updatedAt })

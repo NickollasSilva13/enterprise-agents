@@ -148,7 +148,11 @@ interface Leg {
   readonly toSlot: number;
 }
 
-export type Heading = 'front' | 'back';
+/**
+ * Which way a character looks on screen: down-left (+y), down-right (+x),
+ * up-left (-x) or up-right (-y).
+ */
+export type Heading = 'sw' | 'se' | 'nw' | 'ne';
 
 interface Actor {
   readonly id: string;
@@ -164,7 +168,7 @@ interface Actor {
   speed: number;
   x: number;
   y: number;
-  /** Seen from the front (walking down the screen) or from the back. */
+  /** The way it walks. */
   heading: Heading;
   /** Coming back from a visit or a meeting, with the result in hand. */
   carrying: boolean;
@@ -186,8 +190,9 @@ export interface ActorView {
 
 const OUTSIDE: Place = { kind: 'outside' };
 
-/** Walking toward the top of the screen shows the back. */
-const headingOf = (dx: number, dy: number): Heading => (dx + dy < 0 ? 'back' : 'front');
+/** The way of a stretch of walk; steps on the grid go along one axis. */
+export const headingOf = (dx: number, dy: number): Heading =>
+  Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'se' : 'nw') : dy > 0 ? 'sw' : 'ne';
 
 export const bandOf = (x: number, y: number): number => Math.floor(x) + Math.floor(y);
 
@@ -227,7 +232,7 @@ export class SceneEngine {
           speed: WALK_SPEED,
           x: 0,
           y: 0,
-          heading: 'front',
+          heading: 'sw',
           carrying: false,
         };
         if (!walksIn) fresh.slot = this.freeSlot(target, id);
@@ -284,7 +289,7 @@ export class SceneEngine {
       moving,
       carrying: moving && actor.carrying,
       resting: !moving && kind === 'pantry',
-      heading: moving ? actor.heading : 'front',
+      heading: moving ? actor.heading : 'sw',
       band: bandOf(actor.x, actor.y),
     };
   }
@@ -319,7 +324,7 @@ export class SceneEngine {
     actor.length = 0;
     actor.traveled = 0;
     actor.carrying = false;
-    actor.heading = 'front';
+    actor.heading = 'sw';
     const spot = this.geometry?.spot(actor.id, actor.at, actor.slot);
     if (spot) {
       actor.x = spot.x;
