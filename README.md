@@ -2,7 +2,7 @@
 
 Plataforma local para criar, configurar, executar e monitorar agentes de IA por uma interface gráfica. Roda inteiramente na sua máquina, com modelos locais (Ollama) ou externos (OpenAI, Anthropic e compatíveis).
 
-> **Estado do projeto:** as onze fases estão concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, e acompanhar tudo no painel, nos logs e no escritório. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
+> **Estado do projeto:** dezessete fases concluídas e a Fase 18 proposta. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no painel, nos logs e no escritório, e organizar os agentes em áreas com quadro de tarefas, fluxos e pedidos entre áreas. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
 
 ## Funcionalidades
 
@@ -20,6 +20,10 @@ Cada uma é marcada como disponível quando é entregue.
 | Ferramentas com permissões por agente e aprovação humana | 8 | Sim (validado com o Ollama) |
 | Delegação entre agentes, com árvore de execução | 8 | Sim (validado com o Ollama) |
 | Exportar e importar agentes em JSON, sem segredos | 11 | Sim |
+| Claude Code e Codex instalados na máquina como provedores, com as ferramentas da plataforma | 12 / 13 | Sim (Claude Code validado com a conta do usuário; Codex não validado) |
+| Escritório isométrico personalizável, personagens 16 bits e entorno | 14 / 15 | Sim |
+| Áreas com quadro de tarefas e fluxos configuráveis; modelo pronto Desenvolvimento | 16 | Sim (validado com o provedor simulado) |
+| Pedidos entre áreas, com regras, aprovação e entrega de arquivos | 17 | Sim (validado com o provedor simulado) |
 
 ## Pré-requisitos
 
@@ -88,6 +92,8 @@ Um agente começa sem nenhuma ferramenta. Na tela **Ferramentas**, escolha o age
 | Buscar URL | Lê páginas públicas da internet; endereços desta máquina e da rede local são bloqueados. | Médio |
 | Delegar a agente | Passa uma tarefa a outro agente, que usa as próprias permissões. | Médio |
 | Executar script | Roda um script Node.js da pasta de trabalho. Desligada por padrão e sempre com aprovação. | Alto |
+| Passar a tarefa adiante, Comentar na tarefa | Só numa tarefa do quadro, pelas passagens do fluxo. Não se concedem por agente. | Baixo |
+| Pedir trabalho a outra área | Só numa tarefa do quadro, e só com uma regra criada pelo usuário. Não se concede por agente. | Médio |
 
 Cada agente tem a sua pasta, em `data/workspaces/<id do agente>` (o caminho aparece na tela). Quando um agente pede uma ferramenta marcada como "pede aprovação", a execução para e o pedido aparece na conversa, na tela **Aprovações** e na mesa do agente no Escritório, com os argumentos exatos. O modelo precisa aceitar ferramentas: no Ollama isso é detectado; em serviços compatíveis com OpenAI, marque o modelo na tela Modelos.
 

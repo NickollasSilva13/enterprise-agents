@@ -1,5 +1,9 @@
 import {
   areaFromTemplateSchema,
+  areaLinkInputSchema,
+  areaLinkUpdateSchema,
+  requestRefuseSchema,
+  taskRequestSchema,
   taskCommentSchema,
   taskCreateSchema,
   taskMoveSchema,
@@ -9,7 +13,15 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { idParamSchema, parseInput } from '../../http/error-handler';
 import {
+  approveRequest,
   cancelTask,
+  createAreaLink,
+  deleteAreaLink,
+  listAreaLinks,
+  listRequests,
+  refuseRequest,
+  requestFromTask,
+  updateAreaLink,
   commentTask,
   createAreaFromTemplate,
   createTask,
@@ -91,5 +103,42 @@ export function registerTaskRoutes(app: FastifyInstance, deps: { tasks: TasksCon
   app.post('/api/tasks/:id/resume', async (request) => {
     const { id } = parseInput(idParamSchema, request.params);
     return resumeTask(tasks, id);
+  });
+
+  // Requests between areas (Phase 17).
+  app.get('/api/area-links', async () => listAreaLinks(db));
+
+  app.post('/api/area-links', async (request, reply) => {
+    const link = createAreaLink(db, parseInput(areaLinkInputSchema, request.body));
+    return reply.status(201).send(link);
+  });
+
+  app.patch('/api/area-links/:id', async (request) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    return updateAreaLink(db, id, parseInput(areaLinkUpdateSchema, request.body).requiresApproval);
+  });
+
+  app.delete('/api/area-links/:id', async (request, reply) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    deleteAreaLink(db, id);
+    return reply.status(204).send();
+  });
+
+  app.get('/api/requests', async () => listRequests(db));
+
+  app.post('/api/tasks/:id/requests', async (request, reply) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    const child = requestFromTask(tasks, id, parseInput(taskRequestSchema, request.body));
+    return reply.status(201).send(child);
+  });
+
+  app.post('/api/tasks/:id/approve-request', async (request) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    return approveRequest(tasks, id);
+  });
+
+  app.post('/api/tasks/:id/refuse-request', async (request) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    return refuseRequest(tasks, id, parseInput(requestRefuseSchema, request.body).note);
   });
 }

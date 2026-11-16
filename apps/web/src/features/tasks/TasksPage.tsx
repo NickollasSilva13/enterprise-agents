@@ -1,5 +1,5 @@
 import type { Board, TaskSummary, WorkflowStage } from '@ea/shared';
-import { Plus, Workflow } from 'lucide-react';
+import { ArrowLeftRight, Plus, Workflow } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, buttonClass } from '../../components/Button';
@@ -116,10 +116,16 @@ export function TasksPage() {
         title="Tarefas"
         description="O quadro de cada área. Quando uma tarefa chega à etapa de um agente, ele trabalha nela e a passa adiante pelas regras do fluxo."
         actions={
-          <Button onClick={() => setCreatingArea(true)}>
-            <Plus className="size-4.5" aria-hidden />
-            Nova área a partir de modelo
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/tarefas/pedidos" className={buttonClass()}>
+              <ArrowLeftRight className="size-4.5" aria-hidden />
+              Pedidos entre áreas
+            </Link>
+            <Button onClick={() => setCreatingArea(true)}>
+              <Plus className="size-4.5" aria-hidden />
+              Nova área a partir de modelo
+            </Button>
+          </div>
         }
       />
 

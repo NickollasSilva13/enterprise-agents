@@ -7,11 +7,12 @@ import {
   type Workflow,
   type WorkflowStage,
 } from '@ea/shared';
-import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
 import {
   agents,
+  areaLinks,
   projects,
   runs,
   taskEvents,
@@ -182,6 +183,7 @@ export function insertEvent(
     runId?: string | null;
     fromStage?: string | null;
     toStage?: string | null;
+    relatedTaskId?: string | null;
     text?: string;
   },
 ): void {
@@ -195,6 +197,7 @@ export function insertEvent(
       runId: event.runId ?? null,
       fromStage: event.fromStage ?? null,
       toStage: event.toStage ?? null,
+      relatedTaskId: event.relatedTaskId ?? null,
       text: event.text ?? '',
     })
     .run();
@@ -211,6 +214,7 @@ export function eventsOf(db: Tx, taskId: string): TaskEvent[] {
       runId: taskEvents.runId,
       fromStageName: taskEvents.fromStage,
       toStageName: taskEvents.toStage,
+      relatedTaskId: taskEvents.relatedTaskId,
       text: taskEvents.text,
       createdAt: taskEvents.createdAt,
     })
@@ -284,6 +288,10 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
   );
   const working = workingTaskIds(db);
   const busy = busyAgentIds(db);
+  const waiting = openChildCounts(
+    db,
+    rows.map((row) => row.id),
+  );
   return rows.map((row) => {
     const stage = stages.get(row.stageId);
     const agentId = stage?.kind === 'agent' ? (stage.agentId ?? null) : null;
@@ -305,10 +313,13 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
         !isWorking &&
         row.state === 'open' &&
         row.attention === null &&
+        !waiting.has(row.id) &&
         agentId !== null &&
         busy.has(agentId),
       returns: row.returns,
       runCount: row.runCount,
+      parentTaskId: row.parentTaskId,
+      waitingOn: waiting.get(row.id) ?? 0,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -390,4 +401,108 @@ export function waitingTasks(db: Tx): (TaskRow & { areaName: string })[] {
   return rows
     .filter((row) => row.kind === 'human' || row.task.attention !== null)
     .map((row) => ({ ...row.task, areaName: row.areaName }));
+}
+
+// ---- Requests between areas (Phase 17) -------------------------------------------------
+
+export type AreaLinkRow = typeof areaLinks.$inferSelect;
+
+/** A request still to be finished: waiting for approval or being worked on. */
+const UNFINISHED = ['pending', 'open'] as const;
+
+export function childrenOf(db: Tx, taskId: string): TaskRow[] {
+  return db.select().from(tasks).where(eq(tasks.parentTaskId, taskId)).orderBy(asc(tasks.id)).all();
+}
+
+/** How many unfinished requests each task given has. */
+export function openChildCounts(db: Tx, taskIds: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  if (taskIds.length === 0) return counts;
+  const rows = db
+    .select({ parentTaskId: tasks.parentTaskId })
+    .from(tasks)
+    .where(and(inArray(tasks.parentTaskId, [...taskIds]), inArray(tasks.state, UNFINISHED)))
+    .all();
+  for (const row of rows) {
+    if (row.parentTaskId) counts.set(row.parentTaskId, (counts.get(row.parentTaskId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Every request not finished yet, oldest first. */
+export function unfinishedRequests(db: Tx): TaskRow[] {
+  return db
+    .select()
+    .from(tasks)
+    .where(and(isNotNull(tasks.parentTaskId), inArray(tasks.state, UNFINISHED)))
+    .orderBy(asc(tasks.id))
+    .all();
+}
+
+export function listLinks(db: Tx): AreaLinkRow[] {
+  return db.select().from(areaLinks).orderBy(asc(areaLinks.createdAt), asc(areaLinks.id)).all();
+}
+
+export function findLink(db: Tx, linkId: string): AreaLinkRow | undefined {
+  return db.select().from(areaLinks).where(eq(areaLinks.id, linkId)).get();
+}
+
+export function linkBetween(db: Tx, fromAreaId: string, toAreaId: string): AreaLinkRow | undefined {
+  return db
+    .select()
+    .from(areaLinks)
+    .where(and(eq(areaLinks.fromProjectId, fromAreaId), eq(areaLinks.toProjectId, toAreaId)))
+    .get();
+}
+
+export function linksFrom(db: Tx, fromAreaId: string): AreaLinkRow[] {
+  return db.select().from(areaLinks).where(eq(areaLinks.fromProjectId, fromAreaId)).all();
+}
+
+export function insertLink(db: Tx, row: typeof areaLinks.$inferInsert): void {
+  db.insert(areaLinks).values(row).run();
+}
+
+export function updateLink(db: Tx, linkId: string, requiresApproval: boolean): void {
+  db.update(areaLinks).set({ requiresApproval }).where(eq(areaLinks.id, linkId)).run();
+}
+
+export function deleteLink(db: Tx, linkId: string): void {
+  db.delete(areaLinks).where(eq(areaLinks.id, linkId)).run();
+}
+
+/** Names of every area, by id. */
+export function areaNames(db: Tx): Map<string, string> {
+  return new Map(
+    db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .all()
+      .map((row) => [row.id, row.name] as const),
+  );
+}
+
+/** Requests agents made since `since`: who made them and to which area. */
+export function requestsMadeSince(
+  db: Tx,
+  since: string,
+): { agentId: string; areaId: string; createdAt: string }[] {
+  return db
+    .select({
+      agentId: taskEvents.agentId,
+      areaId: tasks.projectId,
+      createdAt: taskEvents.createdAt,
+    })
+    .from(taskEvents)
+    .innerJoin(tasks, eq(taskEvents.relatedTaskId, tasks.id))
+    .where(
+      and(
+        eq(taskEvents.kind, 'requested'),
+        eq(taskEvents.actor, 'agent'),
+        gte(taskEvents.createdAt, since),
+      ),
+    )
+    .orderBy(asc(taskEvents.id))
+    .all()
+    .flatMap((row) => (row.agentId ? [{ ...row, agentId: row.agentId }] : []));
 }

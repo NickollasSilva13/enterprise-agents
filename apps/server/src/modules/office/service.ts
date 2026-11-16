@@ -15,9 +15,13 @@ import { approvals, messages, projects, runs, tasks, toolCalls } from '../../db/
 import type { ToolRegistry } from '../../tools/registry';
 import { listAgentsWithState, storedAppearance } from '../agents/repository';
 import { messageText } from '../runs/service';
+import { requestsMadeSince } from '../tasks/repository';
 import { clearLayout, readStoredLayout, writeLayout } from './repository';
 
 const PROMPT_PREVIEW_LENGTH = 120;
+
+/** How long an agent spends taking a request to the other area's room (Phase 17). */
+export const VISIT_MS = 20_000;
 
 type CurrentRun = NonNullable<OfficeAgent['currentRun']>;
 
@@ -224,12 +228,23 @@ export function resetLayout(db: Db): void {
   clearLayout(db);
 }
 
+/** The latest request each agent took to another area, while it is still on its way. */
+function visits(db: Db, now: number): Map<string, NonNullable<OfficeAgent['visit']>> {
+  const found = new Map<string, NonNullable<OfficeAgent['visit']>>();
+  for (const made of requestsMadeSince(db, new Date(now - VISIT_MS).toISOString())) {
+    const until = new Date(Date.parse(made.createdAt) + VISIT_MS).toISOString();
+    found.set(made.agentId, { areaId: made.areaId, until });
+  }
+  return found;
+}
+
 /** The office: its layout, its projects and every agent with what it is doing. */
-export function getOffice(db: Db, registry: ToolRegistry): Office {
+export function getOffice(db: Db, registry: ToolRegistry, now = Date.now()): Office {
   const running = currentRuns(db);
   const finished = lastFinishedRuns(db);
   const waiting = pendingApprovals(db, registry);
   const delegating = delegations(db);
+  const visiting = visits(db, now);
   const agents: OfficeAgent[] = listAgentsWithState(db).map(({ agent, state }) => ({
     id: agent.id,
     name: agent.name,
@@ -245,6 +260,7 @@ export function getOffice(db: Db, registry: ToolRegistry): Office {
       state === 'idle'
         ? idleSinceOf(agent.updatedAt, finished.get(agent.id)?.finishedAt ?? null)
         : null,
+    visit: visiting.get(agent.id) ?? null,
   }));
   const { layout, customized } = currentLayout(db);
   return {

@@ -5,7 +5,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { formatDateTime, plural } from '../../lib/format';
-import { useWaitingTasks } from '../../lib/task-queries';
+import { useRequests, useWaitingTasks } from '../../lib/task-queries';
 import { useApprovals } from '../../lib/tool-queries';
 import { TaskStatus } from '../tasks/TaskBadges';
 
@@ -77,6 +77,42 @@ function WaitingTasks() {
   );
 }
 
+/** Requests between areas that wait for the user's approval before reaching the other board (Phase 17). */
+function PendingRequests() {
+  const requests = useRequests();
+  const pending = requests.data?.filter((request) => request.state === 'pending') ?? [];
+  if (pending.length === 0) return null;
+  return (
+    <Panel
+      title="Pedidos entre áreas esperando você"
+      aside={plural(pending.length, 'pedido', 'pedidos')}
+      className="mb-6"
+    >
+      <ul className="divide-y divide-line">
+        {pending.map((request) => (
+          <li key={request.id} className="px-4 py-2.5">
+            <Link
+              to={`/tarefas/${request.id}`}
+              className="font-semibold text-info underline underline-offset-4"
+            >
+              {request.title}
+            </Link>
+            <span className="text-dim">
+              {' '}
+              · {request.fromAreaName} → {request.toAreaName}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-line px-4 py-2.5 text-sm">
+        <Link to="/tarefas/pedidos" className="text-info underline underline-offset-4">
+          Aprovar ou recusar em Pedidos entre áreas
+        </Link>
+      </p>
+    </Panel>
+  );
+}
+
 /** The queue of actions waiting for the user, and what was decided before (RF-54). */
 export function ApprovalsPage() {
   const pending = useApprovals('pending');
@@ -90,6 +126,7 @@ export function ApprovalsPage() {
       />
 
       <WaitingTasks />
+      <PendingRequests />
 
       {pending.isPending && <LoadingState label="Carregando as aprovações…" />}
       {pending.error && !pending.data && (

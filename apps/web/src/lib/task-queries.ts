@@ -1,7 +1,12 @@
 import {
   type AreaFromTemplate,
+  type AreaLinkInput,
   areaCreatedSchema,
+  areaLinkSchema,
+  areaLinksSchema,
   boardSchema,
+  requestsSchema,
+  type TaskRequestInput,
   type TaskCreateInput,
   taskDetailSchema,
   taskSummarySchema,
@@ -12,7 +17,7 @@ import {
   type WorkflowUpdate,
 } from '@ea/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch, apiSend } from './api';
+import { apiDelete, apiFetch, apiSend } from './api';
 
 // The task board (Phase 16). Runs start and end on the server by themselves,
 // so the board and an open task are refreshed often while anything works.
@@ -67,6 +72,7 @@ function useRefreshTasks() {
       queryClient.invalidateQueries({ queryKey: ['task'] }),
       queryClient.invalidateQueries({ queryKey: ['tasks-waiting'] }),
       queryClient.invalidateQueries({ queryKey: ['workflow'] }),
+      queryClient.invalidateQueries({ queryKey: ['requests'] }),
     ]);
 }
 
@@ -142,6 +148,79 @@ export function useTaskAction() {
   return useMutation({
     mutationFn: ({ taskId, action }: { taskId: string; action: 'cancel' | 'resume' }) =>
       apiSend('POST', `/api/tasks/${enc(taskId)}/${action}`, taskSummarySchema),
+    onSettled: refresh,
+  });
+}
+
+// ---- Requests between areas (Phase 17) ----------------------------------------
+
+export const useRequests = () =>
+  useQuery({
+    queryKey: ['requests'],
+    queryFn: async () => (await apiFetch('/api/requests', requestsSchema)).requests,
+    refetchInterval: BOARD_REFRESH_MS,
+  });
+
+export const useAreaLinks = () =>
+  useQuery({
+    queryKey: ['area-links'],
+    queryFn: async () => (await apiFetch('/api/area-links', areaLinksSchema)).links,
+  });
+
+/** A rule changes which areas a task may ask, shown on the task page. */
+function useRefreshLinks() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['area-links'] }),
+      queryClient.invalidateQueries({ queryKey: ['task'] }),
+    ]);
+}
+
+export function useCreateAreaLink() {
+  const refresh = useRefreshLinks();
+  return useMutation({
+    mutationFn: (input: AreaLinkInput) => apiSend('POST', '/api/area-links', areaLinkSchema, input),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateAreaLink() {
+  const refresh = useRefreshLinks();
+  return useMutation({
+    mutationFn: ({ linkId, requiresApproval }: { linkId: string; requiresApproval: boolean }) =>
+      apiSend('PATCH', `/api/area-links/${enc(linkId)}`, areaLinkSchema, { requiresApproval }),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteAreaLink() {
+  const refresh = useRefreshLinks();
+  return useMutation({
+    mutationFn: (linkId: string) => apiDelete(`/api/area-links/${enc(linkId)}`),
+    onSuccess: refresh,
+  });
+}
+
+export function useRequestFromTask() {
+  const refresh = useRefreshTasks();
+  return useMutation({
+    mutationFn: ({ taskId, request }: { taskId: string; request: TaskRequestInput }) =>
+      apiSend('POST', `/api/tasks/${enc(taskId)}/requests`, taskSummarySchema, request),
+    onSuccess: refresh,
+  });
+}
+
+/** The user lets a request into the other area, or turns it down. */
+export function useDecideRequest() {
+  const refresh = useRefreshTasks();
+  return useMutation({
+    mutationFn: ({ taskId, approve, note }: { taskId: string; approve: boolean; note?: string }) =>
+      approve
+        ? apiSend('POST', `/api/tasks/${enc(taskId)}/approve-request`, taskSummarySchema)
+        : apiSend('POST', `/api/tasks/${enc(taskId)}/refuse-request`, taskSummarySchema, {
+            note: note ?? '',
+          }),
     onSettled: refresh,
   });
 }

@@ -13,6 +13,7 @@ const occupant = (overrides: Partial<OfficeAgent> & { id: string; name: string }
   pendingApproval: null,
   delegatingTo: [],
   idleSince: null,
+  visit: null,
   ...overrides,
 });
 

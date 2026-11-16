@@ -1,9 +1,15 @@
-import { TASK_LIMITS, type TaskDetail, type TaskEvent } from '@ea/shared';
+import {
+  type LinkedTask,
+  REQUEST_LIMITS,
+  TASK_LIMITS,
+  type TaskDetail,
+  type TaskEvent,
+} from '@ea/shared';
 import { ArrowLeft } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button } from '../../components/Button';
-import { SelectField, TextAreaField } from '../../components/Form';
+import { SelectField, TextAreaField, TextField } from '../../components/Form';
 import { Markdown } from '../../components/Markdown';
 import { ConfirmDialog } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
@@ -12,7 +18,14 @@ import { ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/errors';
 import { formatCount, formatDateTime } from '../../lib/format';
-import { useCommentTask, useMoveTask, useTask, useTaskAction } from '../../lib/task-queries';
+import {
+  useCommentTask,
+  useDecideRequest,
+  useMoveTask,
+  useRequestFromTask,
+  useTask,
+  useTaskAction,
+} from '../../lib/task-queries';
 import { PriorityBadge, TaskStatus } from './TaskBadges';
 
 function who(event: TaskEvent): string {
@@ -41,6 +54,14 @@ function whatHappened(event: TaskEvent): string {
       return 'retomou a tarefa';
     case 'cancelled':
       return 'cancelou a tarefa';
+    case 'requested':
+      return 'pediu trabalho a outra área';
+    case 'request_approved':
+      return 'aprovou o pedido';
+    case 'request_refused':
+      return 'recusou o pedido';
+    case 'delivered':
+      return 'registrou uma entrega';
   }
 }
 
@@ -97,6 +118,13 @@ function MoveForm({ detail }: { detail: TaskDetail }) {
     );
   };
 
+  if (detail.task.state === 'pending') {
+    return (
+      <p className="px-4 py-3 text-sm text-dim">
+        Este pedido entra no quadro quando você o aprovar.
+      </p>
+    );
+  }
   if (detail.task.working) {
     return (
       <p className="px-4 py-3 text-sm text-dim">
@@ -201,6 +229,7 @@ function Situation({ detail }: { detail: TaskDetail }) {
           {task.attention}
         </p>
       )}
+      {task.state === 'pending' && <RequestDecision detail={detail} />}
       {task.state === 'open' && (
         <div className="flex flex-wrap gap-3 px-4 pb-3">
           {task.attention && (
@@ -246,6 +275,194 @@ function Situation({ detail }: { detail: TaskDetail }) {
           A tarefa sai do quadro e, se um agente estiver trabalhando nela, a execução é
           interrompida. O histórico é mantido.
         </ConfirmDialog>
+      )}
+    </Panel>
+  );
+}
+
+function RequestDecision({ detail }: { detail: TaskDetail }) {
+  const decide = useDecideRequest();
+  const notify = useToast();
+  const [note, setNote] = useState('');
+  const from = detail.parent?.areaName ?? 'outra área';
+  return (
+    <div className="space-y-3 px-4 pb-3">
+      <p role="status" className="rounded-md border border-wait/60 bg-wait/10 p-3 text-sm">
+        Pedido da área {from}. Ele só entra no quadro desta área depois da sua aprovação.
+      </p>
+      <TextAreaField
+        label="Motivo, se recusar"
+        rows={2}
+        value={note}
+        maxLength={TASK_LIMITS.note}
+        onChange={(event) => setNote(event.target.value)}
+        hint="Vai para o histórico da tarefa que pediu."
+      />
+      <div className="flex flex-wrap gap-3">
+        <Button
+          variant="primary"
+          disabled={decide.isPending}
+          onClick={() =>
+            decide.mutate(
+              { taskId: detail.task.id, approve: true },
+              { onSuccess: () => notify('Pedido aprovado.') },
+            )
+          }
+        >
+          Aprovar pedido
+        </Button>
+        <Button
+          disabled={decide.isPending}
+          onClick={() =>
+            decide.mutate(
+              { taskId: detail.task.id, approve: false, note },
+              { onSuccess: () => notify('Pedido recusado.') },
+            )
+          }
+        >
+          Recusar
+        </Button>
+      </div>
+      {decide.error && (
+        <p role="alert" className="text-sm text-fail">
+          {errorMessage(decide.error)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const LINKED_STATE: Record<LinkedTask['state'], string> = {
+  pending: 'esperando aprovação',
+  open: 'em andamento',
+  done: 'entregue',
+  cancelled: 'cancelado',
+};
+
+function LinkedTaskItem({ task }: { task: LinkedTask }) {
+  return (
+    <li className="px-4 py-3 text-sm">
+      <Link to={`/tarefas/${encodeURIComponent(task.id)}`} className="font-semibold text-info">
+        {task.title}
+      </Link>
+      <p className="text-dim">
+        Área {task.areaName} · {LINKED_STATE[task.state]}
+        {task.state === 'open' && ` em "${task.stageName}"`}
+      </p>
+    </li>
+  );
+}
+
+function RequestForm({ detail }: { detail: TaskDetail }) {
+  const send = useRequestFromTask();
+  const notify = useToast();
+  const [areaId, setAreaId] = useState(detail.requestTargets[0]?.areaId ?? '');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [files, setFiles] = useState('');
+  const target =
+    detail.requestTargets.find((entry) => entry.areaId === areaId) ?? detail.requestTargets[0];
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!target) return;
+    send.mutate(
+      {
+        taskId: detail.task.id,
+        request: {
+          toAreaId: target.areaId,
+          title,
+          description,
+          files: files
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line !== ''),
+        },
+      },
+      {
+        onSuccess: () => {
+          setTitle('');
+          setDescription('');
+          setFiles('');
+          notify(
+            target.requiresApproval
+              ? `Pedido enviado à área ${target.areaName}. Ele espera a sua aprovação.`
+              : `Pedido criado no quadro da área ${target.areaName}.`,
+          );
+        },
+      },
+    );
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3 border-t border-line px-4 py-3">
+      <SelectField
+        label="Pedir à área"
+        value={target?.areaId ?? ''}
+        onChange={(event) => setAreaId(event.target.value)}
+      >
+        {detail.requestTargets.map((entry) => (
+          <option key={entry.areaId} value={entry.areaId}>
+            {entry.areaName}
+          </option>
+        ))}
+      </SelectField>
+      <TextField
+        label="O que pedir"
+        value={title}
+        maxLength={TASK_LIMITS.title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <TextAreaField
+        label="Detalhes"
+        rows={3}
+        value={description}
+        maxLength={TASK_LIMITS.description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+      <TextAreaField
+        label="Arquivos para mandar junto"
+        rows={2}
+        value={files}
+        onChange={(event) => setFiles(event.target.value)}
+        hint={`Opcional. Um caminho da pasta da área por linha (até ${REQUEST_LIMITS.paths}); uma cópia vai com o pedido.`}
+      />
+      {send.error && (
+        <p role="alert" className="text-sm text-fail">
+          {errorMessage(send.error)}
+        </p>
+      )}
+      <Button variant="primary" type="submit" disabled={send.isPending || title.trim() === ''}>
+        {send.isPending ? 'Enviando…' : 'Enviar pedido'}
+      </Button>
+    </form>
+  );
+}
+
+function Requests({ detail }: { detail: TaskDetail }) {
+  const canAsk = detail.task.state === 'open' && detail.requestTargets.length > 0;
+  return (
+    <Panel title="Pedidos a outras áreas">
+      {detail.children.length > 0 ? (
+        <ul className="divide-y divide-line">
+          {detail.children.map((child) => (
+            <LinkedTaskItem key={child.id} task={child} />
+          ))}
+        </ul>
+      ) : (
+        <p className="px-4 py-3 text-sm text-dim">Nenhum pedido feito por esta tarefa.</p>
+      )}
+      {canAsk ? (
+        <RequestForm detail={detail} />
+      ) : (
+        detail.task.state === 'open' && (
+          <p className="border-t border-line px-4 py-3 text-sm text-dim">
+            Esta área ainda não pode pedir trabalho a nenhuma outra.{' '}
+            <Link to="/tarefas/pedidos" className="text-info underline underline-offset-4">
+              Criar uma regra
+            </Link>
+          </p>
+        )
       )}
     </Panel>
   );
@@ -303,11 +520,19 @@ export function TaskPage() {
         </div>
         <div className="space-y-6">
           <Situation detail={data} />
+          {data.parent && (
+            <Panel title="Pedido de outra área">
+              <ul>
+                <LinkedTaskItem task={data.parent} />
+              </ul>
+            </Panel>
+          )}
           {task.state !== 'cancelled' && (
             <Panel title="Mover">
               <MoveForm key={task.stageId} detail={data} />
             </Panel>
           )}
+          {task.state !== 'cancelled' && <Requests detail={data} />}
         </div>
       </div>
     </>

@@ -172,6 +172,13 @@ Se o Ollama não estiver instalado na máquina, o roteiro fica pendente e isso �
 
 **Não verificado na Fase 16:** nenhum modelo real atravessou um fluxo (só o provedor simulado, em processo e no E2E). O editor de fluxo foi exercitado só por testes de componente, não pelo E2E nem num celular de verdade. O quadro não foi visto em captura de tela.
 
+| 2026-11-16 | 17 | `npm run check:full` | Passou (saída 0). Contrato: 20 testes; servidor: 33 arquivos, 597 testes; interface: 17 arquivos, 182 testes; cobertura: linhas do servidor 96,25%, `modules/tasks` 90,26% (`area-files.ts` 97,1%); E2E: 49 testes, 1 ignorado de propósito, em 2,2 min, incluindo o roteiro novo `requests.spec.ts` em desktop e celular. |
+| 2026-11-16 | 17 | `npm run check` | Depois de um teste a mais (arquivo fora da pasta pedido por agente): passou; servidor com 598 testes. |
+| 2026-11-16 | 17 | `npm audit --omit=dev` | 0 vulnerabilidades. |
+| 2026-11-16 | 17 | E2E intermitente | Antes do `check:full`, o roteiro "an agent leaves and comes back by the reception (walking)" de `office.spec.ts` falhou duas vezes (desktop e celular, na conferência de que os primeiros passos são na recepção). Falhou igual com o código da Fase 16 e passou no `check:full`: não é desta fase; parece depender da carga da máquina (havia outro servidor de desenvolvimento rodando). Também na primeira rodada, `requests.spec.ts` registrou um 401 no console por criar dados antes de a página abrir a sessão; corrigido esperando o título da página. |
+
+**Não verificado na Fase 17:** nenhum modelo real pediu trabalho a outra área. A ida do agente à sala da outra área não foi vista em movimento. As telas novas não foram vistas em captura de tela.
+
 | 2026-11-16 | 14 | `npm run check:full` | Passou. Compartilhado: 1 arquivo, 17 testes; servidor: 30 arquivos, 548 testes; interface: 15 arquivos, 164 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
 | 2026-11-16 | 14 | E2E: cena com 30 agentes | Na cena isométrica, 30 agentes saindo juntos: 59,4 quadros/s (desktop) e 59,7 (celular) durante os 7,0 s de caminhada; maior intervalo entre quadros 67 e 33 ms. Chromium sem interface, nesta máquina. |
 | 2026-11-16 | 14 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): Escritório em 1500 px com seis agentes de aparências diferentes, aproximar, um agente desligado caminhando até a porta da rua, editor carregando o layout e selecionando uma mesa por evento de ponteiro. |

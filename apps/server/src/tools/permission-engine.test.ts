@@ -136,6 +136,7 @@ describe('ToolRegistry', () => {
       ['run_script', 'high', 'ask'],
       ['move_task', 'low', 'allow'],
       ['comment_task', 'low', 'allow'],
+      ['request_from_area', 'medium', 'allow'],
     ]);
     expect(builtin.filter((entry) => entry.offByDefault).map((entry) => entry.name)).toEqual([
       'run_script',
@@ -144,6 +145,7 @@ describe('ToolRegistry', () => {
     expect(builtin.filter((entry) => entry.scope === 'task').map((entry) => entry.name)).toEqual([
       'move_task',
       'comment_task',
+      'request_from_area',
     ]);
   });
 

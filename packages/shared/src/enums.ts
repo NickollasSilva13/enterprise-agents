@@ -41,7 +41,8 @@ export type StageKind = (typeof STAGE_KINDS)[number];
 export const TRANSITION_ACTORS = ['agent', 'human', 'both'] as const;
 export type TransitionActor = (typeof TRANSITION_ACTORS)[number];
 
-export const TASK_STATES = ['open', 'done', 'cancelled'] as const;
+/** `pending`: a request from another area that waits for the user's approval (Phase 17). */
+export const TASK_STATES = ['pending', 'open', 'done', 'cancelled'] as const;
 export type TaskState = (typeof TASK_STATES)[number];
 
 export const TASK_PRIORITIES = ['normal', 'high'] as const;
@@ -57,6 +58,11 @@ export const TASK_EVENT_KINDS = [
   'stopped',
   'resumed',
   'cancelled',
+  // Requests between areas (Phase 17).
+  'requested',
+  'request_approved',
+  'request_refused',
+  'delivered',
 ] as const;
 export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 

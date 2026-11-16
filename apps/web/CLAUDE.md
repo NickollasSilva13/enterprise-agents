@@ -21,7 +21,7 @@ O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/o
 
 ## Quadro de tarefas (Fase 16)
 
-Telas em `src/features/tasks/` (quadro em `/tarefas?area=<id>`, tarefa em `/tarefas/:taskId`, fluxo em `/tarefas/fluxo/:areaId`); consultas em `src/lib/task-queries.ts`, com atualização a cada 3 s enquanto agentes trabalham. Texto de tarefa, nota e comentário vêm de pessoas e modelos: só pelo `Markdown`. O editor de fluxo valida com `workflowUpdateSchema` antes de enviar.
+Telas em `src/features/tasks/` (quadro em `/tarefas?area=<id>`, tarefa em `/tarefas/:taskId`, fluxo em `/tarefas/fluxo/:areaId`); consultas em `src/lib/task-queries.ts`, com atualização a cada 3 s enquanto agentes trabalham. Texto de tarefa, nota e comentário vêm de pessoas e modelos: só pelo `Markdown`. O editor de fluxo valida com `workflowUpdateSchema` antes de enviar. Pedidos entre áreas (Fase 17) ficam em `/tarefas/pedidos` (`RequestsPage.tsx`), declarada antes de `/tarefas/:taskId`. No Escritório, `visit` do agente vira o lugar `room` (sala da outra área) só enquanto `until` não passou e a área tem sala no layout.
 
 ## Testes de componente
 

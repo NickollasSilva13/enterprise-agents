@@ -10,8 +10,17 @@ export const STAGE_KIND_LABEL: Record<StageKind, string> = {
 export function taskStatus(task: TaskSummary): { label: string; tone: string } {
   if (task.state === 'cancelled') return { label: 'Cancelada', tone: 'text-dim' };
   if (task.state === 'done') return { label: 'Concluída', tone: 'text-ok' };
+  if (task.state === 'pending')
+    return { label: 'Pedido esperando sua aprovação', tone: 'text-wait' };
   if (task.attention) return { label: 'Precisa de você', tone: 'text-wait' };
   if (task.working) return { label: `${task.agentName ?? 'Agente'} trabalhando`, tone: 'text-ok' };
+  if (task.waitingOn > 0) {
+    return {
+      label:
+        task.waitingOn === 1 ? 'Aguardando outra área' : `Aguardando ${task.waitingOn} pedidos`,
+      tone: 'text-dim',
+    };
+  }
   if (task.queued) return { label: `Na fila de ${task.agentName ?? 'agente'}`, tone: 'text-dim' };
   if (task.stageKind === 'human') return { label: 'Esperando você', tone: 'text-wait' };
   return { label: 'Aguardando', tone: 'text-dim' };

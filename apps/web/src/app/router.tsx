@@ -12,6 +12,7 @@ import { OfficeEditorPage } from '../features/office/editor/OfficeEditorPage';
 import { OfficePage } from '../features/office/OfficePage';
 import { PlannedPage } from '../features/planned/PlannedPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { RequestsPage } from '../features/tasks/RequestsPage';
 import { TaskPage } from '../features/tasks/TaskPage';
 import { TasksPage } from '../features/tasks/TasksPage';
 import { WorkflowEditorPage } from '../features/tasks/WorkflowEditorPage';
@@ -48,6 +49,7 @@ export const routes: RouteObject[] = [
       { path: 'agentes/:id/conversa/:conversationId', element: <ChatPage /> },
       { path: 'tarefas', element: <TasksPage /> },
       { path: 'tarefas/fluxo/:areaId', element: <WorkflowEditorPage /> },
+      { path: 'tarefas/pedidos', element: <RequestsPage /> },
       { path: 'tarefas/:taskId', element: <TaskPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'logs/:runId', element: <RunDetailPage /> },

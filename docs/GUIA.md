@@ -171,6 +171,19 @@ Uma tarefa **para e espera você** quando chega a uma etapa sua, quando a execu�
 
 > Validado com o provedor simulado dos testes, não com um modelo real atravessando um fluxo inteiro.
 
+### Pedidos entre áreas
+
+Uma área pode pedir trabalho a outra, como o marketing pede números à área de dados.
+
+1. **Libere o pedido**: em Tarefas → **Pedidos entre áreas**, crie uma regra dizendo que uma área pode pedir trabalho a outra. Sem regra, nenhum pedido é aceito. Com "Exigir minha aprovação" ligado (o padrão), cada pedido espera você antes de entrar no quadro da outra área.
+2. **Peça**: na página de uma tarefa, em "Pedidos a outras áreas", escolha a área, diga o que precisa e, se quiser, liste arquivos da pasta da área para mandar uma cópia. Os agentes fazem o mesmo com a ferramenta `request_from_area`, que aparece para eles quando há uma regra; o briefing diz a quais áreas podem pedir.
+3. **O pedido vira uma tarefa** na primeira etapa do fluxo da outra área. A tarefa que pediu fica "Aguardando outra área" e não volta a um agente até a entrega.
+4. **A entrega**: o que a outra área deixar em `area/entregas/<pedido>/` é copiado para `area/recebidos/<pedido>/` da área que pediu quando o pedido chega à etapa final, e a nota de quem concluiu vai para o histórico da tarefa que pediu, que volta a andar.
+
+Se você recusar um pedido, a tarefa que pediu segue sem ele, com o motivo no histórico; se cancelar, ela para e espera você. Um pedido não pode voltar a uma área que já está na cadeia (o marketing pede a dados, que não pode pedir de volta ao marketing pela mesma tarefa), e a cadeia tem no máximo 3 níveis. No Escritório, o agente que fez o pedido vai até a sala da outra área por alguns segundos.
+
+> Validado com o provedor simulado e pela interface, não com um modelo real pedindo trabalho.
+
 ## 8. Acompanhar o trabalho: Painel, Escritório e Logs
 
 **Painel.** Quantos agentes há em cada estado, execuções em andamento e à espera de aprovação, indicadores das últimas 24 horas (concluídas, taxa de sucesso, tokens), a atividade recente e os alertas: falhas, aprovações pendentes, agente sem modelo, provedor inacessível. Atualiza sozinho.

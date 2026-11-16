@@ -20,6 +20,7 @@ const office: Office = {
       pendingApproval: null,
       delegatingTo: [],
       idleSince: null,
+      visit: null,
     },
   ],
 };

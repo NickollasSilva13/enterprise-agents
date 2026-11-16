@@ -13,6 +13,8 @@ import {
   providers,
   runs,
   runSteps,
+  taskEvents,
+  tasks,
 } from '../src/db/schema';
 import { makeDatabase, makeTempDir } from './helpers';
 
@@ -20,6 +22,7 @@ const EXPECTED_TABLES = [
   'agent_tools',
   'agents',
   'approvals',
+  'area_links',
   'audit_log',
   'conversations',
   'messages',
@@ -203,6 +206,35 @@ describe('migrations over existing data', () => {
       areaAccess: 'none',
     });
     expect(database.db.select().from(runs).get()).toMatchObject({ id: 'r1', taskId: null });
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+
+  it('keep tasks and their history, now with no parent, when adding requests (0006)', () => {
+    const database = databaseUpTo(5);
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Site');
+      INSERT INTO workflow_stages (id, project_id, position, name, kind)
+        VALUES ('s1', 'pr1', 0, 'Fila', 'human');
+      INSERT INTO tasks (id, project_id, title, stage_id) VALUES ('t1', 'pr1', 'Tarefa', 's1');
+      INSERT INTO task_events (id, task_id, kind, actor) VALUES ('e1', 't1', 'created', 'user');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select().from(tasks).get()).toMatchObject({ id: 't1', parentTaskId: null });
+    expect(database.db.select().from(taskEvents).get()).toMatchObject({
+      id: 'e1',
+      relatedTaskId: null,
+    });
+    // Adding columns kept the history append-only.
+    expect(() => database.sqlite.prepare('DELETE FROM task_events').run()).toThrow(/append-only/);
+    // A task asked for by another cannot be erased from under it.
+    database.sqlite.exec(
+      "INSERT INTO tasks (id, project_id, title, stage_id, parent_task_id) VALUES ('t2', 'pr1', 'Pedido', 's1', 't1')",
+    );
+    expect(() => database.sqlite.prepare("DELETE FROM tasks WHERE id = 't1'").run()).toThrow(
+      /FOREIGN KEY/,
+    );
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
   });
 });

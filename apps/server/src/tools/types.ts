@@ -24,6 +24,19 @@ export interface TaskPort {
   /** Moves the task to the named stage, if the workflow allows it, with a note. */
   move(stageName: string, note: string): ToolResult;
   comment(text: string): ToolResult;
+  /**
+   * Asks another area, by name, for work (Phase 17). `files` are absolute
+   * paths already confined by the path resolver; the server copies them.
+   */
+  request(input: AreaRequest): ToolResult;
+}
+
+export interface AreaRequest {
+  readonly area: string;
+  readonly title: string;
+  readonly description: string;
+  readonly acceptance: string;
+  readonly files: readonly string[];
 }
 
 /**

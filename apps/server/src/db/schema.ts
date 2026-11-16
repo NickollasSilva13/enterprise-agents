@@ -373,13 +373,35 @@ export const tasks = sqliteTable(
     returns: integer('returns').notNull().default(0),
     /** Runs started for it (limit of D4). */
     runCount: integer('run_count').notNull().default(0),
+    /** The task of another area that asked for this one (Phase 17). */
+    parentTaskId: text('parent_task_id').references((): AnySQLiteColumn => tasks.id, {
+      onDelete: 'restrict',
+    }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     index('tasks_project_idx').on(table.projectId),
     index('tasks_stage_idx').on(table.stageId),
+    index('tasks_parent_idx').on(table.parentTaskId),
   ],
+);
+
+/** Which area may ask which for work (Phase 17, D2). No rule, no request. */
+export const areaLinks = sqliteTable(
+  'area_links',
+  {
+    id: id(),
+    fromProjectId: text('from_project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    toProjectId: text('to_project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex('area_links_pair_unique').on(table.fromProjectId, table.toProjectId)],
 );
 
 /** What happened to a task. Insert only, like the audit trail. */
@@ -397,6 +419,10 @@ export const taskEvents = sqliteTable(
     /** Stage names as they were, so renaming or deleting a stage keeps the history readable. */
     fromStage: text('from_stage'),
     toStage: text('to_stage'),
+    /** The other task of a request event (Phase 17). */
+    relatedTaskId: text('related_task_id').references((): AnySQLiteColumn => tasks.id, {
+      onDelete: 'restrict',
+    }),
     text: text('text').notNull().default(''),
     createdAt: createdAt(),
   },

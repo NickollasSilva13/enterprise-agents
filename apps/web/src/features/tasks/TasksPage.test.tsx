@@ -64,6 +64,8 @@ const task = (overrides: Partial<TaskSummary> & { id: string; title: string }): 
   queued: false,
   returns: 0,
   runCount: 1,
+  parentTaskId: null,
+  waitingOn: 0,
   createdAt: '2026-11-16T12:00:00.000Z',
   updatedAt: '2026-11-16T12:00:00.000Z',
   ...overrides,
@@ -102,6 +104,7 @@ const detail: TaskDetail = {
       agentId: 'a1',
       agentName: 'Dev',
       runId: 'r1',
+      relatedTaskId: null,
       fromStageName: 'Desenvolvimento',
       toStageName: 'Sua revisão',
       text: 'Pronto. <script>alert(1)</script> **feito**',
@@ -112,6 +115,9 @@ const detail: TaskDetail = {
     { stageId: 's1', stageName: 'Desenvolvimento' },
     { stageId: 's3', stageName: 'Concluído' },
   ],
+  parent: null,
+  children: [],
+  requestTargets: [],
 };
 
 describe('the board (Phase 16)', () => {

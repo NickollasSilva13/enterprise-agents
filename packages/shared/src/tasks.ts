@@ -222,6 +222,10 @@ export const taskSummarySchema = z.object({
   queued: z.boolean(),
   returns: count,
   runCount: count,
+  /** The task of another area that asked for this one (Phase 17). */
+  parentTaskId: id.nullable(),
+  /** Requests to other areas still being worked on: the task waits for them. */
+  waitingOn: count,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -236,11 +240,23 @@ export const taskEventSchema = z.object({
   runId: id.nullable(),
   fromStageName: z.string().nullable(),
   toStageName: z.string().nullable(),
+  /** The other task a request event is about: the request, or the task that asked. */
+  relatedTaskId: id.nullable(),
   /** A note, comment or explanation. Written by people or models: untrusted. */
   text: z.string(),
   createdAt: z.string(),
 });
 export type TaskEvent = z.infer<typeof taskEventSchema>;
+
+const linkedTaskSchema = z.object({
+  id,
+  title: z.string(),
+  areaId: id,
+  areaName: z.string(),
+  state: z.enum(TASK_STATES),
+  stageName: z.string(),
+});
+export type LinkedTask = z.infer<typeof linkedTaskSchema>;
 
 export const taskDetailSchema = z.object({
   task: taskSummarySchema.extend({
@@ -251,6 +267,14 @@ export const taskDetailSchema = z.object({
   events: z.array(taskEventSchema),
   /** Where the user can move the task from its current stage. */
   moves: z.array(z.object({ stageId: id, stageName: z.string() })),
+  /** The task that asked for this one, when it is a request (Phase 17). */
+  parent: linkedTaskSchema.nullable(),
+  /** Requests this task made to other areas. */
+  children: z.array(linkedTaskSchema),
+  /** Areas this task's area may ask for work. */
+  requestTargets: z.array(
+    z.object({ areaId: id, areaName: z.string(), requiresApproval: z.boolean() }),
+  ),
 });
 export type TaskDetail = z.infer<typeof taskDetailSchema>;
 
@@ -266,6 +290,93 @@ export const tasksWaitingSchema = z.object({
   tasks: z.array(taskSummarySchema.extend({ areaName: z.string() })),
 });
 export type TasksWaiting = z.infer<typeof tasksWaitingSchema>;
+
+// ---- Requests between areas (Phase 17) ---------------------------------------------
+
+export const REQUEST_LIMITS = {
+  /** How deep a chain of requests may go: a request of a request of a request (D4). */
+  maxDepth: 3,
+  /** Requests a task may have open at once. */
+  openPerTask: 5,
+  /** Paths named in one request; each may be a folder. */
+  paths: 20,
+  /** Files copied between areas at once, on the way there or back (D3). */
+  files: 200,
+  /** Bytes copied between areas at once. */
+  bytes: 50 * 1024 * 1024,
+} as const;
+
+/** A rule saying an area may ask another for work (D2). */
+export const areaLinkInputSchema = z
+  .strictObject({
+    fromAreaId: id,
+    toAreaId: id,
+    /** The user approves each request before it reaches the other area's board. */
+    requiresApproval: z.boolean().default(true),
+  })
+  .refine((link) => link.fromAreaId !== link.toAreaId, {
+    message: 'Uma área não faz pedidos a si mesma.',
+    path: ['toAreaId'],
+  });
+export type AreaLinkInput = z.input<typeof areaLinkInputSchema>;
+
+export const areaLinkUpdateSchema = z.strictObject({ requiresApproval: z.boolean() });
+export type AreaLinkUpdate = z.infer<typeof areaLinkUpdateSchema>;
+
+export const areaLinkSchema = z.object({
+  id,
+  fromAreaId: id,
+  fromAreaName: z.string(),
+  toAreaId: id,
+  toAreaName: z.string(),
+  requiresApproval: z.boolean(),
+});
+export type AreaLink = z.infer<typeof areaLinkSchema>;
+
+export const areaLinksSchema = z.object({ links: z.array(areaLinkSchema) });
+export type AreaLinks = z.infer<typeof areaLinksSchema>;
+
+const requestPath = z.string().trim().min(1).max(400);
+
+/** A request the user makes for a task, to another area. */
+export const taskRequestSchema = z.strictObject({
+  toAreaId: id,
+  title,
+  description: longText('Descrição', TASK_LIMITS.description).default(''),
+  acceptance: longText('Critérios de aceite', TASK_LIMITS.acceptance).default(''),
+  /** Files or folders of the asking area's folder, copied to the other area (D3). */
+  files: z
+    .array(requestPath)
+    .max(REQUEST_LIMITS.paths, `Um pedido leva até ${REQUEST_LIMITS.paths} caminhos.`)
+    .default([]),
+});
+export type TaskRequest = z.infer<typeof taskRequestSchema>;
+export type TaskRequestInput = z.input<typeof taskRequestSchema>;
+
+export const requestRefuseSchema = z.strictObject({
+  note: longText('Motivo', TASK_LIMITS.note).trim().default(''),
+});
+export type RequestRefuse = z.infer<typeof requestRefuseSchema>;
+
+export const requestSummarySchema = z.object({
+  /** The task created in the other area. */
+  id,
+  title: z.string(),
+  state: z.enum(TASK_STATES),
+  stageName: z.string(),
+  fromAreaId: id,
+  fromAreaName: z.string(),
+  toAreaId: id,
+  toAreaName: z.string(),
+  parentTaskId: id,
+  parentTitle: z.string(),
+  createdAt: z.string(),
+});
+export type RequestSummary = z.infer<typeof requestSummarySchema>;
+
+/** Requests between areas not finished yet: waiting for approval or being worked on. */
+export const requestsSchema = z.object({ requests: z.array(requestSummarySchema) });
+export type Requests = z.infer<typeof requestsSchema>;
 
 // ---- Areas from a template -----------------------------------------------------
 

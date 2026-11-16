@@ -21,8 +21,8 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 13 | Ferramentas da plataforma para agentes de harness | Concluída em 2026-11-15 |
 | 14 | Escritório isométrico personalizável | Concluída em 2026-11-16 |
 | 15 | Personagens 16 bits e entorno do escritório | Concluída em 2026-11-16 |
-| 16 | Áreas, quadro de tarefas e fluxos configuráveis | Concluída em 2026-11-16 (aguardando aprovação) |
-| 17 | Pedidos entre áreas | Proposta (aguardando aprovação) |
+| 16 | Áreas, quadro de tarefas e fluxos configuráveis | Concluída em 2026-11-16 |
+| 17 | Pedidos entre áreas | Concluída em 2026-11-16 |
 | 18 | Catálogo de fluxos prontos | Proposta (aguardando aprovação) |
 
 ## Fases concluídas
@@ -632,7 +632,7 @@ não sustentam um fluxo de desenvolvimento. Um fluxo com idas e voltas faz muita
 chamadas e, pelo harness, cada passo com ferramenta executa o programa de novo:
 os tetos de D4 e o limite de tokens por execução são o que segura o consumo.
 
-## Fase 17 — Pedidos entre áreas (proposta)
+## Fase 17 — Pedidos entre áreas (concluída)
 
 **Objetivo.** Uma área pede trabalho a outra, como numa empresa: o marketing
 pede um número à área de dados, o produto envia uma especificação ao
@@ -658,6 +658,39 @@ desenvolvimento. A resposta volta para quem pediu.
 filha ligada à de origem, tela de pedidos abertos entre áreas, ligação entre as
 salas no Escritório (um agente "leva" o pedido à sala da outra área), testes e
 documentação viva.
+
+**Decisões aprovadas em 2026-11-16 (D1 a D5, todas como recomendadas).** D1: o
+pedido é uma tarefa filha na primeira etapa da outra área; a tarefa que pediu
+espera e volta a andar com a entrega; pedido cancelado a para; até 5 pedidos
+abertos por tarefa; pedem o agente (`request_from_area`) e o usuário. D2: regra
+por par de áreas (`area_links`), com "exige minha aprovação" ligado por padrão;
+recusa deixa a tarefa que pediu seguir. D3: arquivos sempre copiados
+(`pedidos/`, `entregas/`, `recebidos/`), com teto de 200 arquivos e 50 MB. D4:
+cadeia de até 3 níveis, sem voltar a uma área da cadeia. D5: tela "Pedidos
+entre áreas", tarefa de origem e filhas na página da tarefa, regras editáveis,
+agente que vai à sala da outra área no Escritório.
+
+### O que foi feito
+
+- Contrato: `REQUEST_LIMITS`, esquemas de regra, pedido, recusa e lista de pedidos; resumo e detalhe da tarefa com `parentTaskId`, `waitingOn`, tarefa de origem, filhas e áreas que podem ser acionadas; estado `pending` e eventos `requested`, `request_approved`, `request_refused`, `delivered`; `visit` no agente do Escritório.
+- Banco: migração `0006_area_requests` (tabela `area_links`; colunas `tasks.parent_task_id` e `task_events.related_task_id`; só cria e acrescenta coluna, o histórico continua só de inserção). Testada sobre dados existentes.
+- Servidor: `requestWork` (regra, laço, profundidade, pedidos abertos, cópia dos arquivos), aprovar, recusar, entrega na etapa final, espera da tarefa que pediu no despachante e no fim da execução; `modules/tasks/area-files.ts` para as cópias; ferramenta `request_from_area`; rotas `/api/area-links`, `/api/requests`, `/api/tasks/:id/requests`, `/approve-request`, `/refuse-request`; briefing com as áreas que podem ser acionadas e as pastas do pedido.
+- Interface: tela "Pedidos entre áreas" (`/tarefas/pedidos`), painéis "Pedidos a outras áreas" e "Pedido de outra área" na tarefa, aprovar e recusar com motivo, andamento "Aguardando outra área" no quadro, pedidos a aprovar na tela Aprovações, e o lugar "sala de outra área" no Escritório.
+- E2E novo (`requests.spec.ts`): regra criada pela tela, pedido feito pela tarefa, aprovação, conclusão na outra área e entrega no histórico de quem pediu.
+
+### Decisões tomadas durante a implementação
+
+- **Arquivos do agente vêm da pasta dele ou da área.** O agente pode mandar com o pedido arquivos da própria pasta ou de `area/`, sempre pelo resolvedor (C-17); o usuário, da pasta da área.
+- **Pedido reaberto entrega de novo.** Se o usuário tira o pedido da etapa final, a tarefa que pediu volta a esperar e recebe uma nova entrega quando ele for concluído outra vez; entregar uma vez só a deixaria esperando para sempre.
+- **Cancelar a tarefa que pediu não cancela os pedidos.** O trabalho da outra área pode ser útil; a entrega é copiada mesmo assim.
+- **Pedido esperando aprovação não pode ser movido**: primeiro aprovar ou recusar.
+- **`request_from_area` tem risco médio**: cria trabalho em outra área; continua não concedida por agente (regra do quadro, C-26), protegida pela regra do usuário (C-27).
+- **A visita ao Escritório dura 20 s** e é derivada do histórico (evento `requested`), nunca gravada; sem sala da outra área no layout, o agente fica na mesa.
+
+### Não validado
+
+- Nenhum modelo real pediu trabalho a outra área: os testes usam o provedor simulado (em processo) e o E2E faz o pedido pela interface.
+- A ida do agente à sala da outra área foi testada como função (lugar e ponto na sala), não vista em movimento nem pelo E2E.
 
 ## Fase 18 — Catálogo de fluxos prontos (proposta)
 

@@ -28,6 +28,8 @@ export function whereabouts(
       return 'Fora do escritório';
     case 'lobby':
       return 'Sem mesa no layout: espera na recepção';
+    case 'room':
+      return 'Levando um pedido a outra área';
   }
 }
 

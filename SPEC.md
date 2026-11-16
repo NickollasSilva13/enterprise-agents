@@ -126,7 +126,16 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | RF-94 | Pasta compartilhada por área, acessada pelos agentes com o prefixo `area/`, com acesso por agente (nenhum, leitura, leitura e escrita). | 16 |
 | RF-95 | Criar uma área a partir de um fluxo pronto com boas práticas (nesta fase, Desenvolvimento), que cria os agentes, as etapas e as passagens, com as ferramentas sugeridas pedindo aprovação. | 16 |
 
-Pedidos entre áreas (Fase 17) e mais fluxos prontos (Fase 18) estão propostos.
+### 4.6.2 Pedidos entre áreas (Fase 17)
+
+| ID | Requisito | Fase |
+|---|---|---|
+| RF-96 | O usuário define, por par de áreas, quem pode pedir trabalho a quem, e se cada pedido exige a aprovação dele. Sem regra, nenhum pedido é aceito. | 17 |
+| RF-97 | Um agente (com a ferramenta `request_from_area`) ou o usuário (na página da tarefa) pede trabalho a outra área: o pedido vira uma tarefa na primeira etapa do fluxo dela, ligada à tarefa que pediu, que espera a entrega. | 17 |
+| RF-98 | Quando o pedido chega à etapa final, o que a área deixou em `area/entregas/<pedido>/` é copiado para `area/recebidos/<pedido>/` da área que pediu, e a tarefa que pediu volta a andar com a nota da entrega no histórico. Arquivos mandados com o pedido chegam como cópia em `area/pedidos/<pedido>/`. | 17 |
+| RF-99 | Tela "Pedidos entre áreas" com os pedidos abertos (aprovar, recusar com motivo, acompanhar) e as regras; os pedidos esperando aprovação aparecem também em Aprovações. No Escritório, o agente que pediu vai à sala da outra área e volta. | 17 |
+
+Mais fluxos prontos (Fase 18) estão propostos.
 
 ### 4.7 Logs e monitoramento
 
@@ -199,6 +208,7 @@ Pedidos entre áreas (Fase 17) e mais fluxos prontos (Fase 18) estão propostos.
 | RN-12 | Ao iniciar, o servidor marca como `interrupted` as execuções que estavam ativas quando ele parou. |
 | RN-13 | Uma tarefa só anda pelas passagens do fluxo; das etapas do usuário e da final, só o usuário a move. Uma tarefa nunca é apagada, só cancelada, e uma área com tarefas não pode ser excluída. |
 | RN-14 | Uma tarefa que volta a etapas anteriores mais de 3 vezes, ou que chega a 20 execuções, para e espera o usuário; retomar zera os contadores e fica no histórico. |
+| RN-15 | Um pedido nunca volta a uma área que já está na cadeia daquela tarefa, uma cadeia tem no máximo 3 níveis, e uma tarefa tem até 5 pedidos abertos. Pedido cancelado para a tarefa que pediu; pedido recusado não a para. Arquivos entre áreas são sempre cópias, até 200 arquivos e 50 MB por vez. |
 
 **Estados de execução:** `queued` → `running` ⇄ `waiting_approval` → `completed` | `failed` | `cancelled` | `timed_out` | `interrupted`.
 

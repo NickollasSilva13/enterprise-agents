@@ -29,6 +29,7 @@ const agent = (overrides: Partial<OfficeAgent> & { id: string }): OfficeAgent =>
   pendingApproval: null,
   delegatingTo: [],
   idleSince: null,
+  visit: null,
   ...overrides,
 });
 
@@ -76,6 +77,24 @@ describe('placeOf (RF-80)', () => {
         BARE,
       ).kind,
     ).toBe('desk');
+  });
+
+  it('takes a request to the room of the other area for a moment (Phase 17)', () => {
+    const rooms = { ...BARE, rooms: new Set(['p2']) };
+    const asker = (until: number, areaId = 'p2') =>
+      agent({
+        id: 'a',
+        state: 'working',
+        visit: { areaId, until: new Date(until).toISOString() },
+      });
+    expect(placeOf(asker(NOW + 1_000), NOW, present, none, rooms)).toEqual({
+      kind: 'room',
+      areaId: 'p2',
+    });
+    // Back at the desk when the visit is over, or when that area has no room.
+    expect(placeOf(asker(NOW), NOW, present, none, rooms).kind).toBe('desk');
+    expect(placeOf(asker(NOW + 1_000, 'p3'), NOW, present, none, rooms).kind).toBe('desk');
+    expect(placeOf(asker(NOW + 1_000), NOW, present, none, BARE).kind).toBe('desk');
   });
 
   it('puts agents without a desk at the reception, and finds who is helping whom', () => {
@@ -226,7 +245,18 @@ describe('buildGeometry on a real layout', () => {
       y: (geometry.seats.get('a')?.chair.y ?? 0) + 0.5,
     });
     expect(geometry.spot('c', { kind: 'desk' }, 0)).toBeNull();
-    expect(geometry.features).toEqual({ meeting: true, lounge: true });
+    expect(geometry.features).toEqual({ meeting: true, lounge: true, rooms: new Set(['p1']) });
+  });
+
+  it('has a spot in the room of an area, for a request taken there (Phase 17)', () => {
+    const spot = geometry.spot('c', { kind: 'room', areaId: 'p1' }, 0);
+    const room = layout.areas.find((area) => area.projectId === 'p1');
+    expect(spot).not.toBeNull();
+    expect(spot!.x).toBeGreaterThanOrEqual(room!.x);
+    expect(spot!.x).toBeLessThan(room!.x + room!.width);
+    expect(spot!.y).toBeGreaterThanOrEqual(room!.y);
+    expect(spot!.y).toBeLessThan(room!.y + room!.height);
+    expect(geometry.spot('c', { kind: 'room', areaId: 'nowhere' }, 0)).toBeNull();
   });
 
   it('has spots in every common room and beside a colleague’s chair', () => {
