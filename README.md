@@ -2,7 +2,7 @@
 
 Plataforma local para criar, configurar, executar e monitorar agentes de IA por uma interface gráfica. Roda inteiramente na sua máquina, com modelos locais (Ollama) ou externos (OpenAI, Anthropic e compatíveis).
 
-> **Estado do projeto:** dezessete fases concluídas e a Fase 18 proposta. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no painel, nos logs e no escritório, e organizar os agentes em áreas com quadro de tarefas, fluxos e pedidos entre áreas. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
+> **Estado do projeto:** dezoito fases concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no painel, nos logs e no escritório, e organizar os agentes em áreas com quadro de tarefas, fluxos, pedidos entre áreas e um catálogo de modelos de fluxo. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
 
 ## Funcionalidades
 
@@ -24,6 +24,7 @@ Cada uma é marcada como disponível quando é entregue.
 | Escritório isométrico personalizável, personagens 16 bits e entorno | 14 / 15 | Sim |
 | Áreas com quadro de tarefas e fluxos configuráveis; modelo pronto Desenvolvimento | 16 | Sim (validado com o provedor simulado) |
 | Pedidos entre áreas, com regras, aprovação e entrega de arquivos | 17 | Sim (validado com o provedor simulado) |
+| Catálogo de modelos de fluxo: Desenvolvimento, Marketing, Dados, Produto e Conteúdo; salvar uma área como modelo; exportar e importar | 18 | Sim (fluxos novos não percorridos por um modelo real) |
 
 ## Pré-requisitos
 

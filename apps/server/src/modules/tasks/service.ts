@@ -16,10 +16,7 @@ import {
   type TaskSummary,
   type TaskUpdate,
   type TasksWaiting,
-  templateSummary,
   type Workflow,
-  WORKFLOW_TEMPLATES,
-  type WorkflowTemplateSummary,
   type WorkflowUpdate,
 } from '@ea/shared';
 import { eq, isNull } from 'drizzle-orm';
@@ -34,6 +31,7 @@ import { resolveInWorkspace, WorkspacePathError } from '../../tools/workspace';
 import { recordAudit } from '../audit/service';
 import { areaDirOf, blockedReason, type RunsContext, startTaskRun } from '../runs/service';
 import { AreaCopyError, copyFolderContents, copyIntoFolder } from './area-files';
+import { findTemplate } from './templates';
 import {
   agentById,
   type AreaLinkRow,
@@ -1118,11 +1116,7 @@ export function deleteAreaLink(db: Db, linkId: string): void {
   recordAudit(db, { actor: 'user', action: 'area_link.deleted', target: linkId });
 }
 
-// ---- Templates (D7) ----------------------------------------------------------------
-
-export function listTemplates(): WorkflowTemplateSummary[] {
-  return WORKFLOW_TEMPLATES.map(templateSummary);
-}
+// ---- Templates (D7; catalogue in templates.ts, Phase 18) ----------------------------
 
 /** "Papel (Área)", with a number when that is taken too, cut to the name limit. */
 function agentNameFor(role: string, area: string, taken: readonly string[]): string {
@@ -1140,8 +1134,7 @@ function agentNameFor(role: string, area: string, taken: readonly string[]): str
  */
 export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplate): AreaCreated {
   const { db } = ctx;
-  const template = WORKFLOW_TEMPLATES.find((entry) => entry.id === input.templateId);
-  if (!template) throw new NotFoundError('Modelo de fluxo não encontrado.');
+  const template = findTemplate(db, input.templateId);
   if (
     db
       .select()
@@ -1184,7 +1177,11 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
           areaAccess: role.areaAccess,
         })
         .run();
-      const known = role.tools.filter((tool) => ctx.registry.get(tool));
+      // Tools that only exist inside tasks are never granted per agent (C-26).
+      const known = role.tools.filter((tool) => {
+        const definition = ctx.registry.get(tool);
+        return definition !== undefined && definition.scope !== 'task';
+      });
       if (known.length > 0) {
         tx.insert(agentTools)
           .values(known.map((toolName) => ({ agentId: id, toolName, permission: 'ask' as const })))

@@ -6,18 +6,19 @@ import {
   WORKFLOW_LIMITS,
   workflowUpdateSchema,
 } from '@ea/shared';
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowDown, ArrowLeft, ArrowUp, LayoutTemplate, Plus, Trash2 } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Button, IconButton } from '../../components/Button';
-import { SelectField, TextField } from '../../components/Form';
+import { SelectField, TextAreaField, TextField } from '../../components/Form';
+import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
 import { ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
-import { errorMessage } from '../../lib/errors';
+import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useAgents, useProjects } from '../../lib/queries';
-import { useSaveWorkflow, useWorkflow } from '../../lib/task-queries';
+import { useSaveTemplate, useSaveWorkflow, useWorkflow } from '../../lib/task-queries';
 import { STAGE_KIND_LABEL } from './TaskBadges';
 
 interface StageDraft {
@@ -371,12 +372,108 @@ function Editor({
   );
 }
 
+/**
+ * Saves the area's flow as it is saved now, with the agents on its stages,
+ * as a template of the user (Phase 18, D3). Unsaved changes in the editor do
+ * not go along.
+ */
+function SaveTemplateDialog({
+  area,
+  onClose,
+}: {
+  area: { id: string; name: string; description: string };
+  onClose: () => void;
+}) {
+  const save = useSaveTemplate();
+  const notify = useToast();
+  const [name, setName] = useState(area.name);
+  const [description, setDescription] = useState(area.description);
+  const [practices, setPractices] = useState('');
+  const errors = save.error ? fieldErrors(save.error) : {};
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate(
+      {
+        areaId: area.id,
+        name,
+        description,
+        practices: practices
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+      },
+      {
+        onSuccess: (saved) => {
+          notify(`Modelo "${saved.name}" salvo.`);
+          onClose();
+        },
+      },
+    );
+  };
+  return (
+    <Modal
+      title="Salvar como modelo"
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" type="submit" form="save-template" disabled={save.isPending}>
+            {save.isPending ? 'Salvando…' : 'Salvar modelo'}
+          </Button>
+        </>
+      }
+    >
+      <form id="save-template" onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-dim">
+          O modelo guarda o fluxo como está salvo agora: as etapas, as passagens e os agentes das
+          etapas, com instruções, acesso à pasta da área e o nome das ferramentas. Não guarda o
+          modelo de IA, tarefas, arquivos nem permissões: ao aplicar, toda ferramenta pede
+          aprovação.
+        </p>
+        <TextField
+          label="Nome do modelo"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          error={errors.name}
+          required
+        />
+        <TextAreaField
+          label="Descrição"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          error={errors.description}
+          rows={3}
+        />
+        <TextAreaField
+          label="Boas práticas"
+          hint="Uma por linha. Aparecem para quem escolher o modelo."
+          value={practices}
+          onChange={(event) => setPractices(event.target.value)}
+          error={errors.practices}
+          rows={3}
+        />
+        {save.error && !errors.name && !errors.description && !errors.practices && (
+          <p role="alert" className="text-sm text-fail">
+            {errorMessage(save.error)}
+          </p>
+        )}
+        <p className="text-sm">
+          <Link to="/tarefas/modelos" className="text-info underline underline-offset-4">
+            Ver os modelos de fluxo
+          </Link>
+        </p>
+      </form>
+    </Modal>
+  );
+}
+
 /** Each area's own flow: its stages, who works each one, and the moves allowed (D2). */
 export function WorkflowEditorPage() {
   const { areaId } = useParams();
   const workflow = useWorkflow(areaId);
   const projects = useProjects();
   const area = projects.data?.find((project) => project.id === areaId);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   return (
     <>
@@ -390,7 +487,18 @@ export function WorkflowEditorPage() {
       <PageHeader
         title={area ? `Fluxo de ${area.name}` : 'Fluxo'}
         description="As etapas por onde as tarefas passam, quem trabalha em cada uma e as passagens permitidas. A plataforma só deixa um agente levar uma tarefa pelas passagens que você liberar."
+        actions={
+          area && (
+            <Button onClick={() => setSavingTemplate(true)}>
+              <LayoutTemplate className="size-4.5" aria-hidden />
+              Salvar como modelo
+            </Button>
+          )
+        }
       />
+      {savingTemplate && area && (
+        <SaveTemplateDialog area={area} onClose={() => setSavingTemplate(false)} />
+      )}
       {(workflow.isPending || projects.isPending) && <LoadingState label="Carregando o fluxo…" />}
       {workflow.error && (
         <ErrorState title="Não foi possível carregar o fluxo." error={workflow.error} />

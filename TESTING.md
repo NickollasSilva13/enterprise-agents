@@ -179,6 +179,14 @@ Se o Ollama não estiver instalado na máquina, o roteiro fica pendente e isso �
 
 **Não verificado na Fase 17:** nenhum modelo real pediu trabalho a outra área. A ida do agente à sala da outra área não foi vista em movimento. As telas novas não foram vistas em captura de tela.
 
+| 2026-11-16 | 18 | `npm run check:full` | Falhou (saída 1) só no E2E: contrato 25 testes, servidor 34 arquivos e 610 testes, interface 18 arquivos e 191 testes, todos passando; cobertura: linhas do servidor 96,36%, `modules/tasks` 91,76% (`templates.ts` 98,21%). E2E: 44 passaram, 3 falharam, 1 ignorado de propósito. Duas falhas eram do roteiro novo `templates.spec.ts` (desktop e celular): o texto procurado na janela de importação aparecia também no aviso; corrigido com busca exata. A terceira é o roteiro intermitente do Escritório (linha abaixo). |
+| 2026-11-16 | 18 | E2E depois da correção | `templates.spec.ts` passou em desktop e celular. A suíte inteira de novo: 46 passaram, 1 falhou, 1 ignorado, 4 não rodaram (os seguintes do mesmo arquivo, que roda em série); a falha foi "an agent leaves and comes back by the reception (walking)" de `office.spec.ts`. |
+| 2026-11-16 | 18 | E2E intermitente do Escritório | O mesmo roteiro falhou sozinho (um dos dois projetos a cada vez) e falhou igual com o código da Fase 17 (`e9a0e9d`, alterações guardadas com `git stash` e devolvidas depois), na conferência de que os primeiros passos são na recepção. A Fase 18 não toca no Escritório. Havia outro servidor de desenvolvimento rodando nesta pasta durante as rodadas. Causa não identificada. |
+| 2026-11-16 | 18 | `npm run check` | Depois da correção do roteiro: passou (contrato 25, servidor 610, interface 191). |
+| 2026-11-16 | 18 | `npm audit --omit=dev` | 0 vulnerabilidades. |
+
+**Não verificado na Fase 18:** nenhum modelo real percorreu os fluxos novos (Marketing, Dados, Produto, Conteúdo): as instruções dos papéis não foram postas à prova. As telas novas não foram vistas em captura de tela. O E2E não passou inteiro numa mesma rodada por causa do roteiro intermitente do Escritório.
+
 | 2026-11-16 | 14 | `npm run check:full` | Passou. Compartilhado: 1 arquivo, 17 testes; servidor: 30 arquivos, 548 testes; interface: 15 arquivos, 164 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
 | 2026-11-16 | 14 | E2E: cena com 30 agentes | Na cena isométrica, 30 agentes saindo juntos: 59,4 quadros/s (desktop) e 59,7 (celular) durante os 7,0 s de caminhada; maior intervalo entre quadros 67 e 33 ms. Chromium sem interface, nesta máquina. |
 | 2026-11-16 | 14 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): Escritório em 1500 px com seis agentes de aparências diferentes, aproximar, um agente desligado caminhando até a porta da rua, editor carregando o layout e selecionando uma mesa por evento de ponteiro. |

@@ -16,6 +16,7 @@ import {
   TASK_EVENT_KINDS,
   TASK_PRIORITIES,
   TASK_STATES,
+  type TemplateContent,
   TOOL_CALL_STATUSES,
   TOOL_PERMISSIONS,
   TRANSITION_ACTORS,
@@ -403,6 +404,19 @@ export const areaLinks = sqliteTable(
   },
   (table) => [uniqueIndex('area_links_pair_unique').on(table.fromProjectId, table.toProjectId)],
 );
+
+/**
+ * Workflow templates saved by the user (Phase 18, D1). The ready-made ones
+ * live in code. `content` is checked with `templateContentSchema` on the way
+ * in and out; it never holds ids, models, keys or permissions (D2).
+ */
+export const workflowTemplates = sqliteTable('workflow_templates', {
+  id: id(),
+  name: text('name').notNull().unique(),
+  content: text('content', { mode: 'json' }).notNull().$type<TemplateContent>(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
 
 /** What happened to a task. Insert only, like the audit trail. */
 export const taskEvents = sqliteTable(

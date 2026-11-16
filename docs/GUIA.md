@@ -162,7 +162,7 @@ Nos Logs, a execução mostra a **árvore de execução**, com um link para a de
 
 Para trabalho que passa de mão em mão, como numa empresa, use o menu **Tarefas**. Uma **área** é um time: os agentes de um projeto, um fluxo e um quadro.
 
-1. **Crie uma área a partir de um modelo**: "Nova área a partir de modelo", escolha o fluxo pronto (nesta versão, **Desenvolvimento**: refinamento, desenvolvimento, testes, a sua revisão e concluído), dê um nome e escolha o modelo de IA dos agentes. A plataforma cria a área, os agentes de cada papel, já com instruções, e o fluxo. As ferramentas sugeridas começam como "Pede aprovação": libere na tela Ferramentas o que quiser deixar automático.
+1. **Crie uma área a partir de um modelo**: "Nova área a partir de modelo", escolha o modelo de fluxo (os prontos são **Desenvolvimento**, **Marketing**, **Dados**, **Produto** e **Conteúdo e documentação**; a janela mostra as etapas, os agentes, o acesso de cada um à pasta da área e as boas práticas), dê um nome e escolha o modelo de IA dos agentes. A plataforma cria a área, os agentes de cada papel, já com instruções, e o fluxo. As ferramentas sugeridas começam como "Pede aprovação": libere na tela Ferramentas o que quiser deixar automático.
 2. **Ou monte o seu fluxo**: em "Editar fluxo", defina as etapas (de um agente, sua ou final), quem trabalha em cada uma e as **passagens**: de onde para onde uma tarefa pode ir, e se quem leva é o agente, você ou os dois. Das etapas suas e da final, só você move a tarefa.
 3. **Crie uma tarefa** com título, descrição e critérios de aceite. Ela entra na primeira etapa. Quando chega à etapa de um agente, ele começa a trabalhar sozinho e, ao terminar, passa a tarefa adiante com uma nota, só pelas passagens que você liberou. Cada agente trabalha numa tarefa por vez; as outras esperam na fila dele.
 4. **A pasta compartilhada da área** é onde os agentes trocam arquivos, pelo prefixo `area/` (por exemplo, `area/especificacao.md`). Na configuração de cada agente, escolha se ele não tem acesso, só lê ou lê e escreve.
@@ -170,6 +170,19 @@ Para trabalho que passa de mão em mão, como numa empresa, use o menu **Tarefas
 Uma tarefa **para e espera você** quando chega a uma etapa sua, quando a execução falha, quando o agente termina sem passar a tarefa adiante, ou quando ela volta mais de 3 vezes entre etapas ou chega a 20 execuções (proteção contra dois agentes devolvendo trabalho um ao outro sem fim). Essas tarefas aparecem na tela **Aprovações**, em "Tarefas esperando você". Na página da tarefa você lê o histórico com as notas de cada agente, comenta, move, retoma ou cancela. Uma tarefa cancelada sai do quadro, mas o histórico fica; por isso uma área com tarefas não pode ser excluída.
 
 > Validado com o provedor simulado dos testes, não com um modelo real atravessando um fluxo inteiro.
+
+### Modelos de fluxo
+
+Em Tarefas → **Modelos de fluxo** ficam os modelos prontos e os seus.
+
+- **Salvar uma área como modelo**: na tela de fluxo da área, **Salvar como modelo**. O modelo guarda o fluxo como está salvo: etapas, passagens e os agentes das etapas, com instruções, acesso à pasta da área e o nome das ferramentas. Não guarda o modelo de IA, tarefas, arquivos nem permissões: ao aplicar, toda ferramenta pede aprovação.
+- **Mudar um modelo seu**: o nome, a descrição e as boas práticas mudam na tela de modelos. Para mudar etapas ou agentes, crie uma área com ele, ajuste o fluxo e salve como modelo de novo. Os modelos prontos não mudam.
+- **Levar para outra máquina**: **Exportar** gera um arquivo JSON sem nada secreto; **Importar modelo** traz de volta. Ferramentas que não existem aqui, de risco alto ou que só existem dentro das tarefas ficam de fora, com aviso. Confira o acesso dos agentes à pasta da área antes de usar um modelo que veio de outra pessoa.
+- **Excluir** um modelo seu não muda as áreas criadas com ele.
+
+O modelo Produto termina mandando a especificação como pedido para outra área: crie antes a regra em **Pedidos entre áreas**.
+
+> Os fluxos novos foram validados pelas regras e pela interface, não percorridos por um modelo real.
 
 ### Pedidos entre áreas
 

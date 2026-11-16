@@ -110,7 +110,7 @@ describe('areas from a template (D7)', () => {
     const { templates } = workflowTemplateListSchema.parse(
       (await s.call('GET', '/api/workflow-templates')).body,
     );
-    expect(templates.map((template) => template.id)).toEqual(['desenvolvimento']);
+    expect(templates.map((template) => template.id)).toContain('desenvolvimento');
 
     const area = await s.devArea();
     expect(area.board.workflow.stages.map((stage) => [stage.name, stage.kind])).toEqual([
