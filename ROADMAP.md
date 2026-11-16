@@ -20,6 +20,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 12 | Harness local como provedor | Planejada (2026-11-15) |
 | 13 | Ferramentas da plataforma para agentes de harness | Planejada |
 | 14 | Escritório isométrico personalizável | Concluída em 2026-11-16 |
+| 15 | Personagens 16 bits e entorno do escritório | Concluída em 2026-11-16 |
 
 ## Fases concluídas
 
@@ -423,6 +424,47 @@ importada pelo usuário (imagens enviadas).
 - O editor foi exercitado por testes de componente e E2E (selecionar, renomear, apagar, desfazer, salvar, voltar ao automático); desenhar área arrastando o ponteiro e mover móvel arrastando foram testados só como função pura e por evento sintético, não por um ponteiro real.
 - Telas de toque reais (arrastar e aproximar com dois dedos) não foram testadas; o perfil de celular do Playwright usa clique.
 - A porta 4317 estava ocupada por um `npm start` de outra conversa durante a fase; a verificação no navegador usou portas 4327/5183 e uma pasta de dados temporária, com uma configuração de pré-visualização provisória que já foi removida.
+
+## Fase 15 — Personagens 16 bits e entorno do escritório (concluída)
+
+**Objetivo.** Personagens com mais detalhe, em pixel art 16 bits própria no
+estilo de jogos isométricos de escritório (sem copiar arte de nenhum jogo), e um
+entorno em volta do escritório, como se ele estivesse num prédio, numa casa ou
+num parque.
+
+**Decisões aprovadas pelo usuário em 2026-11-16:**
+
+1. **Entorno escolhível** no editor, entre três: andar de prédio (fachada,
+   janelas de vidro, cidade ao fundo), casa (quintal, cerca, árvores, calçada e
+   rua) e parque/campus (gramado, caminhos, árvores, lago, bancos). Guardado com
+   o layout, na entrada `office.layout` de `settings`: sem migração. Layout
+   automático e layouts já salvos usam o prédio.
+2. **Personagens em 3/4, quatro direções** (duas desenhadas, duas espelhadas),
+   maiores (20 × 37 pixels de arte), com contorno, sombreamento, olhos com
+   brilho e caminhada com quadros de animação trocados por CSS.
+3. **Mais opções de aparência**: cor dos olhos, barba ou bigode, cor do
+   calçado, três penteados novos e estampa na roupa. Os campos novos têm valor
+   padrão, então as aparências já salvas continuam válidas.
+
+**Fora do escopo.** Entornos além desses três; vários andares navegáveis;
+clima ou ciclo de dia e noite; animação de rosto (piscar, falar).
+
+### O que foi feito
+
+- Personagens novos em `components/pixel-art/character.tsx`: 20 × 40 pixels de arte, desenhados em escala 0,8 para combinar com os móveis; cabeça grande, contorno escuro, sombra na pele e no cabelo, brilho no cabelo e nos olhos, sobrancelhas, orelha. Nove penteados (três novos: black power, rabo de cavalo, ondulado), três roupas com estampa lisa, listrada ou com crachá, barba por fazer, bigode ou barba, óculos, fone e boné (com aba na frente e por trás). Robô mantém o rosto de sempre sobre o corpo novo.
+- Quatro direções: o motor dá a direção pelo eixo de cada passo (`headingOf`), e quem está sentado olha para a mesa. Caminhada com dois quadros de pernas alternados por CSS.
+- Entorno em `features/office/art/surroundings.tsx`: prédio (céu com estrelas, torres com janelas acesas, fachada com faixas de vidro descendo, paredes externas de vidro com montantes), casa (gramado, cerca com portão na frente da entrada, paredes com janelas e beiral, calçada, rua com faixa, caminho até a entrada) e parque (gramado, caminho de areia em volta, lago, bancos, postes acesos, árvores, pinheiros e canteiros). Tudo determinístico: o mesmo layout desenha as mesmas árvores.
+- Contrato: `SURROUNDINGS` e o campo `surroundings` do layout (padrão prédio; layout salvo antes é lido como prédio); opções novas de aparência com padrão, então as aparências antigas continuam valendo.
+- Editor: seletor "Entorno". Formulário do agente: olhos, barba, estampa e calçado.
+- Paredes um pouco mais altas (34) e moldura da vista com dois ladrilhos de entorno em volta.
+- Defeito da Fase 14 corrigido: o id dos grupos de amostras de cor vinha do rótulo, e rótulos com espaço ("Cor do cabelo") quebravam o `aria-labelledby`. Agora vem de `useId`, com teste.
+
+- Defeito encontrado em uso e corrigido: a interface recompilada para esta fase recusava a resposta de um servidor ainda na Fase 14 (sem `surroundings`), e o Escritório dava erro. A resposta sem entorno agora é lida como prédio, com teste. A causa imediata foi o `npm run build` do E2E ter recompilado a pasta `dist` que um `npm start` antigo estava servindo.
+
+### Não validado
+
+- Visto por mim em capturas do navegador embutido (prédio, casa e parque, e a prévia do personagem no formulário), num servidor à parte com dados descartáveis; ninguém viu a caminhada nas quatro direções em movimento.
+- A arte foi desenhada à mão em matrizes de texto: a conferência foi visual e por testes de forma (tamanho de todo sprite, cor válida em todo pixel, toda opção desenhada); não houve revisão de um artista.
 
 ## Pendências ao final do projeto
 

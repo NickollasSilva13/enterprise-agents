@@ -117,6 +117,8 @@ describe('OfficePage', () => {
     expect(scene?.textContent).toContain('Atendimento');
     expect(scene?.textContent).toContain('Copa');
     expect(scene?.textContent).toContain('Boas ideias!');
+    // Around it, by default, a building: its facade and the city behind (Phase 15).
+    expect(scene?.querySelector('[data-surroundings="building"]')).not.toBeNull();
     // Nothing uses an inline style, an outside resource or <text> (CSP, readable text).
     expect(document.querySelector('main [style]')).toBeNull();
     expect(document.querySelector('main image, main use, main [href^="http"]')).toBeNull();
@@ -133,6 +135,10 @@ describe('OfficePage', () => {
       outfitColor: 'teal',
       pants: 'denim',
       accessory: 'headset',
+      eyes: 'brown',
+      facialHair: 'none',
+      shoes: 'black',
+      pattern: 'plain',
     };
     render(
       officeWith([
@@ -149,6 +155,17 @@ describe('OfficePage', () => {
     expect(entry('same-too')?.querySelector('svg')?.innerHTML).not.toBe(
       entry('same')?.querySelector('svg')?.innerHTML,
     );
+  });
+
+  it('draws the surroundings the layout says: a house, a park', async () => {
+    for (const surroundings of ['house', 'park'] as const) {
+      const data = officeWith([occupant({ id: 'a1', name: 'Ana' })]);
+      const view = render({ ...data, layout: { ...data.layout, surroundings } });
+      await screen.findByRole('region', { name: /^Agentes no escritório/ });
+      expect(document.querySelector(`[data-surroundings="${surroundings}"]`)).not.toBeNull();
+      expect(document.querySelector('main [style], main svg text')).toBeNull();
+      view.unmount();
+    }
   });
 
   it('explains an empty office and what will fill it', async () => {

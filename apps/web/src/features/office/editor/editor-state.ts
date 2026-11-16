@@ -10,6 +10,7 @@ import {
   type OfficeLayout,
   type OfficeLayoutInput,
   type Side,
+  type Surroundings,
   type Tile,
 } from '@ea/shared';
 
@@ -31,6 +32,7 @@ export type EditorAction =
   | { readonly type: 'load'; readonly layout: OfficeLayout }
   | { readonly type: 'replace'; readonly layout: OfficeLayout }
   | { readonly type: 'grid'; readonly width: number; readonly height: number }
+  | { readonly type: 'surroundings'; readonly value: Surroundings }
   | {
       readonly type: 'add-area';
       readonly kind: AreaKind;
@@ -140,6 +142,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         height: clamp(Math.round(action.height), min, max),
       });
     }
+    case 'surroundings':
+      return action.value === layout.surroundings
+        ? state
+        : change(state, { ...layout, surroundings: action.value });
     case 'add-area': {
       const width = Math.max(OFFICE_LIMITS.areaSize.min, action.width);
       const height = Math.max(OFFICE_LIMITS.areaSize.min, action.height);

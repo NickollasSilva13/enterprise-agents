@@ -196,7 +196,7 @@ export const areaOfKind = (layout: LayoutShape, kind: AreaKind): number =>
   layout.areas.findIndex((area) => area.kind === kind);
 
 /** The street door: the entrance item, where agents come in and go out. */
-export function entranceOf(layout: LayoutShape): Tile | null {
+export function entranceOf(layout: Pick<LayoutShape, 'items'>): Tile | null {
   const entrance = layout.items.find((item) => item.kind === 'entrance');
   return entrance ? { x: entrance.x, y: entrance.y } : null;
 }

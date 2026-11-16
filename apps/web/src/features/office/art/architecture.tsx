@@ -12,7 +12,7 @@ import { type BoxColors, floorPoints, IsoBox, project } from './iso';
 // (south and east) are low, so nothing in a room is hidden behind them, as in
 // a cutaway drawing. A door is a gap in a wall.
 
-export const WALL_HEIGHT = 28;
+export const WALL_HEIGHT = 34;
 const LOW_WALL = 5;
 const THICK = 0.14;
 
@@ -169,11 +169,17 @@ export function areaName(
 export const signPoint = (area: Pick<OfficeArea, 'x' | 'y' | 'width'>) =>
   project(area.x + area.width / 2, area.y, WALL_HEIGHT + 6);
 
-/** The rectangle of user units the whole office takes on screen. */
+/** Tiles of surroundings shown around the office when it is seen whole. */
+const AROUND = 2;
+
+/**
+ * The rectangle of user units the office takes on screen, with a little of
+ * its surroundings; they go on beyond it, for panning.
+ */
 export function sceneBounds(layout: Pick<OfficeLayout, 'width' | 'height'>) {
-  const left = project(0, layout.height).x - 4;
-  const right = project(layout.width, 0).x + 4;
-  const top = project(0, 0, WALL_HEIGHT + 30).y;
-  const bottom = project(layout.width, layout.height).y + 16;
+  const left = project(-AROUND, layout.height + AROUND).x;
+  const right = project(layout.width + AROUND, -AROUND).x;
+  const top = project(-AROUND, -AROUND, WALL_HEIGHT + 40).y;
+  const bottom = project(layout.width + AROUND, layout.height + AROUND).y + 16;
   return { x: left, y: top, width: right - left, height: bottom - top };
 }

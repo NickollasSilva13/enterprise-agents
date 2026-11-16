@@ -131,6 +131,12 @@ describe('creating an agent', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Cabelo' }), {
       target: { value: 'bun' },
     });
+    // The swatches are named groups (the name has spaces: the id must not come from it).
+    expect(screen.getByRole('radiogroup', { name: /Cor do cabelo/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Verdes' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Barba' }), {
+      target: { value: 'beard' },
+    });
     fireEvent.change(screen.getByRole('combobox', { name: 'Acessório' }), {
       target: { value: 'glasses' },
     });

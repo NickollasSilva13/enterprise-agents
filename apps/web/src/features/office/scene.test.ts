@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGeometry } from './geometry';
 import {
   type Geometry,
+  headingOf,
   LOUNGE_AFTER_MS,
   MAX_WALK_SECONDS,
   PANTRY_AFTER_MS,
@@ -192,12 +193,21 @@ describe('SceneEngine', () => {
     };
     engine.sync(places({ a: 'pantry' }), geometry, true);
     engine.sync(places({ a: 'desk' }), geometry, true);
-    // Walking toward the top of the screen: seen from the back.
-    expect(engine.view('a')?.heading).toBe('back');
+    // Walking toward -y, up and to the right on screen.
+    expect(engine.view('a')?.heading).toBe('ne');
     const first = engine.view('a')?.band;
     const { changed } = engine.tick(500);
     expect(changed).toBe(true);
     expect(engine.view('a')?.band).not.toBe(first);
+  });
+});
+
+describe('headingOf', () => {
+  it('looks the way of the step, along the grid', () => {
+    expect(headingOf(1, 0)).toBe('se');
+    expect(headingOf(-1, 0)).toBe('nw');
+    expect(headingOf(0, 1)).toBe('sw');
+    expect(headingOf(0, -1)).toBe('ne');
   });
 });
 

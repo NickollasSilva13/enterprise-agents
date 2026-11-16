@@ -56,11 +56,20 @@ describe('OfficeEditorPage', () => {
     });
     expect(screen.getByRole('heading', { name: 'Alterações não salvas' })).toBeTruthy();
 
+    // The surroundings change with the layout (Phase 15).
+    fireEvent.change(screen.getByRole('combobox', { name: 'Entorno' }), {
+      target: { value: 'house' },
+    });
+    expect(
+      document.querySelector('[data-editor-canvas] [data-surroundings="house"]'),
+    ).not.toBeNull();
+
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(view.writes()).toHaveLength(1));
     const write = view.writes()[0];
     expect(write?.method).toBe('PUT');
     const body = write?.body as OfficeLayoutInput;
+    expect(body.surroundings).toBe('house');
     expect(body.areas[2]).toMatchObject({
       name: 'Sala azul',
       floor: 'carpet_blue',

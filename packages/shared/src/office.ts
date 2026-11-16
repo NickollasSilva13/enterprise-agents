@@ -87,6 +87,18 @@ export const FLOOR_LABELS: Record<Floor, string> = {
   carpet_green: 'Carpete verde',
 };
 
+/** What is around the office (Phase 15): it is drawn, and nobody walks there. */
+export const SURROUNDINGS = ['building', 'house', 'park'] as const;
+export type Surroundings = (typeof SURROUNDINGS)[number];
+export const SURROUNDINGS_INFO: Record<Surroundings, { label: string; hint: string }> = {
+  building: {
+    label: 'Andar de prédio',
+    hint: 'Fachada de vidro, os andares de baixo e a cidade ao fundo.',
+  },
+  house: { label: 'Casa', hint: 'Quintal com cerca, árvores, calçada e rua.' },
+  park: { label: 'Parque', hint: 'Gramado, caminhos, árvores, lago e bancos.' },
+};
+
 export const SIDES = ['n', 'e', 's', 'w'] as const;
 export type Side = (typeof SIDES)[number];
 
@@ -203,6 +215,7 @@ const gridSize = z
 export const officeLayoutInputSchema = z.strictObject({
   width: gridSize,
   height: gridSize,
+  surroundings: z.enum(SURROUNDINGS).default('building'),
   areas: z
     .array(z.strictObject(areaFields))
     .max(OFFICE_LIMITS.areas, `O escritório pode ter até ${OFFICE_LIMITS.areas} áreas.`),
@@ -220,6 +233,8 @@ export type OfficeItem = z.infer<typeof officeItemSchema>;
 export const officeLayoutSchema = z.object({
   width: z.number().int(),
   height: z.number().int(),
+  // A server from before Phase 15 sends no surroundings: its offices were in a building.
+  surroundings: z.enum(SURROUNDINGS).default('building'),
   areas: z.array(officeAreaSchema),
   items: z.array(officeItemSchema),
 });
@@ -238,6 +253,7 @@ export function layoutInputOf(layout: OfficeLayout): OfficeLayoutInput {
   return {
     width: layout.width,
     height: layout.height,
+    surroundings: layout.surroundings,
     areas: layout.areas.map((area) => ({
       kind: area.kind,
       name: area.name,

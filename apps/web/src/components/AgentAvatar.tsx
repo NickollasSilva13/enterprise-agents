@@ -1,5 +1,5 @@
 import type { Appearance } from '@ea/shared';
-import { PixelBust } from './pixel-art/character';
+import { BUST_VIEWBOX, PixelBust } from './pixel-art/character';
 
 interface AgentAvatarProps {
   agentId: string;
@@ -18,7 +18,7 @@ export function AgentAvatar({
 }: AgentAvatarProps) {
   return (
     <svg
-      viewBox="0 0 12 12"
+      viewBox={BUST_VIEWBOX}
       width={size}
       height={size}
       aria-hidden

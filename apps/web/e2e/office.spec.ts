@@ -204,6 +204,8 @@ test('the look chosen for an agent shows in the office and in its avatar', async
   await page.getByRole('radio', { name: 'Escura' }).click();
   await page.getByRole('combobox', { name: 'Cabelo' }).selectOption({ label: 'Coque' });
   await page.getByRole('combobox', { name: 'Acessório' }).selectOption({ label: 'Fone' });
+  await page.getByRole('combobox', { name: 'Barba' }).selectOption({ label: 'Bigode' });
+  await page.getByRole('radio', { name: 'Azuis' }).first().click();
   await expectNoHorizontalScroll(page);
   await page.getByRole('button', { name: 'Criar agente' }).click();
   await expect(page.getByText(`${name} criado.`)).toBeVisible();
@@ -219,6 +221,7 @@ test('the look chosen for an agent shows in the office and in its avatar', async
     skin: 'deep',
     hair: 'bun',
     accessory: 'headset',
+    facialHair: 'mustache',
   });
 
   await navigateTo(page, 'Escritório');
@@ -255,9 +258,10 @@ test('the layout is edited, saved, seen in the office and set back to automatic'
   await expect(page.getByRole('button', { name: 'Salvar' })).toBeDisabled();
   await page.getByRole('button', { name: 'Desfazer' }).click();
 
-  // Rename the lounge and save.
+  // Rename the lounge, put the office in a house, and save.
   await areas.getByRole('button', { name: /^Descompressão/ }).click();
   await page.getByRole('textbox', { name: 'Nome' }).fill('Cantinho do jogo');
+  await page.getByRole('combobox', { name: 'Entorno' }).selectOption({ label: 'Casa' });
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByText('Escritório salvo.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Layout salvo' })).toBeVisible();
@@ -266,6 +270,7 @@ test('the layout is edited, saved, seen in the office and set back to automatic'
   await expect(page.locator('[data-office-scene]')).toContainText('Cantinho do jogo');
   await page.reload();
   await expect(page.locator('[data-office-scene]')).toContainText('Cantinho do jogo');
+  await expect(page.locator('[data-office-scene] [data-surroundings="house"]')).toHaveCount(1);
 
   // Back to the automatic layout.
   await page.getByRole('link', { name: 'Editar escritório' }).first().click();
@@ -278,5 +283,6 @@ test('the layout is edited, saved, seen in the office and set back to automatic'
   await page.goto(`${EMPTY_URL}/escritorio`);
   await expect(page.locator('[data-office-scene]')).toContainText('Descompressão');
   await expect(page.locator('[data-office-scene]')).not.toContainText('Cantinho do jogo');
+  await expect(page.locator('[data-office-scene] [data-surroundings="building"]')).toHaveCount(1);
   expect(problems).toEqual([]);
 });

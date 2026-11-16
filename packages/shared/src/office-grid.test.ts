@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultAppearance, randomAppearance } from './appearance';
+import { appearanceSchema, defaultAppearance, randomAppearance } from './appearance';
 import type { LayoutShape, OfficeArea, OfficeItem } from './office';
 import {
   assignDesks,
@@ -13,7 +13,8 @@ import {
   validateLayout,
 } from './office-grid';
 import { buildPresetLayout } from './office-presets';
-import { OFFICE_PRESETS } from './office';
+import { officeSchema } from './api';
+import { layoutInputOf, OFFICE_PRESETS, officeLayoutInputSchema } from './office';
 
 const area = (fields: Partial<OfficeArea> & Pick<OfficeArea, 'kind' | 'x' | 'y'>): OfficeArea => ({
   id: `${fields.kind}-${fields.x}-${fields.y}`,
@@ -265,6 +266,82 @@ describe('desks', () => {
     expect(assignDesks(layout, agents).size).toBe(31);
     expect(assignDesks(layout, [...agents, { id: 'x', projectId: 'a' }]).size).toBe(31);
     expect(chairOf(layout.items.find((each) => each.kind === 'desk')!)).toBeDefined();
+  });
+});
+
+describe('Phase 15 contract', () => {
+  it('fills the new options of a look saved before them', () => {
+    const old = {
+      kind: 'person',
+      skin: 'tan',
+      hair: 'short',
+      hairColor: 'black',
+      outfit: 'tshirt',
+      outfitColor: 'teal',
+      pants: 'denim',
+      accessory: 'none',
+    };
+    expect(appearanceSchema.parse(old)).toEqual({
+      ...old,
+      eyes: 'brown',
+      facialHair: 'none',
+      shoes: 'black',
+      pattern: 'plain',
+    });
+    expect(appearanceSchema.safeParse({ ...old, eyes: 'purple' }).success).toBe(false);
+  });
+
+  // Defect seen in use: the interface rebuilt for Phase 15 refused the answer of
+  // a server still running Phase 14, which has no surroundings, and the office
+  // did not open.
+  it('reads the office of a server from before Phase 15', () => {
+    const older: Record<string, unknown> = { ...buildPresetLayout('compact', []) };
+    delete older.surroundings;
+    const answer = officeSchema.parse({
+      layout: older,
+      customized: true,
+      projects: [],
+      agents: [
+        {
+          id: 'a1',
+          name: 'Ana',
+          objective: '',
+          projectId: null,
+          appearance: {
+            kind: 'person',
+            skin: 'tan',
+            hair: 'short',
+            hairColor: 'black',
+            outfit: 'tshirt',
+            outfitColor: 'teal',
+            pants: 'denim',
+            accessory: 'none',
+          },
+          state: 'idle',
+          currentRun: null,
+          lastError: null,
+          pendingApproval: null,
+          delegatingTo: [],
+          idleSince: null,
+        },
+      ],
+    });
+    expect(answer.layout.surroundings).toBe('building');
+    expect(answer.agents[0]?.appearance).toMatchObject({ eyes: 'brown', pattern: 'plain' });
+  });
+
+  it('puts the office in a building unless told otherwise', () => {
+    const layout = buildPresetLayout('compact', []);
+    expect(layout.surroundings).toBe('building');
+    const without: Record<string, unknown> = { ...layoutInputOf(layout) };
+    delete without.surroundings;
+    expect(officeLayoutInputSchema.parse(without).surroundings).toBe('building');
+    expect(officeLayoutInputSchema.parse({ ...without, surroundings: 'park' }).surroundings).toBe(
+      'park',
+    );
+    expect(officeLayoutInputSchema.safeParse({ ...without, surroundings: 'moon' }).success).toBe(
+      false,
+    );
   });
 });
 

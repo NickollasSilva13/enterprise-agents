@@ -16,6 +16,8 @@ O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/o
 
 - Pixel art em `src/components/pixel-art/`: sprite é lista de linhas, um caractere por pixel, cor pela paleta (`palette.ts`). Opção nova de aparência entra no enum de `packages/shared/src/appearance.ts`, na paleta e no teste `pixels.test.tsx`, que desenha toda opção.
 - Móvel novo: `ITEM_KINDS`/`ITEM_KIND_INFO` em `packages/shared/src/office.ts` e um caso em `art/furniture.tsx`.
+- Personagem (Fase 15): sprites de 20 × 40 montados com `place(linha, linhas)` em `character.tsx`; linha 0 é o alto da cabeça e há 4 linhas acima para cabelo alto. Só as vistas `sw` e `nw` são desenhadas; `se` e `ne` são espelho. O teste `pixels.test.tsx` confere o tamanho de todo sprite (`ALL_SPRITES`).
+- Entorno novo: `SURROUNDINGS` em `packages/shared/src/office.ts` e um caso em cada camada de `art/surroundings.tsx`. Nada do entorno é navegável.
 
 ## Testes de componente
 

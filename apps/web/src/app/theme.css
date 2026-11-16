@@ -124,25 +124,31 @@
     border-top-color: #f4f1ff;
   }
 
-  /* A character on its way: the legs take turns, in two steps like pixel art, and the body bobs. */
-  .pixel-leg-a {
-    animation: pixel-step 0.32s steps(2, jump-none) infinite alternate;
+  /*
+   * A character on its way (Phase 15): two leg frames take turns, shown and
+   * hidden in steps as 16-bit sprites are, and the body bobs.
+   */
+  .pixel-frame-a {
+    animation: pixel-frame 0.36s linear infinite;
   }
 
-  .pixel-leg-b {
-    animation: pixel-step 0.32s steps(2, jump-none) infinite alternate-reverse;
+  .pixel-frame-b {
+    animation: pixel-frame 0.36s linear infinite;
+    animation-delay: -0.18s;
   }
 
   .walker-bob {
-    animation: walker-bob 0.32s steps(2, jump-none) infinite alternate;
+    animation: walker-bob 0.18s steps(2, jump-none) infinite alternate;
   }
 
-  @keyframes pixel-step {
-    from {
-      transform: translateY(0);
+  @keyframes pixel-frame {
+    0%,
+    49.9% {
+      opacity: 1;
     }
-    to {
-      transform: translateY(-2px);
+    50%,
+    100% {
+      opacity: 0;
     }
   }
 

@@ -1,12 +1,22 @@
 import { z } from 'zod';
 
-// How an agent looks in the office and in its avatar (Phase 14). Every option
+// How an agent looks in the office and in its avatar (Phases 14 and 15). Every option
 // is a name from a short list, never a free color: the drawing maps each name
 // to its palette, so nothing the user sends ends up in an attribute verbatim.
 
 export const CHARACTER_KINDS = ['person', 'robot'] as const;
 export const SKIN_TONES = ['porcelain', 'light', 'tan', 'olive', 'brown', 'deep'] as const;
-export const HAIR_STYLES = ['short', 'long', 'curly', 'bun', 'spiky', 'shaved'] as const;
+export const HAIR_STYLES = [
+  'short',
+  'long',
+  'curly',
+  'bun',
+  'spiky',
+  'shaved',
+  'afro',
+  'ponytail',
+  'wavy',
+] as const;
 export const HAIR_COLORS = [
   'black',
   'brown',
@@ -32,6 +42,11 @@ export const OUTFIT_COLORS = [
 ] as const;
 export const PANTS_COLORS = ['denim', 'black', 'khaki', 'gray'] as const;
 export const ACCESSORIES = ['none', 'glasses', 'headset', 'cap'] as const;
+// Phase 15: more detail. Each has a default, so looks saved before still parse.
+export const EYE_COLORS = ['brown', 'black', 'blue', 'green', 'hazel', 'gray'] as const;
+export const FACIAL_HAIR = ['none', 'stubble', 'mustache', 'beard'] as const;
+export const SHOE_COLORS = ['black', 'white', 'brown', 'red', 'blue'] as const;
+export const PATTERNS = ['plain', 'stripes', 'badge'] as const;
 
 export type CharacterKind = (typeof CHARACTER_KINDS)[number];
 export type SkinTone = (typeof SKIN_TONES)[number];
@@ -41,6 +56,10 @@ export type Outfit = (typeof OUTFITS)[number];
 export type OutfitColor = (typeof OUTFIT_COLORS)[number];
 export type PantsColor = (typeof PANTS_COLORS)[number];
 export type Accessory = (typeof ACCESSORIES)[number];
+export type EyeColor = (typeof EYE_COLORS)[number];
+export type FacialHair = (typeof FACIAL_HAIR)[number];
+export type ShoeColor = (typeof SHOE_COLORS)[number];
+export type Pattern = (typeof PATTERNS)[number];
 
 /** Names shown in the appearance form. */
 export const APPEARANCE_LABELS = {
@@ -60,6 +79,9 @@ export const APPEARANCE_LABELS = {
     bun: 'Coque',
     spiky: 'Espetado',
     shaved: 'Raspado',
+    afro: 'Black power',
+    ponytail: 'Rabo de cavalo',
+    wavy: 'Ondulado',
   },
   hairColor: {
     black: 'Preto',
@@ -86,6 +108,17 @@ export const APPEARANCE_LABELS = {
   },
   pants: { denim: 'Jeans', black: 'Preta', khaki: 'Cáqui', gray: 'Cinza' },
   accessory: { none: 'Nenhum', glasses: 'Óculos', headset: 'Fone', cap: 'Boné' },
+  eyes: {
+    brown: 'Castanhos',
+    black: 'Pretos',
+    blue: 'Azuis',
+    green: 'Verdes',
+    hazel: 'Mel',
+    gray: 'Cinzentos',
+  },
+  facialHair: { none: 'Nenhuma', stubble: 'Por fazer', mustache: 'Bigode', beard: 'Barba' },
+  shoes: { black: 'Pretos', white: 'Brancos', brown: 'Marrons', red: 'Vermelhos', blue: 'Azuis' },
+  pattern: { plain: 'Lisa', stripes: 'Listrada', badge: 'Com crachá' },
 } as const;
 
 export const appearanceSchema = z.strictObject({
@@ -97,6 +130,10 @@ export const appearanceSchema = z.strictObject({
   outfitColor: z.enum(OUTFIT_COLORS),
   pants: z.enum(PANTS_COLORS),
   accessory: z.enum(ACCESSORIES),
+  eyes: z.enum(EYE_COLORS).default('brown'),
+  facialHair: z.enum(FACIAL_HAIR).default('none'),
+  shoes: z.enum(SHOE_COLORS).default('black'),
+  pattern: z.enum(PATTERNS).default('plain'),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
 
@@ -127,6 +164,10 @@ export function defaultAppearance(agentId: string): Appearance {
     outfitColor: pick(OUTFIT_COLORS, seed >>> 15),
     pants: pick(PANTS_COLORS, seed >>> 19),
     accessory: pick(ACCESSORIES, seed >>> 22),
+    eyes: pick(EYE_COLORS, seed >>> 24),
+    facialHair: 'none',
+    shoes: pick(SHOE_COLORS, seed >>> 26),
+    pattern: 'plain',
   };
 }
 
@@ -143,5 +184,10 @@ export function randomAppearance(random: () => number): Appearance {
     outfitColor: choose(OUTFIT_COLORS),
     pants: choose(PANTS_COLORS),
     accessory: choose(ACCESSORIES),
+    eyes: choose(EYE_COLORS),
+    // Most people drawn at random are clean-shaven.
+    facialHair: random() < 0.7 ? 'none' : choose(FACIAL_HAIR),
+    shoes: choose(SHOE_COLORS),
+    pattern: choose(PATTERNS),
   };
 }

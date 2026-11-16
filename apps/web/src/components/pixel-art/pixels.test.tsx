@@ -2,16 +2,27 @@ import {
   ACCESSORIES,
   type Appearance,
   defaultAppearance,
+  EYE_COLORS,
+  FACIAL_HAIR,
   HAIR_COLORS,
   HAIR_STYLES,
   OUTFIT_COLORS,
   OUTFITS,
   PANTS_COLORS,
+  PATTERNS,
+  SHOE_COLORS,
   SKIN_TONES,
 } from '@ea/shared';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { PixelBust, PixelCharacter } from './character';
+import {
+  ALL_SPRITES,
+  CHARACTER_HEIGHT,
+  CHARACTER_WIDTH,
+  type Direction,
+  PixelBust,
+  PixelCharacter,
+} from './character';
 import { layer, mirror, toPaths } from './pixels';
 
 describe('pixel art', () => {
@@ -43,9 +54,13 @@ describe('pixel art', () => {
     for (const outfitColor of OUTFIT_COLORS) looks.push({ ...base, kind: 'person', outfitColor });
     for (const pants of PANTS_COLORS) looks.push({ ...base, kind: 'person', pants });
     for (const accessory of ACCESSORIES) looks.push({ ...base, kind: 'person', accessory });
+    for (const eyes of EYE_COLORS) looks.push({ ...base, kind: 'person', eyes });
+    for (const facialHair of FACIAL_HAIR) looks.push({ ...base, kind: 'person', facialHair });
+    for (const shoes of SHOE_COLORS) looks.push({ ...base, kind: 'person', shoes });
+    for (const pattern of PATTERNS) looks.push({ ...base, kind: 'person', pattern });
     const drawings = new Set<string>();
     for (const look of looks) {
-      for (const facing of ['front', 'back'] as const) {
+      for (const facing of ['sw', 'nw'] as const satisfies readonly Direction[]) {
         const { container } = render(
           <svg>
             <PixelCharacter agentId="x" appearance={look} pose="walk" facing={facing} />
@@ -62,8 +77,32 @@ describe('pixel art', () => {
         drawings.add(container.innerHTML);
       }
     }
-    // Each option changes the drawing (front and back of every look are different pictures).
+    // Front and back are different pictures, and most options change at least one of them.
     expect(drawings.size).toBeGreaterThan(looks.length);
+  });
+
+  it('keeps every sprite inside the character box', () => {
+    for (const sprite of ALL_SPRITES) {
+      expect(sprite).toHaveLength(CHARACTER_HEIGHT);
+      for (const row of sprite) expect(row).toHaveLength(CHARACTER_WIDTH);
+    }
+  });
+
+  it('looks four ways: two drawn, two mirrored', () => {
+    const look: Appearance = { ...defaultAppearance('x'), kind: 'person' };
+    const draw = (facing: Direction, pose: 'stand' | 'walk' | 'sit' = 'stand') =>
+      render(
+        <svg>
+          <PixelCharacter agentId="x" appearance={look} pose={pose} facing={facing} />
+        </svg>,
+      ).container.querySelector('g');
+    expect(draw('sw')?.getAttribute('transform')).toBe('scale(0.8 0.8)');
+    expect(draw('se')?.getAttribute('transform')).toBe('scale(-0.8 0.8)');
+    expect(draw('ne')?.innerHTML).toBe(draw('nw')?.innerHTML);
+    expect(draw('nw')?.innerHTML).not.toBe(draw('sw')?.innerHTML);
+    // A walk alternates two leg frames; seated, no legs at all.
+    expect(draw('sw', 'walk')?.querySelectorAll('.pixel-frame-a, .pixel-frame-b')).toHaveLength(2);
+    expect(draw('sw', 'sit')?.querySelector('ellipse')).toBeNull();
   });
 
   it('draws an agent with no look as the robot of its id, always the same', () => {

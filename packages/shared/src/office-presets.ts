@@ -220,5 +220,5 @@ export function buildPresetLayout(
     width = Math.max(width, x);
   }
   const height = Math.max(OFFICE_LIMITS.grid.min, Math.min(max, y + rowHeight + gap));
-  return { width: Math.min(max, width), height, areas, items };
+  return { width: Math.min(max, width), height, surroundings: 'building', areas, items };
 }
