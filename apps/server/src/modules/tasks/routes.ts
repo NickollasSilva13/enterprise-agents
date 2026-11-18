@@ -8,6 +8,9 @@ import {
   taskCreateSchema,
   taskMoveSchema,
   taskUpdateSchema,
+  templateExportSchema,
+  templateFromAreaSchema,
+  templateUpdateSchema,
   workflowUpdateSchema,
 } from '@ea/shared';
 import type { FastifyInstance } from 'fastify';
@@ -29,13 +32,20 @@ import {
   getBoard,
   getTaskDetail,
   getWorkflow,
-  listTemplates,
   listWaiting,
   moveTask,
   resumeTask,
   saveWorkflow,
   type TasksContext,
 } from './service';
+import {
+  deleteTemplate,
+  exportTemplate,
+  importTemplate,
+  listTemplates,
+  saveTemplateFromArea,
+  updateTemplate,
+} from './templates';
 
 // Areas are projects (Phase 16, D1): their workflow and board live under
 // /api/areas/:id, and tasks under /api/tasks.
@@ -43,7 +53,42 @@ export function registerTaskRoutes(app: FastifyInstance, deps: { tasks: TasksCon
   const { tasks } = deps;
   const { db } = tasks;
 
-  app.get('/api/workflow-templates', async () => ({ templates: listTemplates() }));
+  app.get('/api/workflow-templates', async () => ({ templates: listTemplates(db) }));
+
+  // The user's own templates (Phase 18): saved from an area, or from a file.
+  app.post('/api/workflow-templates', async (request, reply) => {
+    const saved = saveTemplateFromArea(
+      db,
+      tasks.registry,
+      parseInput(templateFromAreaSchema, request.body),
+    );
+    return reply.status(201).send(saved);
+  });
+
+  app.post('/api/workflow-templates/import', async (request, reply) => {
+    const result = importTemplate(
+      db,
+      tasks.registry,
+      parseInput(templateExportSchema, request.body),
+    );
+    return reply.status(201).send(result);
+  });
+
+  app.get('/api/workflow-templates/:id/export', async (request) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    return exportTemplate(db, id);
+  });
+
+  app.patch('/api/workflow-templates/:id', async (request) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    return updateTemplate(db, id, parseInput(templateUpdateSchema, request.body));
+  });
+
+  app.delete('/api/workflow-templates/:id', async (request, reply) => {
+    const { id } = parseInput(idParamSchema, request.params);
+    deleteTemplate(db, id);
+    return reply.status(204).send();
+  });
 
   app.post('/api/areas/from-template', async (request, reply) => {
     const created = createAreaFromTemplate(tasks, parseInput(areaFromTemplateSchema, request.body));

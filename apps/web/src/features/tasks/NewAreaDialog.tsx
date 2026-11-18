@@ -8,8 +8,14 @@ import { useToast } from '../../components/Toast';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useModels } from '../../lib/queries';
 import { useCreateAreaFromTemplate, useWorkflowTemplates } from '../../lib/task-queries';
+import { TemplateDetails } from './TemplateDetails';
 
-/** Creates an area from a ready-made flow: the area, its agents and its stages (D7). */
+const GROUPS = [
+  { origin: 'builtin', label: 'Modelos prontos' },
+  { origin: 'user', label: 'Seus modelos' },
+] as const;
+
+/** Creates an area from a template: the area, its agents and its stages (D7, Phase 18). */
 export function NewAreaDialog({ onClose }: { onClose: () => void }) {
   const templates = useWorkflowTemplates();
   const models = useModels();
@@ -33,7 +39,7 @@ export function NewAreaDialog({ onClose }: { onClose: () => void }) {
       { templateId: chosenTemplate.id, name, modelId: chosenModel },
       {
         onSuccess: (created) => {
-          notify(`Área "${name.trim()}" criada com o fluxo de ${chosenTemplate.name}.`);
+          notify(`Área "${name.trim()}" criada com o modelo ${chosenTemplate.name}.`);
           onClose();
           void navigate(`/tarefas?area=${encodeURIComponent(created.areaId)}`);
         },
@@ -66,36 +72,27 @@ export function NewAreaDialog({ onClose }: { onClose: () => void }) {
       {chosenTemplate && (
         <form id="new-area" onSubmit={submit} className="space-y-4">
           <SelectField
-            label="Fluxo pronto"
+            label="Modelo de fluxo"
             value={chosenTemplate.id}
             onChange={(event) => setTemplateId(event.target.value)}
           >
-            {templates.data?.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
+            {GROUPS.map(({ origin, label }) => {
+              const group = templates.data?.filter((template) => template.origin === origin) ?? [];
+              return (
+                group.length > 0 && (
+                  <optgroup key={origin} label={label}>
+                    {group.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              );
+            })}
           </SelectField>
-          <div className="rounded-md border border-line p-3 text-sm">
-            <p>{chosenTemplate.description}</p>
-            <p className="mt-2 font-semibold">Etapas</p>
-            <p className="text-dim">
-              {chosenTemplate.stages.map((stage) => stage.name).join(' → ')}
-            </p>
-            <p className="mt-2 font-semibold">Agentes criados</p>
-            <ul className="text-dim">
-              {chosenTemplate.roles.map((role) => (
-                <li key={role.name}>
-                  {role.name}: {role.objective}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 font-semibold">Boas práticas</p>
-            <ul className="list-disc pl-5 text-dim">
-              {chosenTemplate.practices.map((practice) => (
-                <li key={practice}>{practice}</li>
-              ))}
-            </ul>
+          <div className="rounded-md border border-line p-3">
+            <TemplateDetails template={chosenTemplate} />
           </div>
           <TextField
             label="Nome da área"

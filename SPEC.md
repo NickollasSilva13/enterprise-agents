@@ -135,7 +135,13 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | RF-98 | Quando o pedido chega à etapa final, o que a área deixou em `area/entregas/<pedido>/` é copiado para `area/recebidos/<pedido>/` da área que pediu, e a tarefa que pediu volta a andar com a nota da entrega no histórico. Arquivos mandados com o pedido chegam como cópia em `area/pedidos/<pedido>/`. | 17 |
 | RF-99 | Tela "Pedidos entre áreas" com os pedidos abertos (aprovar, recusar com motivo, acompanhar) e as regras; os pedidos esperando aprovação aparecem também em Aprovações. No Escritório, o agente que pediu vai à sala da outra área e volta. | 17 |
 
-Mais fluxos prontos (Fase 18) estão propostos.
+### 4.6.3 Catálogo de fluxos prontos (Fase 18)
+
+| ID | Requisito | Fase |
+|---|---|---|
+| RF-100 | Modelos prontos de Desenvolvimento, Marketing, Dados, Produto e Conteúdo e documentação, cada um com etapas, papéis, instruções, ferramentas sugeridas e boas práticas, para criar uma área. | 18 |
+| RF-101 | O usuário salva o fluxo de uma área, com os agentes das etapas, como modelo seu; renomeia, muda descrição e boas práticas, e exclui os seus modelos. Excluir um modelo não muda as áreas criadas com ele. | 18 |
+| RF-102 | Exportar um modelo para um arquivo JSON e importar de volta. O arquivo nunca leva chave, endereço, modelo de IA, ids ou permissões; na importação, ferramenta desconhecida, de risco alto ou só de tarefa fica de fora, com aviso. | 18 |
 
 ### 4.7 Logs e monitoramento
 
@@ -208,6 +214,7 @@ Mais fluxos prontos (Fase 18) estão propostos.
 | RN-12 | Ao iniciar, o servidor marca como `interrupted` as execuções que estavam ativas quando ele parou. |
 | RN-13 | Uma tarefa só anda pelas passagens do fluxo; das etapas do usuário e da final, só o usuário a move. Uma tarefa nunca é apagada, só cancelada, e uma área com tarefas não pode ser excluída. |
 | RN-14 | Uma tarefa que volta a etapas anteriores mais de 3 vezes, ou que chega a 20 execuções, para e espera o usuário; retomar zera os contadores e fica no histórico. |
+| RN-16 | Aplicar um modelo copia o fluxo para uma área nova; toda ferramenta sugerida entra como "pede aprovação". Um modelo tem nome único (inclusive frente aos prontos), e há no máximo 100 modelos salvos. |
 | RN-15 | Um pedido nunca volta a uma área que já está na cadeia daquela tarefa, uma cadeia tem no máximo 3 níveis, e uma tarefa tem até 5 pedidos abertos. Pedido cancelado para a tarefa que pediu; pedido recusado não a para. Arquivos entre áreas são sempre cópias, até 200 arquivos e 50 MB por vez. |
 
 **Estados de execução:** `queued` → `running` ⇄ `waiting_approval` → `completed` | `failed` | `cancelled` | `timed_out` | `interrupted`.

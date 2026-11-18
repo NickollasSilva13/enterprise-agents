@@ -5,6 +5,7 @@ import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { ApiRequestError } from '../../lib/api';
+import { download } from '../../lib/download';
 import { errorMessage } from '../../lib/errors';
 import { plural } from '../../lib/format';
 import { fetchAgentExport, useImportAgents } from '../../lib/queries';
@@ -14,18 +15,6 @@ import { fetchAgentExport, useImportAgents } from '../../lib/queries';
 
 /** The server refuses larger requests; said here in words instead of as an error code. */
 const MAX_FILE_BYTES = 1024 * 1024;
-
-/** Hands a file to the browser's download, without leaving the page. */
-function download(fileName: string, content: string): void {
-  const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
 
 function ImportResultDialog({
   result,

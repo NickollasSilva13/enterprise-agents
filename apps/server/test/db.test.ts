@@ -15,6 +15,8 @@ import {
   runSteps,
   taskEvents,
   tasks,
+  workflowStages,
+  workflowTemplates,
 } from '../src/db/schema';
 import { makeDatabase, makeTempDir } from './helpers';
 
@@ -38,6 +40,7 @@ const EXPECTED_TABLES = [
   'tasks',
   'tool_calls',
   'workflow_stages',
+  'workflow_templates',
   'workflow_transitions',
 ];
 
@@ -235,6 +238,26 @@ describe('migrations over existing data', () => {
     expect(() => database.sqlite.prepare("DELETE FROM tasks WHERE id = 't1'").run()).toThrow(
       /FOREIGN KEY/,
     );
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+
+  it('keep areas and their flows when adding saved templates (0007)', () => {
+    const database = databaseUpTo(6);
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Site');
+      INSERT INTO workflow_stages (id, project_id, position, name, kind)
+        VALUES ('s1', 'pr1', 0, 'Fila', 'human'), ('s2', 'pr1', 1, 'Fim', 'done');
+      INSERT INTO workflow_transitions (id, project_id, from_stage_id, to_stage_id, actor)
+        VALUES ('w1', 'pr1', 's1', 's2', 'human');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select({ id: workflowStages.id }).from(workflowStages).all()).toEqual([
+      { id: 's1' },
+      { id: 's2' },
+    ]);
+    expect(database.db.select().from(workflowTemplates).all()).toEqual([]);
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
   });
 });

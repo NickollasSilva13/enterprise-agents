@@ -12,8 +12,14 @@ import {
   taskSummarySchema,
   tasksWaitingSchema,
   type TaskUpdate,
+  type TemplateExport,
+  type TemplateFromArea,
+  templateExportSchema,
+  templateImportResultSchema,
+  type TemplateUpdate,
   workflowSchema,
   workflowTemplateListSchema,
+  workflowTemplateSummarySchema,
   type WorkflowUpdate,
 } from '@ea/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +38,57 @@ export const useWorkflowTemplates = () =>
     queryFn: async () =>
       (await apiFetch('/api/workflow-templates', workflowTemplateListSchema)).templates,
   });
+
+/** A template as a document that can be saved to a file (Phase 18, D4). */
+export const fetchTemplateExport = (templateId: string): Promise<TemplateExport> =>
+  apiFetch(`/api/workflow-templates/${enc(templateId)}/export`, templateExportSchema);
+
+function useRefreshTemplates() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: ['workflow-templates'] });
+}
+
+/** Saves the flow of an area, and the agents on it, as a template (D3). */
+export function useSaveTemplate() {
+  const refresh = useRefreshTemplates();
+  return useMutation({
+    mutationFn: (input: TemplateFromArea) =>
+      apiSend('POST', '/api/workflow-templates', workflowTemplateSummarySchema, input),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateTemplate() {
+  const refresh = useRefreshTemplates();
+  return useMutation({
+    mutationFn: ({ templateId, patch }: { templateId: string; patch: TemplateUpdate }) =>
+      apiSend(
+        'PATCH',
+        `/api/workflow-templates/${enc(templateId)}`,
+        workflowTemplateSummarySchema,
+        patch,
+      ),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteTemplate() {
+  const refresh = useRefreshTemplates();
+  return useMutation({
+    mutationFn: (templateId: string) => apiDelete(`/api/workflow-templates/${enc(templateId)}`),
+    onSuccess: refresh,
+  });
+}
+
+/** Adds the template of a file. The file is checked by the server, not here. */
+export function useImportTemplate() {
+  const refresh = useRefreshTemplates();
+  return useMutation({
+    mutationFn: (document: unknown) =>
+      apiSend('POST', '/api/workflow-templates/import', templateImportResultSchema, document),
+    onSuccess: refresh,
+  });
+}
 
 export const useBoard = (areaId: string | undefined) =>
   useQuery({

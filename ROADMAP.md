@@ -23,7 +23,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 15 | Personagens 16 bits e entorno do escritório | Concluída em 2026-11-16 |
 | 16 | Áreas, quadro de tarefas e fluxos configuráveis | Concluída em 2026-11-16 |
 | 17 | Pedidos entre áreas | Concluída em 2026-11-16 |
-| 18 | Catálogo de fluxos prontos | Proposta (aguardando aprovação) |
+| 18 | Catálogo de fluxos prontos | Concluída em 2026-11-16 |
 
 ## Fases concluídas
 
@@ -692,7 +692,7 @@ agente que vai à sala da outra área no Escritório.
 - Nenhum modelo real pediu trabalho a outra área: os testes usam o provedor simulado (em processo) e o E2E faz o pedido pela interface.
 - A ida do agente à sala da outra área foi testada como função (lugar e ponto na sala), não vista em movimento nem pelo E2E.
 
-## Fase 18 — Catálogo de fluxos prontos (proposta)
+## Fase 18 — Catálogo de fluxos prontos (concluída)
 
 **Objetivo.** Mais modelos com boas práticas e a possibilidade de o usuário
 salvar e reaproveitar os próprios fluxos.
@@ -716,6 +716,42 @@ ferramenta nova (busca na web, leitura de planilha, execução de testes) é
 decisão própria, com nível de risco, testes de permissão e controle no
 `SECURITY.md`; executar testes de código, em particular, depende do executor
 isolado em contêiner, que está nas melhorias futuras.
+
+**Decisões aprovadas em 2026-11-16 (D1 a D6, todas como recomendadas).** D1:
+modelos do usuário no banco (`workflow_templates`); os prontos continuam no
+código e não mudam; excluir um modelo não toca nas áreas criadas com ele. D2: um
+modelo leva nome, descrição, boas práticas, papéis (nome, objetivo, instruções,
+ferramentas sugeridas, acesso à pasta da área), etapas e passagens; nunca
+chaves, endereços, modelo ou provedor, ids, permissões `allow`, tarefas ou
+arquivos; ao aplicar, toda ferramenta entra como "pede aprovação". D3: "Salvar
+como modelo" na tela de fluxo da área, sem editor de modelos à parte. D4:
+exportar e importar em JSON; na importação, ferramenta desconhecida, de risco
+alto ou só de tarefa é descartada com aviso; o acesso à pasta da área vem junto
+e é mostrado antes de aplicar. D5: quatro modelos novos (Marketing, Dados,
+Produto, Conteúdo e documentação) só com ferramentas que já existem. D6: tela
+"Modelos de fluxo" e escolha agrupada em "Nova área a partir de modelo".
+
+### O que foi feito
+
+- Contrato: esquemas do conteúdo de um modelo (as mesmas regras do editor de fluxo, com o papel no lugar do agente, mais as regras dos papéis), do arquivo (`enterprise-agents/workflow-template`, versão 1), de salvar, editar e importar; `origin` (pronto ou seu), ferramentas e acesso de cada papel no resumo; os cinco modelos prontos, com teste que confere cada um.
+- Banco: migração `0007_workflow_templates` (só cria a tabela), testada sobre dados existentes.
+- Servidor: `modules/tasks/templates.ts` (listar, salvar a partir da área, editar, excluir, exportar, importar) e `template-repository.ts`; rotas `POST /api/workflow-templates`, `PATCH`/`DELETE /api/workflow-templates/:id`, `GET /api/workflow-templates/:id/export` e `POST /api/workflow-templates/import`; criar área aceita modelo do usuário e nunca concede ferramenta só de tarefa.
+- Interface: tela "Modelos de fluxo" (`/tarefas/modelos`) com exportar, importar, editar e excluir; "Salvar como modelo" na tela de fluxo; "Nova área a partir de modelo" com os modelos agrupados e, de cada papel, o acesso à pasta e as ferramentas.
+- E2E novo (`templates.spec.ts`): área salva como modelo pela tela, modelo no catálogo, exportado para arquivo, importado de volta com nome livre, cópia excluída, e o modelo oferecido ao criar área.
+
+### Decisões tomadas durante a implementação
+
+- **O modelo guarda o fluxo como está salvo**, não o que estiver por salvar no editor; a janela diz isso.
+- **Só os agentes das etapas viram papéis.** O nome do papel volta a ser o do modelo ("Produto (Site)" vira "Produto"), para a área nova ganhar o próprio sufixo.
+- **Ferramentas de risco alto saem de um arquivo, mas não de um modelo salvo por você.** Num modelo salvo da própria área, `run_script` continua como sugestão (entra como "pede aprovação"); num arquivo, é descartada com aviso.
+- **Até 100 modelos salvos**, e o nome não pode repetir o de um modelo pronto.
+- **Modelo gravado que não passa mais pelas regras** some da lista e não pode ser aplicado, em vez de quebrar a tela.
+- **No Produto, a etapa Envio usa `request_from_area`**: o modelo não cria a regra entre áreas, porque não conhece as outras áreas do usuário; a boa prática pede para criá-la antes.
+
+### Não validado
+
+- Nenhum modelo real percorreu os fluxos novos: as instruções dos papéis foram revisadas na escrita, não postas à prova com um modelo de verdade.
+- As telas novas não foram vistas em captura de tela.
 
 ## Pendências ao final do projeto
 

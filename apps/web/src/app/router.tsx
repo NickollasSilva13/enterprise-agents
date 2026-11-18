@@ -15,6 +15,7 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 import { RequestsPage } from '../features/tasks/RequestsPage';
 import { TaskPage } from '../features/tasks/TaskPage';
 import { TasksPage } from '../features/tasks/TasksPage';
+import { TemplatesPage } from '../features/tasks/TemplatesPage';
 import { WorkflowEditorPage } from '../features/tasks/WorkflowEditorPage';
 import { ToolsPage } from '../features/tools/ToolsPage';
 import { AppLayout } from './AppLayout';
@@ -50,6 +51,7 @@ export const routes: RouteObject[] = [
       { path: 'tarefas', element: <TasksPage /> },
       { path: 'tarefas/fluxo/:areaId', element: <WorkflowEditorPage /> },
       { path: 'tarefas/pedidos', element: <RequestsPage /> },
+      { path: 'tarefas/modelos', element: <TemplatesPage /> },
       { path: 'tarefas/:taskId', element: <TaskPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'logs/:runId', element: <RunDetailPage /> },
