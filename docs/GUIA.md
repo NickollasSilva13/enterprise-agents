@@ -184,6 +184,17 @@ O modelo Produto termina mandando a especificação como pedido para outra área
 
 > Os fluxos novos foram validados pelas regras e pela interface, não percorridos por um modelo real.
 
+### Agendamentos
+
+Em Tarefas → **Agendamentos**, uma tarefa é criada sozinha no quadro de uma área em horários marcados, como um relatório toda segunda às 9h.
+
+1. **Novo agendamento**: escolha a área, escreva a tarefa como faria à mão (título, descrição, critérios de aceite, prioridade) e a repetição: uma vez, todo dia, toda semana (nos dias que marcar) ou todo mês (num dia; em meses mais curtos, vale o último dia). O horário é o desta máquina.
+2. **Na hora marcada**, a tarefa entra na primeira etapa do fluxo da área e segue como qualquer outra. A página dela mostra de qual agendamento veio, e o histórico diz para quando estava marcada.
+3. **Sem empilhar**: enquanto a tarefa anterior do agendamento estiver aberta, nenhuma nova é criada; a tela mostra que ele pulou aquela vez.
+4. **Plataforma desligada**: se ela estava desligada na hora marcada, a tarefa é criada uma vez quando voltar, mesmo que vários horários tenham passado.
+
+Na lista dá para pausar e retomar (a contagem recomeça de agora), **Criar agora** (sem mudar a próxima vez), editar e excluir. Excluir um agendamento não apaga as tarefas que ele criou. Só você cria agendamentos: os agentes não têm ferramenta para isso.
+
 ### Pedidos entre áreas
 
 Uma área pode pedir trabalho a outra, como o marketing pede números à área de dados.

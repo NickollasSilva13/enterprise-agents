@@ -187,6 +187,12 @@ Se o Ollama não estiver instalado na máquina, o roteiro fica pendente e isso �
 
 **Não verificado na Fase 18:** nenhum modelo real percorreu os fluxos novos (Marketing, Dados, Produto, Conteúdo): as instruções dos papéis não foram postas à prova. As telas novas não foram vistas em captura de tela. O E2E não passou inteiro numa mesma rodada por causa do roteiro intermitente do Escritório.
 
+| 2026-11-16 | 19 | `npm run check:full` | Passou (saída 0). Contrato: 3 arquivos, 31 testes; servidor: 35 arquivos, 619 testes; interface: 19 arquivos, 198 testes; cobertura: linhas do servidor 96,5%, `modules/schedules` 98,33% (`scheduler.ts` 95,65%, `service.ts` 98,52%); E2E: 53 passaram e 1 ignorado de propósito, em 2,2 min, incluindo o roteiro novo `schedules.spec.ts` em desktop e celular. O roteiro do Escritório que falhava na Fase 18 passou nesta rodada. |
+| 2026-11-16 | 19 | `schedules.spec.ts` sozinho | Na primeira rodada, logo depois de compilar, falhou em desktop na conferência final de que não houve erro no console (o celular passou); a saída não foi guardada e a mensagem exata se perdeu. Depois disso passou 3 vezes seguidas sozinho e no `check:full`. Causa não identificada. |
+| 2026-11-16 | 19 | `npm audit --omit=dev` | 0 vulnerabilidades. |
+
+**Não verificado na Fase 19:** o disparo pelo relógio foi testado com horários já vencidos (na partida e ao reprogramar), não esperando um horário futuro chegar. A troca de horário de verão não foi testada. As telas novas não foram vistas em captura de tela. A falha única de `schedules.spec.ts` ficou sem causa.
+
 | 2026-11-16 | 14 | `npm run check:full` | Passou. Compartilhado: 1 arquivo, 17 testes; servidor: 30 arquivos, 548 testes; interface: 15 arquivos, 164 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
 | 2026-11-16 | 14 | E2E: cena com 30 agentes | Na cena isométrica, 30 agentes saindo juntos: 59,4 quadros/s (desktop) e 59,7 (celular) durante os 7,0 s de caminhada; maior intervalo entre quadros 67 e 33 ms. Chromium sem interface, nesta máquina. |
 | 2026-11-16 | 14 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): Escritório em 1500 px com seis agentes de aparências diferentes, aproximar, um agente desligado caminhando até a porta da rua, editor carregando o layout e selecionando uma mesa por evento de ponteiro. |

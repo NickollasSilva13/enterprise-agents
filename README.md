@@ -2,7 +2,7 @@
 
 Plataforma local para criar, configurar, executar e monitorar agentes de IA por uma interface gráfica. Roda inteiramente na sua máquina, com modelos locais (Ollama) ou externos (OpenAI, Anthropic e compatíveis).
 
-> **Estado do projeto:** dezoito fases concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no painel, nos logs e no escritório, e organizar os agentes em áreas com quadro de tarefas, fluxos, pedidos entre áreas e um catálogo de modelos de fluxo. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
+> **Estado do projeto:** dezenove fases concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no painel, nos logs e no escritório, e organizar os agentes em áreas com quadro de tarefas, fluxos, pedidos entre áreas, um catálogo de modelos de fluxo e tarefas agendadas. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
 
 ## Funcionalidades
 
@@ -25,6 +25,7 @@ Cada uma é marcada como disponível quando é entregue.
 | Áreas com quadro de tarefas e fluxos configuráveis; modelo pronto Desenvolvimento | 16 | Sim (validado com o provedor simulado) |
 | Pedidos entre áreas, com regras, aprovação e entrega de arquivos | 17 | Sim (validado com o provedor simulado) |
 | Catálogo de modelos de fluxo: Desenvolvimento, Marketing, Dados, Produto e Conteúdo; salvar uma área como modelo; exportar e importar | 18 | Sim (fluxos novos não percorridos por um modelo real) |
+| Tarefas agendadas: uma vez, todo dia, toda semana ou todo mês, no quadro de uma área | 19 | Sim |
 
 ## Pré-requisitos
 

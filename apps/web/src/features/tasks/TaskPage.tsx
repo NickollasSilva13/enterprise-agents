@@ -527,6 +527,20 @@ export function TaskPage() {
               </ul>
             </Panel>
           )}
+          {data.schedule && (
+            <Panel title="Agendamento">
+              <p className="px-4 py-3 text-sm">
+                Criada pelo agendamento{' '}
+                <Link
+                  to="/tarefas/agendamentos"
+                  className="font-semibold text-info underline underline-offset-4"
+                >
+                  {data.schedule.title}
+                </Link>
+                .
+              </p>
+            </Panel>
+          )}
           {task.state !== 'cancelled' && (
             <Panel title="Mover">
               <MoveForm key={task.stageId} detail={data} />

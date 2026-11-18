@@ -13,6 +13,7 @@ export * from './office-grid';
 export * from './office-presets';
 export * from './providers';
 export * from './runs';
+export * from './schedules';
 export * from './tasks';
 export * from './tools';
 export * from './workflow-templates';

@@ -275,6 +275,8 @@ export const taskDetailSchema = z.object({
   requestTargets: z.array(
     z.object({ areaId: id, areaName: z.string(), requiresApproval: z.boolean() }),
   ),
+  /** The schedule that created this task (Phase 19); null when made otherwise or deleted. */
+  schedule: z.object({ id, title: z.string() }).nullable(),
 });
 export type TaskDetail = z.infer<typeof taskDetailSchema>;
 

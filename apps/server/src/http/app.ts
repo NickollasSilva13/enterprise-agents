@@ -19,6 +19,8 @@ import { registerHealthRoutes } from '../modules/health/routes';
 import { registerOfficeRoutes } from '../modules/office/routes';
 import { registerSystemRoutes } from '../modules/system/routes';
 import { registerTaskRoutes } from '../modules/tasks/routes';
+import { registerScheduleRoutes } from '../modules/schedules/routes';
+import { createScheduler } from '../modules/schedules/scheduler';
 import { createTasksContext } from '../modules/tasks/service';
 import { registerToolRoutes } from '../modules/tools/routes';
 import { createBuiltinRegistry } from '../tools/builtin';
@@ -166,11 +168,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerApprovalRoutes(app, { runs });
   const tasks = createTasksContext(runs, registry);
   registerTaskRoutes(app, { tasks });
+  const scheduler = createScheduler(tasks, logWarning);
+  registerScheduleRoutes(app, { tasks, scheduler });
+  // What came due while the server was off is created once it is ready (D3).
+  app.addHook('onReady', async () => scheduler.start());
 
   // Before the server stops accepting connections: interrupt what is running
   // (the runs are recorded as such) and end the event streams, which would
   // otherwise keep their sockets open for ever.
   app.addHook('preClose', async () => {
+    scheduler.stop();
     await runs.manager.shutdown();
     sse.closeAll();
   });

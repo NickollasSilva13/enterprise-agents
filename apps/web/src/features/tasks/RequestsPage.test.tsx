@@ -69,6 +69,7 @@ const detailOf = (task: TaskSummary, extra: Partial<TaskDetail> = {}): TaskDetai
   parent: null,
   children: [],
   requestTargets: [],
+  schedule: null,
   ...extra,
 });
 

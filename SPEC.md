@@ -143,6 +143,14 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | RF-101 | O usuário salva o fluxo de uma área, com os agentes das etapas, como modelo seu; renomeia, muda descrição e boas práticas, e exclui os seus modelos. Excluir um modelo não muda as áreas criadas com ele. | 18 |
 | RF-102 | Exportar um modelo para um arquivo JSON e importar de volta. O arquivo nunca leva chave, endereço, modelo de IA, ids ou permissões; na importação, ferramenta desconhecida, de risco alto ou só de tarefa fica de fora, com aviso. | 18 |
 
+### 4.6.4 Agendamento de tarefas (Fase 19)
+
+| ID | Requisito | Fase |
+|---|---|---|
+| RF-103 | O usuário agenda uma tarefa para o quadro de uma área: uma vez, todo dia, em dias da semana ou num dia do mês, numa hora, no horário desta máquina. Na hora marcada, a tarefa entra na primeira etapa do fluxo da área. | 19 |
+| RF-104 | Tela "Agendamentos" com a repetição por extenso, a próxima vez e o último resultado de cada agendamento; criar, editar, pausar, retomar, "criar agora" e excluir. A tarefa criada mostra de qual agendamento veio. | 19 |
+| RF-105 | Horários perdidos com a plataforma desligada criam uma tarefa só, quando ela volta, com o horário marcado no histórico. | 19 |
+
 ### 4.7 Logs e monitoramento
 
 | ID | Requisito | Fase |
@@ -214,6 +222,7 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | RN-12 | Ao iniciar, o servidor marca como `interrupted` as execuções que estavam ativas quando ele parou. |
 | RN-13 | Uma tarefa só anda pelas passagens do fluxo; das etapas do usuário e da final, só o usuário a move. Uma tarefa nunca é apagada, só cancelada, e uma área com tarefas não pode ser excluída. |
 | RN-14 | Uma tarefa que volta a etapas anteriores mais de 3 vezes, ou que chega a 20 execuções, para e espera o usuário; retomar zera os contadores e fica no histórico. |
+| RN-17 | Um agendamento não cria tarefa enquanto a anterior dele estiver aberta, e registra que pulou. Há no máximo 50 agendamentos, e só o usuário os cria. |
 | RN-16 | Aplicar um modelo copia o fluxo para uma área nova; toda ferramenta sugerida entra como "pede aprovação". Um modelo tem nome único (inclusive frente aos prontos), e há no máximo 100 modelos salvos. |
 | RN-15 | Um pedido nunca volta a uma área que já está na cadeia daquela tarefa, uma cadeia tem no máximo 3 níveis, e uma tarefa tem até 5 pedidos abertos. Pedido cancelado para a tarefa que pediu; pedido recusado não a para. Arquivos entre áreas são sempre cópias, até 200 arquivos e 50 MB por vez. |
 

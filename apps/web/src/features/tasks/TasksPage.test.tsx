@@ -118,6 +118,7 @@ const detail: TaskDetail = {
   parent: null,
   children: [],
   requestTargets: [],
+  schedule: null,
 };
 
 describe('the board (Phase 16)', () => {

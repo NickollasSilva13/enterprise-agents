@@ -6,6 +6,10 @@ import {
   areaLinksSchema,
   boardSchema,
   requestsSchema,
+  type ScheduleInputValue,
+  scheduleSchema,
+  schedulesSchema,
+  type ScheduleUpdate,
   type TaskRequestInput,
   type TaskCreateInput,
   taskDetailSchema,
@@ -86,6 +90,59 @@ export function useImportTemplate() {
   return useMutation({
     mutationFn: (document: unknown) =>
       apiSend('POST', '/api/workflow-templates/import', templateImportResultSchema, document),
+    onSuccess: refresh,
+  });
+}
+
+// ---- Schedules (Phase 19) -----------------------------------------------------
+
+export const useSchedules = () =>
+  useQuery({
+    queryKey: ['schedules'],
+    queryFn: async () => (await apiFetch('/api/schedules', schedulesSchema)).schedules,
+    // The clock creates tasks by itself: the last result shows up without a reload.
+    refetchInterval: 30_000,
+  });
+
+function useRefreshSchedules() {
+  const queryClient = useQueryClient();
+  const refreshTasks = useRefreshTasks();
+  return () =>
+    Promise.all([queryClient.invalidateQueries({ queryKey: ['schedules'] }), refreshTasks()]);
+}
+
+export function useCreateSchedule() {
+  const refresh = useRefreshSchedules();
+  return useMutation({
+    mutationFn: (input: ScheduleInputValue) =>
+      apiSend('POST', '/api/schedules', scheduleSchema, input),
+    onSuccess: refresh,
+  });
+}
+
+export function useUpdateSchedule() {
+  const refresh = useRefreshSchedules();
+  return useMutation({
+    mutationFn: ({ scheduleId, patch }: { scheduleId: string; patch: ScheduleUpdate }) =>
+      apiSend('PATCH', `/api/schedules/${enc(scheduleId)}`, scheduleSchema, patch),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteSchedule() {
+  const refresh = useRefreshSchedules();
+  return useMutation({
+    mutationFn: (scheduleId: string) => apiDelete(`/api/schedules/${enc(scheduleId)}`),
+    onSuccess: refresh,
+  });
+}
+
+/** "Criar agora": a task now, without moving the next time. */
+export function useRunSchedule() {
+  const refresh = useRefreshSchedules();
+  return useMutation({
+    mutationFn: (scheduleId: string) =>
+      apiSend('POST', `/api/schedules/${enc(scheduleId)}/run`, scheduleSchema),
     onSuccess: refresh,
   });
 }
