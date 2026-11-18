@@ -22,6 +22,7 @@ const exported: AgentExport = {
       maxTotalTokens: null,
       enabled: true,
       appearance: null,
+      areaAccess: 'none',
       project: null,
       model: null,
       tools: [],

@@ -1,6 +1,7 @@
 import {
   type Appearance,
   APPROVAL_STATUSES,
+  AREA_ACCESS,
   AREA_KINDS,
   AUDIT_ACTORS,
   type Door,
@@ -11,8 +12,13 @@ import {
   RUN_STATUSES,
   RUN_TRIGGERS,
   SIDES,
+  STAGE_KINDS,
+  TASK_EVENT_KINDS,
+  TASK_PRIORITIES,
+  TASK_STATES,
   TOOL_CALL_STATUSES,
   TOOL_PERMISSIONS,
+  TRANSITION_ACTORS,
 } from '@ea/shared';
 import { sql } from 'drizzle-orm';
 import {
@@ -92,6 +98,8 @@ export const agents = sqliteTable(
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
     /** How the agent is drawn (Phase 14); null means drawn from its id. Validated on the way in and out. */
     appearance: text('appearance', { mode: 'json' }).$type<Appearance>(),
+    /** What the agent may do in its area's shared folder (Phase 16, D6). */
+    areaAccess: text('area_access', { enum: AREA_ACCESS }).notNull().default('none'),
     /** Soft delete keeps run history readable (RN-07). */
     deletedAt: text('deleted_at'),
     createdAt: createdAt(),
@@ -144,6 +152,8 @@ export const runs = sqliteTable(
       onDelete: 'set null',
     }),
     trigger: text('trigger', { enum: RUN_TRIGGERS }).notNull(),
+    /** The task this run works on, for runs started by the task board (Phase 16). */
+    taskId: text('task_id').references((): AnySQLiteColumn => tasks.id, { onDelete: 'set null' }),
     status: text('status', { enum: RUN_STATUSES }).notNull().default('queued'),
     endReason: text('end_reason'),
     errorMessage: text('error_message'),
@@ -159,6 +169,7 @@ export const runs = sqliteTable(
     index('runs_parent_idx').on(table.parentRunId),
     index('runs_status_idx').on(table.status),
     index('runs_created_idx').on(table.createdAt),
+    index('runs_task_idx').on(table.taskId),
   ],
 );
 
@@ -296,4 +307,124 @@ export const officeItems = sqliteTable(
     createdAt: createdAt(),
   },
   (table) => [index('office_items_agent_idx').on(table.agentId)],
+);
+
+// ---- Areas, workflows and tasks (Phase 16) ----------------------------------
+// An area is a project (decision D1). Its workflow is a set of stages and the
+// transitions allowed between them; a task sits in one stage at a time.
+
+export const workflowStages = sqliteTable(
+  'workflow_stages',
+  {
+    id: id(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: STAGE_KINDS }).notNull(),
+    /** Who works an agent stage. A deleted agent leaves the stage without one. */
+    agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (table) => [index('workflow_stages_project_idx').on(table.projectId, table.position)],
+);
+
+export const workflowTransitions = sqliteTable(
+  'workflow_transitions',
+  {
+    id: id(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    fromStageId: text('from_stage_id')
+      .notNull()
+      .references(() => workflowStages.id, { onDelete: 'cascade' }),
+    toStageId: text('to_stage_id')
+      .notNull()
+      .references(() => workflowStages.id, { onDelete: 'cascade' }),
+    actor: text('actor', { enum: TRANSITION_ACTORS }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('workflow_transitions_pair_unique').on(table.fromStageId, table.toStageId),
+  ],
+);
+
+export const tasks = sqliteTable(
+  'tasks',
+  {
+    id: id(),
+    /** An area with tasks cannot be deleted: the history stays. */
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    acceptance: text('acceptance').notNull().default(''),
+    priority: text('priority', { enum: TASK_PRIORITIES }).notNull().default('normal'),
+    state: text('state', { enum: TASK_STATES }).notNull().default('open'),
+    /** A stage with tasks in it cannot be deleted. */
+    stageId: text('stage_id')
+      .notNull()
+      .references(() => workflowStages.id, { onDelete: 'restrict' }),
+    /** Why the task stopped and waits for the user; null while it flows. */
+    attention: text('attention'),
+    /** Times it went back to a stage it had been in (limit of D4). */
+    returns: integer('returns').notNull().default(0),
+    /** Runs started for it (limit of D4). */
+    runCount: integer('run_count').notNull().default(0),
+    /** The task of another area that asked for this one (Phase 17). */
+    parentTaskId: text('parent_task_id').references((): AnySQLiteColumn => tasks.id, {
+      onDelete: 'restrict',
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('tasks_project_idx').on(table.projectId),
+    index('tasks_stage_idx').on(table.stageId),
+    index('tasks_parent_idx').on(table.parentTaskId),
+  ],
+);
+
+/** Which area may ask which for work (Phase 17, D2). No rule, no request. */
+export const areaLinks = sqliteTable(
+  'area_links',
+  {
+    id: id(),
+    fromProjectId: text('from_project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    toProjectId: text('to_project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex('area_links_pair_unique').on(table.fromProjectId, table.toProjectId)],
+);
+
+/** What happened to a task. Insert only, like the audit trail. */
+export const taskEvents = sqliteTable(
+  'task_events',
+  {
+    id: id(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: TASK_EVENT_KINDS }).notNull(),
+    actor: text('actor', { enum: AUDIT_ACTORS }).notNull(),
+    agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+    runId: text('run_id').references(() => runs.id, { onDelete: 'set null' }),
+    /** Stage names as they were, so renaming or deleting a stage keeps the history readable. */
+    fromStage: text('from_stage'),
+    toStage: text('to_stage'),
+    /** The other task of a request event (Phase 17). */
+    relatedTaskId: text('related_task_id').references((): AnySQLiteColumn => tasks.id, {
+      onDelete: 'restrict',
+    }),
+    text: text('text').notNull().default(''),
+    createdAt: createdAt(),
+  },
+  (table) => [index('task_events_task_idx').on(table.taskId)],
 );

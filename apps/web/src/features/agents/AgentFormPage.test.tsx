@@ -70,6 +70,7 @@ describe('creating an agent', () => {
           enabled: true,
           // A new agent starts as a person drawn at random (Phase 14).
           appearance: expect.objectContaining({ kind: 'person' }) as unknown,
+          areaAccess: 'none',
         },
       },
     ]);
@@ -114,6 +115,7 @@ describe('creating an agent', () => {
       maxTotalTokens: 9000,
       enabled: false,
       appearance: null,
+      areaAccess: 'none',
     });
   });
 

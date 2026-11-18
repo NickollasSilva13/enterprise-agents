@@ -22,15 +22,23 @@ export type Place =
   | { readonly kind: 'outside' }
   /** At the reception: the agent has no desk in the layout. */
   | { readonly kind: 'lobby' }
-  | { readonly kind: 'visit'; readonly hostId: string };
+  | { readonly kind: 'visit'; readonly hostId: string }
+  /** In the room of another area, taking it a request (Phase 17). */
+  | { readonly kind: 'room'; readonly areaId: string };
 
 export const placeKey = (place: Place): string =>
-  place.kind === 'visit' ? `visit:${place.hostId}` : place.kind;
+  place.kind === 'visit'
+    ? `visit:${place.hostId}`
+    : place.kind === 'room'
+      ? `room:${place.areaId}`
+      : place.kind;
 
 /** Which rooms with a behaviour of their own the layout has. */
 export interface OfficeFeatures {
   readonly meeting: boolean;
   readonly lounge: boolean;
+  /** Areas (projects) that have a room in the layout. */
+  readonly rooms?: ReadonlySet<string>;
 }
 
 /**
@@ -46,6 +54,11 @@ export function placeOf(
   features: OfficeFeatures,
 ): Place {
   if (agent.state === 'inactive') return { kind: 'outside' };
+  // Taking a request to another area: off to its room for a moment, if it has one.
+  const visit = agent.visit;
+  if (visit && now < Date.parse(visit.until) && features.rooms?.has(visit.areaId)) {
+    return { kind: 'room', areaId: visit.areaId };
+  }
   if (agent.state === 'working') {
     // A delegation is a meeting, or a visit to the desk of whoever does the task.
     const hostId = agent.delegatingTo.find((id) => id !== agent.id && present.has(id));

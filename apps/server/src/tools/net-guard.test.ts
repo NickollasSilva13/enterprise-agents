@@ -203,6 +203,8 @@ describe('fetchPublicUrl (C-19)', () => {
       agentId: 'a',
       runId: 'r',
       workspaceDir: 'unused',
+      area: null,
+      task: null,
       signal: signal(),
       delegate: async () => ({ content: '' }),
     };

@@ -104,6 +104,7 @@ describe('exporting agents (RF-20)', () => {
         maxTotalTokens: null,
         enabled: false,
         appearance: null,
+        areaAccess: 'none',
         project: null,
         model: null,
         tools: [],
@@ -120,6 +121,7 @@ describe('exporting agents (RF-20)', () => {
         maxTotalTokens: 5000,
         enabled: true,
         appearance: null,
+        areaAccess: 'none',
         project: 'Atendimento',
         model: { name: 'llama3.2:3b', provider: 'Ollama local' },
         tools: [

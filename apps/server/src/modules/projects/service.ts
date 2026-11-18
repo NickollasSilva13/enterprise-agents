@@ -3,7 +3,7 @@ import { and, asc, count, eq, isNull } from 'drizzle-orm';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
-import { agents, projects } from '../../db/schema';
+import { agents, projects, tasks } from '../../db/schema';
 
 const sameName = (a: string, b: string) =>
   a.toLocaleLowerCase('pt-BR') === b.toLocaleLowerCase('pt-BR');
@@ -63,6 +63,13 @@ export function updateProject(db: Db, id: string, patch: ProjectUpdate): Project
 /** Removes the project. Its agents stay, without a project (foreign key "set null"). */
 export function deleteProject(db: Db, id: string): void {
   getProject(db, id);
+  // Its tasks and their history stay readable: an area with tasks is kept (Phase 16).
+  if (db.select({ id: tasks.id }).from(tasks).where(eq(tasks.projectId, id)).get()) {
+    throw new ConflictError(
+      'area_has_tasks',
+      'Esta área tem tarefas no quadro, e o histórico delas é mantido. Ela não pode ser excluída.',
+    );
+  }
   db.transaction((tx) => {
     // Deleted agents keep no link either, so a later restore cannot point nowhere.
     tx.update(agents)

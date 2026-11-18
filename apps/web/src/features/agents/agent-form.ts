@@ -4,6 +4,7 @@ import {
   type AgentCreate,
   agentCreateSchema,
   type Appearance,
+  type AreaAccess,
   randomAppearance,
 } from '@ea/shared';
 
@@ -26,6 +27,8 @@ export interface AgentFormValues {
   enabled: boolean;
   /** Null: the robot drawn from the agent's id. */
   appearance: Appearance | null;
+  /** What the agent may do in its area's shared folder (Phase 16). */
+  areaAccess: AreaAccess;
 }
 
 export type AgentFormErrors = Partial<Record<keyof AgentFormValues, string>>;
@@ -47,6 +50,7 @@ export function toFormValues(agent?: Agent, random: () => number = Math.random):
     maxTotalTokens: source.maxTotalTokens === null ? '' : String(source.maxTotalTokens),
     enabled: source.enabled,
     appearance: agent ? agent.appearance : randomAppearance(random),
+    areaAccess: source.areaAccess,
   };
 }
 
@@ -74,6 +78,8 @@ export function parseForm(values: AgentFormValues): ParsedForm {
     maxTotalTokens: values.maxTotalTokens.trim() === '' ? null : toNumber(values.maxTotalTokens),
     enabled: values.enabled,
     appearance: values.appearance,
+    // Without an area there is no shared folder to reach.
+    areaAccess: values.projectId === '' ? 'none' : values.areaAccess,
   });
   if (result.success) return { ok: true, agent: result.data };
 

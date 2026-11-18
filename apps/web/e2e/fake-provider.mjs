@@ -55,6 +55,17 @@ function chat(request, response, body) {
     line({ message: { content: `Ferramenta respondeu: ${result.slice(0, 120)}` } });
     return finish();
   }
+  // A run on a board task (Phase 16): the brief lists where the task may go
+  // next; the "model" takes it to the last one, so a task crosses the
+  // development flow straight to the user's review.
+  const stages = /passar a tarefa para uma destas etapas: (.+?)\. Sempre/.exec(prompt);
+  if (stages && offered.has('move_task')) {
+    const names = [...stages[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    return callTool('move_task', {
+      stage: names.at(-1),
+      note: 'Etapa feita pelo provedor simulado.',
+    });
+  }
   if (prompt.includes('anote') && offered.has('write_file')) {
     return callTool('write_file', { path: 'nota.txt', content: prompt });
   }

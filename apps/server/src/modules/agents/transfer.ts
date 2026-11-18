@@ -70,6 +70,7 @@ export function exportAgents(db: Db, ids: readonly string[] | undefined): AgentE
       maxTotalTokens: agent.maxTotalTokens,
       enabled: agent.enabled,
       appearance: storedAppearance(agent.appearance),
+      areaAccess: agent.areaAccess,
       project: agent.projectId ? (projectNames.get(agent.projectId) ?? null) : null,
       model: agent.modelId ? (modelsById.get(agent.modelId) ?? null) : null,
       tools: grants
@@ -147,6 +148,13 @@ export function importAgents(
       const { modelId, modelWarning } = resolveModel(entry, knownModels);
       if (modelWarning) warnings.push(modelWarning);
       const grants = resolveTools(entry, registry, warnings);
+      // Like tools, access to the area's shared folder is never handed out by a
+      // file: the user grants it after looking (SECURITY C-15).
+      if (entry.areaAccess !== 'none') {
+        warnings.push(
+          `O acesso à pasta da área (${entry.areaAccess === 'write' ? 'leitura e escrita' : 'leitura'}) não foi trazido: libere na configuração do agente, se quiser.`,
+        );
+      }
 
       const id = newId();
       tx.insert(agents)

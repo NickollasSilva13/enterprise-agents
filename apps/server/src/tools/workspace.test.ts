@@ -6,7 +6,10 @@ import { listDirTool, readFileTool, writeFileTool, FILE_LIMITS } from './builtin
 import type { ToolContext } from './types';
 import {
   ensureWorkspace,
+  type PathScope,
   resolveInWorkspace,
+  resolveToolPath,
+  toToolPath,
   toWorkspacePath,
   WorkspacePathError,
 } from './workspace';
@@ -29,6 +32,8 @@ const context = (): ToolContext => ({
   agentId: 'agent-1',
   runId: 'run-1',
   workspaceDir: workspace,
+  area: null,
+  task: null,
   signal: new AbortController().signal,
   delegate: async () => ({ content: '' }),
 });
@@ -99,6 +104,77 @@ describe('resolveInWorkspace (C-17)', () => {
     expect(resolveInWorkspace(workspace, 'apelido/x.txt')).toBe(
       join(ensureWorkspace(workspace), 'real', 'x.txt'),
     );
+  });
+});
+
+describe('the area folder (Phase 16, D6)', () => {
+  let areaDir: string;
+  beforeEach(() => {
+    areaDir = join(temp.path, 'areas', 'area-1');
+    ensureWorkspace(areaDir);
+  });
+  const scope = (canWrite: boolean | null): PathScope => ({
+    workspaceDir: workspace,
+    area: canWrite === null ? null : { dir: areaDir, canWrite },
+  });
+
+  it('sends "area/…" to the area folder and anything else to the agent folder', () => {
+    const shared = resolveToolPath(scope(true), 'area/docs/spec.md', 'write');
+    expect(shared).toMatchObject({ inArea: true });
+    expect(shared.absolute).toBe(join(ensureWorkspace(areaDir), 'docs', 'spec.md'));
+    expect(toToolPath(shared)).toBe('area/docs/spec.md');
+
+    const own = resolveToolPath(scope(true), 'notas.md', 'write');
+    expect(own).toMatchObject({ inArea: false });
+    expect(own.absolute).toBe(join(ensureWorkspace(workspace), 'notas.md'));
+  });
+
+  it.each(['area', 'AREA/x.txt', './area/x.txt', 'area\\x.txt', 'Area/../area/x.txt'])(
+    'reads %j as the area folder, whatever the spelling',
+    (requested) => {
+      expect(() => resolveToolPath(scope(null), requested, 'read')).toThrow(
+        'não tem acesso à pasta da área',
+      );
+    },
+  );
+
+  it('refuses the area folder to an agent without access, and writing to one that may only read', () => {
+    expect(() => resolveToolPath(scope(null), 'area/x.txt', 'read')).toThrow(WorkspacePathError);
+    expect(resolveToolPath(scope(false), 'area/x.txt', 'read').inArea).toBe(true);
+    expect(() => resolveToolPath(scope(false), 'area/x.txt', 'write')).toThrow('não escrever nela');
+  });
+
+  it.each([
+    'area/../segredo.txt',
+    'area/../../outside/secret.txt',
+    'area/C:/Windows',
+    'area/nul',
+    'area/arquivo.',
+    '/area/x.txt',
+    'C:/area/x.txt',
+  ])('keeps every rule of C-17 inside the area folder too: refuses %j', (requested) => {
+    expect(() => resolveToolPath(scope(true), requested, 'read')).toThrow(WorkspacePathError);
+  });
+
+  it('refuses a link in the area folder that leads out of it', () => {
+    symlinkSync(outside, join(areaDir, 'atalho'), 'junction');
+    expect(() => resolveToolPath(scope(true), 'area/atalho/secret.txt', 'read')).toThrow(
+      'passa por um link',
+    );
+  });
+
+  it('lets the file tools share work through the area folder', async () => {
+    const writer = { ...context(), area: { dir: areaDir, canWrite: true } };
+    const reader = { ...context(), agentId: 'agent-2', area: { dir: areaDir, canWrite: false } };
+    const written = await writeFileTool.execute({ path: 'area/codigo.js', content: 'ok' }, writer);
+    expect(written.content).toBe('Arquivo "area/codigo.js" criado (2 bytes).');
+    expect(readFileSync(join(areaDir, 'codigo.js'), 'utf8')).toBe('ok');
+    expect((await readFileTool.execute({ path: 'area/codigo.js' }, reader)).content).toBe('ok');
+    expect((await listDirTool.execute({ path: 'area' }, reader)).content).toContain('codigo.js');
+    await expect(
+      writeFileTool.execute({ path: 'area/codigo.js', content: 'mudei' }, reader),
+    ).rejects.toThrow(WorkspacePathError);
+    expect(readFileSync(join(areaDir, 'codigo.js'), 'utf8')).toBe('ok');
   });
 });
 

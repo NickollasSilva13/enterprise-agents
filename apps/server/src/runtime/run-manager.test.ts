@@ -87,6 +87,8 @@ function harness(
     grants: new Map(Object.entries(options.grants ?? {})),
     enabledTools: new Set(options.enabledTools ?? []),
     workspaceDir: 'unused-workspace',
+    area: null,
+    task: null,
   };
   const manager = new RunManager({
     store: {

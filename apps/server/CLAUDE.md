@@ -47,9 +47,18 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - Ferramentas recebem só `ToolContext` (pasta do agente, sinal, delegar). Caminho vindo do modelo passa sempre por `resolveInWorkspace`; endereço vindo do modelo, por `fetchPublicUrl`.
 - Nova ferramenta: `ToolDefinition` com esquema Zod, nível de risco e testes de permissão.
 
+## Quadro de tarefas (Fase 16)
+
+- `modules/tasks`: área é projeto. Toda passagem de tarefa por agente passa pelo `TaskPort` (`portFor` em `service.ts`), que confere as passagens do fluxo; nunca mude `tasks.stage_id` por fora de `applyMove`.
+- `pump()` abre as execuções (via `startTaskRun` em `modules/runs`) e roda sempre que algo pode liberar ou alimentar um agente; o fim de uma execução chega pelo `EventBus` (`run_changed` final), e o ouvinte nunca pode lançar.
+- `task_events` só aceita inserção (gatilho): uma tarefa é cancelada, nunca apagada.
+- Ferramenta com `scope: 'task'` não é concedida por agente: o `PermissionEngine` a libera só com `inTask`.
+- Pasta da área: `resolveToolPath` (`tools/workspace.ts`) com o prefixo `area/`; o resto passa por `resolveInWorkspace`.
+- Pedidos entre áreas (Fase 17): um pedido é uma tarefa com `parent_task_id`, criada só por `requestWork` (regra em `area_links`, sem laço, profundidade até 3). Tarefa com pedido aberto (`pending` ou `open`) não recebe execução, e o fim de uma execução sem mover não a para. Arquivos entre áreas só por `modules/tasks/area-files.ts` (cópia, links ignorados, limite conferido antes); uma área nunca lê a pasta da outra.
+
 ## Exportar e importar agentes
 
-`modules/agents/transfer.ts`. O arquivo nomeia projeto, modelo e provedor (nunca ids, endereço ou chave) e a importação nunca grava `allow`: tudo entra como `ask`. Campo novo de agente precisa entrar em `exportedAgentSchema` e nos dois sentidos de `transfer.ts`.
+`modules/agents/transfer.ts`. O arquivo nomeia projeto, modelo e provedor (nunca ids, endereço ou chave) e a importação nunca grava `allow`: tudo entra como `ask`. Campo novo de agente precisa entrar em `exportedAgentSchema` e nos dois sentidos de `transfer.ts`. O acesso à pasta da área é exportado, mas a importação sempre grava `none`, com aviso.
 
 ## Testes
 

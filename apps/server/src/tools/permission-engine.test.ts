@@ -84,6 +84,38 @@ describe('PermissionEngine (C-15, C-16, C-20)', () => {
   });
 });
 
+describe('PermissionEngine and task tools (Phase 16)', () => {
+  const taskRegistry = new ToolRegistry()
+    .register(tool('reader', 'low'))
+    .register({ ...tool('mover', 'low'), scope: 'task' });
+  const taskEngine = new PermissionEngine(taskRegistry);
+  const ask = (toolName: string, inTask: boolean, grants: Record<string, ToolPermission> = {}) =>
+    taskEngine.decide({
+      toolName,
+      grants: new Map(Object.entries(grants)),
+      enabledTools: new Set(),
+      inTask,
+    });
+
+  it('allows a task tool only in a run that works on a task', () => {
+    expect(ask('mover', true)).toEqual({ permission: 'allow', reason: 'task_tool' });
+    expect(ask('mover', false)).toEqual({ permission: 'deny', reason: 'not_in_task' });
+  });
+
+  it('does not let a grant open a task tool outside a task, nor a deny close it inside one', () => {
+    expect(ask('mover', false, { mover: 'allow' })).toEqual({
+      permission: 'deny',
+      reason: 'not_in_task',
+    });
+    expect(ask('mover', true, { mover: 'deny' }).permission).toBe('allow');
+  });
+
+  it('leaves every other tool to the grants, task run or not', () => {
+    expect(ask('reader', true)).toEqual({ permission: 'deny', reason: 'not_granted' });
+    expect(ask('reader', true, { reader: 'ask' }).permission).toBe('ask');
+  });
+});
+
 describe('ToolRegistry', () => {
   it('refuses invalid and repeated names', () => {
     expect(() => new ToolRegistry().register(tool('Bad-Name', 'low'))).toThrow();
@@ -102,9 +134,18 @@ describe('ToolRegistry', () => {
       ['fetch_url', 'medium', 'allow'],
       ['delegate_to_agent', 'medium', 'allow'],
       ['run_script', 'high', 'ask'],
+      ['move_task', 'low', 'allow'],
+      ['comment_task', 'low', 'allow'],
+      ['request_from_area', 'medium', 'allow'],
     ]);
     expect(builtin.filter((entry) => entry.offByDefault).map((entry) => entry.name)).toEqual([
       'run_script',
+    ]);
+    // The task tools are not granted per agent: they exist only in task runs.
+    expect(builtin.filter((entry) => entry.scope === 'task').map((entry) => entry.name)).toEqual([
+      'move_task',
+      'comment_task',
+      'request_from_area',
     ]);
   });
 

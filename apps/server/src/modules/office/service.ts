@@ -11,13 +11,17 @@ import {
 import { and, asc, desc, eq, inArray, max, notInArray } from 'drizzle-orm';
 import { ValidationError } from '../../core/errors';
 import type { Db } from '../../db/client';
-import { approvals, messages, projects, runs, toolCalls } from '../../db/schema';
+import { approvals, messages, projects, runs, tasks, toolCalls } from '../../db/schema';
 import type { ToolRegistry } from '../../tools/registry';
 import { listAgentsWithState, storedAppearance } from '../agents/repository';
 import { messageText } from '../runs/service';
+import { requestsMadeSince } from '../tasks/repository';
 import { clearLayout, readStoredLayout, writeLayout } from './repository';
 
 const PROMPT_PREVIEW_LENGTH = 120;
+
+/** How long an agent spends taking a request to the other area's room (Phase 17). */
+export const VISIT_MS = 20_000;
 
 type CurrentRun = NonNullable<OfficeAgent['currentRun']>;
 
@@ -30,6 +34,16 @@ function promptOf(db: Db, runId: string): string | null {
     .get();
   const text = message ? messageText(message.content).replace(/\s+/g, ' ').trim() : '';
   if (text === '') return null;
+  return text.length > PROMPT_PREVIEW_LENGTH
+    ? `${text.slice(0, PROMPT_PREVIEW_LENGTH - 1)}…`
+    : text;
+}
+
+/** "Tarefa: <title>", shortened like a prompt, for a run working on a board task (Phase 16). */
+function taskTitleOf(db: Db, taskId: string): string | null {
+  const task = db.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) return null;
+  const text = `Tarefa: ${task.title}`;
   return text.length > PROMPT_PREVIEW_LENGTH
     ? `${text.slice(0, PROMPT_PREVIEW_LENGTH - 1)}…`
     : text;
@@ -50,7 +64,8 @@ function currentRuns(db: Db): Map<string, CurrentRun> {
       id: run.id,
       conversationId: run.conversationId,
       status: run.status,
-      prompt: promptOf(db, run.id),
+      // A run on a board task opens with the whole brief: the task's title says more.
+      prompt: run.taskId ? taskTitleOf(db, run.taskId) : promptOf(db, run.id),
     });
   }
   return result;
@@ -213,12 +228,23 @@ export function resetLayout(db: Db): void {
   clearLayout(db);
 }
 
+/** The latest request each agent took to another area, while it is still on its way. */
+function visits(db: Db, now: number): Map<string, NonNullable<OfficeAgent['visit']>> {
+  const found = new Map<string, NonNullable<OfficeAgent['visit']>>();
+  for (const made of requestsMadeSince(db, new Date(now - VISIT_MS).toISOString())) {
+    const until = new Date(Date.parse(made.createdAt) + VISIT_MS).toISOString();
+    found.set(made.agentId, { areaId: made.areaId, until });
+  }
+  return found;
+}
+
 /** The office: its layout, its projects and every agent with what it is doing. */
-export function getOffice(db: Db, registry: ToolRegistry): Office {
+export function getOffice(db: Db, registry: ToolRegistry, now = Date.now()): Office {
   const running = currentRuns(db);
   const finished = lastFinishedRuns(db);
   const waiting = pendingApprovals(db, registry);
   const delegating = delegations(db);
+  const visiting = visits(db, now);
   const agents: OfficeAgent[] = listAgentsWithState(db).map(({ agent, state }) => ({
     id: agent.id,
     name: agent.name,
@@ -234,6 +260,7 @@ export function getOffice(db: Db, registry: ToolRegistry): Office {
       state === 'idle'
         ? idleSinceOf(agent.updatedAt, finished.get(agent.id)?.finishedAt ?? null)
         : null,
+    visit: visiting.get(agent.id) ?? null,
   }));
   const { layout, customized } = currentLayout(db);
   return {

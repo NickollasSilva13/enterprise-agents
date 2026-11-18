@@ -58,13 +58,14 @@ Há dois. Nos testes do servidor, `FakeProvider` (`apps/server/test/fake-provide
 | C-11 | O script recebe só as variáveis que o sistema exige para iniciar um processo; uma variável secreta posta no ambiente do servidor não chega a ele. |
 | C-15 | Ferramenta não concedida não executa, mesmo solicitada pelo modelo; ferramenta inexistente e argumentos inválidos também não. |
 | C-16 | Ferramenta `ask` não executa antes da decisão; negada, não executa nunca; risco alto pede aprovação mesmo com `allow` gravado; a API recusa gravar `allow` para risco alto; a decisão não pode ser dada duas vezes, nem quando 12 respostas chegam ao mesmo tempo: a ferramenta roda uma vez. |
-| C-17 | `..`, caminho absoluto, letra de unidade, UNC, fluxo alternativo (`:`), nomes reservados e junção ou link para fora são recusados, para ler, listar, escrever e executar. |
+| C-17 | `..`, caminho absoluto, letra de unidade, UNC, fluxo alternativo (`:`), nomes reservados e junção ou link para fora são recusados, para ler, listar, escrever e executar. O mesmo vale dentro da pasta da área (`area/…`), que exige acesso e, para escrever, acesso de escrita, com o prefixo em qualquer grafia. |
 | C-18 | Arquivo grande é lido só até o limite; conteúdo acima do limite de escrita é recusado; resultado grande de ferramenta é cortado. |
 | C-19 | URLs para `127.0.0.1`, `localhost`, `10.x`, `192.168.x`, `169.254.169.254`, IPv6 local, IPv4 embutido em IPv6, IP escrito como número, nome que resolve para endereço público e privado ao mesmo tempo, e redirecionamento para esses destinos são recusados sem que nenhuma requisição saia. |
 | C-20 | Com a ferramenta de script desligada, não há execução; ligada, não aceita `allow`. Argumentos hostis chegam ao script como texto; o script não lê nem grava fora da pasta e não cria processos; passa do tempo e é encerrado. |
 | C-21 | Delegação além da profundidade máxima ou em ciclo (inclusive a si mesmo) é recusada. |
 | C-22 | O agente delegado não usa uma ferramenta que só quem delegou tem; cada agente grava só na própria pasta. |
 | C-23 | Mudança de permissão, chave da ferramenta de script, aprovação, delegação e execução de ferramenta de risco médio ou alto deixam registro de auditoria. |
+| C-26 | Um agente não leva uma tarefa por passagem que o fluxo não libera nem para fora de uma etapa sua; ferramenta do quadro fora de tarefa é negada e não pode ser concedida; a tarefa que volta mais que o teto para e espera o usuário; um agente trabalha numa tarefa por vez; cancelar a tarefa interrompe a execução dela. |
 | C-25 | O processo do harness não recebe variável de ambiente do servidor: uma variável secreta posta no ambiente não chega ao filho, e `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `OPENAI_API_KEY`, `CLAUDE_CODE_*` e `EA_SESSION_SECRET` são descartadas. Argumentos vão em lista, sem shell: texto com `&`, `>` e `$HOME` chega ao programa como texto. O comando cadastrado recusa argumentos (inclusive depois de um espaço), quebras de linha e início com `-`. Programa inexistente, tempo limite total, inatividade e cancelamento terminam a chamada com o erro certo. As bandeiras de isolamento são conferidas uma a uma na lista exata passada ao programa. Modelo de harness não aceita marcação de ferramentas à mão. Pedido de ferramenta escrito pelo harness (Fase 13): ferramenta não concedida não executa; a aprovação acontece sem processo do harness vivo; bloco malformado ou inacabado aparece como texto e não executa; o texto depois de um pedido é descartado; resultado de ferramenta que imita o protocolo é neutralizado no prompt; só as ferramentas concedidas são descritas; o arquivo do prompt de sistema é apagado mesmo quando a chamada falha. |
 
 ## 5. Cobertura esperada e critérios de aprovação
@@ -163,6 +164,20 @@ Se o Ollama não estiver instalado na máquina, o roteiro fica pendente e isso �
 | 2026-11-16 | 15 | Manual: navegador embutido | Servidor à parte (portas 4327/5183, dados descartáveis): oito agentes de aparências diferentes; Escritório em prédio, casa e parque; prévia do personagem no formulário. |
 
 **Não verificado na Fase 15:** a caminhada nas quatro direções vista em movimento por uma pessoa; o desempenho caiu um pouco no desktop em relação à Fase 14 (59,4 para 55,9 quadros/s), ainda bem acima do limite de 20; outros navegadores.
+
+| 2026-11-16 | 16 | `npm run check` | Passou. Contrato: 20 testes; servidor: 31 arquivos, 584 testes; interface: 16 arquivos, 175 testes. |
+| 2026-11-16 | 16 | `npm run test:coverage` | Passou, todas as metas atingidas. Linhas: servidor inteiro 96,4%; `modules/tasks` 87,1%; `tools/` 97,2% (`workspace.ts` 98,3%). |
+| 2026-11-16 | 16 | `npm run test:e2e` | Passou na primeira execução: 47 testes, 1 ignorado de propósito, em 2,1 min. Inclui o roteiro novo `tasks.spec.ts` em desktop e celular: área criada do modelo Desenvolvimento, tarefa que os agentes passam sozinhos até a revisão do usuário, que a conclui. |
+| 2026-11-16 | 16 | `npm audit --omit=dev` | 0 vulnerabilidades. |
+
+**Não verificado na Fase 16:** nenhum modelo real atravessou um fluxo (só o provedor simulado, em processo e no E2E). O editor de fluxo foi exercitado só por testes de componente, não pelo E2E nem num celular de verdade. O quadro não foi visto em captura de tela.
+
+| 2026-11-16 | 17 | `npm run check:full` | Passou (saída 0). Contrato: 20 testes; servidor: 33 arquivos, 597 testes; interface: 17 arquivos, 182 testes; cobertura: linhas do servidor 96,25%, `modules/tasks` 90,26% (`area-files.ts` 97,1%); E2E: 49 testes, 1 ignorado de propósito, em 2,2 min, incluindo o roteiro novo `requests.spec.ts` em desktop e celular. |
+| 2026-11-16 | 17 | `npm run check` | Depois de um teste a mais (arquivo fora da pasta pedido por agente): passou; servidor com 598 testes. |
+| 2026-11-16 | 17 | `npm audit --omit=dev` | 0 vulnerabilidades. |
+| 2026-11-16 | 17 | E2E intermitente | Antes do `check:full`, o roteiro "an agent leaves and comes back by the reception (walking)" de `office.spec.ts` falhou duas vezes (desktop e celular, na conferência de que os primeiros passos são na recepção). Falhou igual com o código da Fase 16 e passou no `check:full`: não é desta fase; parece depender da carga da máquina (havia outro servidor de desenvolvimento rodando). Também na primeira rodada, `requests.spec.ts` registrou um 401 no console por criar dados antes de a página abrir a sessão; corrigido esperando o título da página. |
+
+**Não verificado na Fase 17:** nenhum modelo real pediu trabalho a outra área. A ida do agente à sala da outra área não foi vista em movimento. As telas novas não foram vistas em captura de tela.
 
 | 2026-11-16 | 14 | `npm run check:full` | Passou. Compartilhado: 1 arquivo, 17 testes; servidor: 30 arquivos, 548 testes; interface: 15 arquivos, 164 testes; cobertura do servidor 98% das linhas; E2E: 45 testes, 1 ignorado de propósito. |
 | 2026-11-16 | 14 | E2E: cena com 30 agentes | Na cena isométrica, 30 agentes saindo juntos: 59,4 quadros/s (desktop) e 59,7 (celular) durante os 7,0 s de caminhada; maior intervalo entre quadros 67 e 33 ms. Chromium sem interface, nesta máquina. |

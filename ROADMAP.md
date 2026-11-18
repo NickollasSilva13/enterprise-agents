@@ -21,6 +21,9 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 13 | Ferramentas da plataforma para agentes de harness | Concluída em 2026-11-15 |
 | 14 | Escritório isométrico personalizável | Concluída em 2026-11-16 |
 | 15 | Personagens 16 bits e entorno do escritório | Concluída em 2026-11-16 |
+| 16 | Áreas, quadro de tarefas e fluxos configuráveis | Concluída em 2026-11-16 |
+| 17 | Pedidos entre áreas | Concluída em 2026-11-16 |
+| 18 | Catálogo de fluxos prontos | Proposta (aguardando aprovação) |
 
 ## Fases concluídas
 
@@ -465,6 +468,254 @@ clima ou ciclo de dia e noite; animação de rosto (piscar, falar).
 
 - Visto por mim em capturas do navegador embutido (prédio, casa e parque, e a prévia do personagem no formulário), num servidor à parte com dados descartáveis; ninguém viu a caminhada nas quatro direções em movimento.
 - A arte foi desenhada à mão em matrizes de texto: a conferência foi visual e por testes de forma (tamanho de todo sprite, cor válida em todo pixel, toda opção desenhada); não houve revisão de um artista.
+
+## Visão das Fases 16 a 18 — a plataforma como uma empresa
+
+Objetivo do usuário (2026-11-16): que a plataforma funcione como uma empresa
+real, com agentes organizados em **áreas** (desenvolvimento, marketing, dados,
+produto, ou qualquer outra) trabalhando de forma coordenada, passando tarefas de
+um para o outro ao longo de um fluxo.
+
+Dois princípios guiam as três fases:
+
+1. **Nada de fluxo fixo.** A plataforma não conhece "PO", "Dev" ou "QA". Ela
+   oferece peças genéricas (área, quadro, etapa, regra de passagem, ponto de
+   aprovação), e cada usuário monta as próprias áreas, agentes e fluxos.
+2. **Fluxos prontos com boas práticas** servem de ponto de partida: ao criar uma
+   área a partir de um modelo, ela recebe uma cópia das etapas, dos papéis e das
+   permissões sugeridas, e o usuário altera o que quiser. O modelo não muda a
+   área depois, e a área não muda o modelo.
+
+**O que existe hoje e não basta.** A delegação (`delegate_to_agent`) é síncrona
+e aninhada: quem delega fica parado esperando, a cadeia tem no máximo
+`MAX_DELEGATION_DEPTH` níveis (padrão 3) e ciclos são recusados (C-21), então
+um revisor não consegue devolver o trabalho a quem o fez. Cada agente tem só a
+própria pasta, isolada dos outros. Não existe tarefa como objeto (estado,
+responsável, histórico) e um agente só trabalha quando alguém escreve no chat.
+A delegação continua existindo para pedidos rápidos dentro de uma execução; o
+quadro é o caminho para trabalho que passa de mão em mão.
+
+**Ordem.** Primeiro o mecanismo genérico com um único modelo (Fase 16), depois
+a comunicação entre áreas (Fase 17), depois os demais modelos (Fase 18). Se as
+peças aguentarem um fluxo real com idas e voltas, aguentam os outros, e é mais
+barato corrigir o mecanismo antes de ter vários modelos em cima dele.
+
+## Fase 16 — Áreas, quadro de tarefas e fluxos configuráveis (concluída)
+
+**Objetivo.** Cada área tem um quadro de tarefas com etapas definidas pelo
+usuário. Quando uma tarefa chega à etapa de um agente, ele começa a trabalhar
+sozinho; ao terminar, passa a tarefa adiante pelas regras do fluxo, que a
+plataforma faz valer. O usuário aprova onde quiser. Um modelo pronto, o de
+desenvolvimento (responsável pelo produto → desenvolvimento → testes, com
+devolução), prova o mecanismo.
+
+### Decisões (aprovadas pelo usuário em 2026-11-16, todas as recomendações)
+
+**D1 — O que é uma área.**
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | A área **é o projeto que já existe** (`projects`), só renomeado na interface. Agentes já têm `project_id`, e o Escritório já desenha uma sala por projeto. | Nenhuma entidade nova para agente, sala e exportação; o que o usuário já criou vira área. | "Projeto" e "área" deixam de ser coisas diferentes; quem quiser as duas noções no futuro precisará separá-las. |
+| B | Tabela nova `areas`, com projetos dentro de áreas. | Separa organização (área) de trabalho (projeto). | Mais uma camada para o usuário entender e para o Escritório desenhar; sem uso claro hoje. |
+| C | Agente em várias áreas (tabela de ligação). | Um especialista atende mais de um time. | Conflita com "uma mesa por agente" do Escritório; complica fila e permissões. A Fase 17 resolve o mesmo caso por pedido entre áreas. |
+
+**D2 — Como guardar o fluxo de uma área.**
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | Tabelas `workflow_stages` (área, ordem, nome, tipo: de agente, sua ou final; responsável padrão `agent_id` com `on delete set null`; se exige a sua aprovação para sair) e `workflow_transitions` (de, para, quem pode mover: o agente da etapa, você, ou os dois). Salvar o fluxo troca tudo numa transação, como o layout da Fase 14. | O banco protege as referências: agente excluído deixa a etapa sem responsável (a tarefa para e avisa), e uma etapa com tarefas não pode ser apagada. | Duas tabelas e um repositório novos. |
+| B | Um documento JSON por área (coluna `projects.workflow`), validado por Zod. | Menos código. | Tarefas apontariam para etapas que o banco não conhece; cada leitura precisaria limpar referências mortas. |
+
+**D3 — Como um agente trabalha numa tarefa.**
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | **A tarefa dispara a execução.** Quando uma tarefa entra numa etapa de agente, a plataforma abre uma execução nova (gatilho `task`) com o contexto montado a partir da tarefa: título, descrição, critérios de aceite, histórico e as notas de quem passou. O agente termina chamando ferramentas novas: `move_task` (para uma etapa permitida, com uma nota de passagem) e `comment_task`. Se a execução terminar sem mover a tarefa, ela fica marcada como "precisa de você". | Previsível e auditável: cada passagem é uma execução nova, com passos, limites e logs como hoje; devolver o trabalho não é ciclo, é outra execução. | O agente não escolhe o que fazer em seguida: trabalha no que chega. |
+| B | Os agentes consultam o quadro (`list_tasks`) e pegam tarefas sozinhos. | Mais autônomo, mais "parecido com gente". | Imprevisível e caro: agentes acordando para olhar o quadro; difícil limitar e explicar. |
+| C | Tornar a delegação assíncrona, sem quadro. | Muda pouco código. | Não dá estado, histórico nem visão do trabalho, que são o objetivo. |
+
+**D4 — Regras de passagem e proteção contra laços.** Recomendado: a
+plataforma valida todo `move_task` contra as transições da etapa (o agente pede,
+o servidor decide, como o `PermissionEngine` faz com ferramentas; segurança não
+depende do prompt). Transições marcadas como "só você" nunca são feitas por
+agente. No lugar da recusa de ciclos (C-21), que impediria a devolução, cada
+tarefa tem dois tetos: **voltas** (quantas vezes ela pode retornar a uma etapa
+já visitada, padrão 3) e **execuções** (total por tarefa, padrão 20). Passou de
+um deles, a tarefa para e vai para você. Alternativa: só o teto de execuções,
+mais simples, mas que deixa um par de agentes devolvendo trabalho um ao outro
+até gastar tudo.
+
+**D5 — Fila e simultaneidade.** Recomendado: **um agente trabalha numa tarefa
+por vez**, como uma pessoa; as outras esperam na fila dele, por prioridade e
+ordem de chegada, sempre dentro do limite global `MAX_CONCURRENT_RUNS`. Uma
+tarefa tem no máximo uma execução ativa. Alternativa: um agente atende várias
+tarefas ao mesmo tempo, mais rápido, mas confunde o Escritório (um personagem
+em várias mesas) e dispara o consumo de cota.
+
+**D6 — Pasta da área.** O modelo de desenvolvimento precisa que quem testa veja
+o que foi feito, então a pasta compartilhada entra nesta fase.
+
+| | Alternativa | Prós | Contras |
+|---|---|---|---|
+| **A (recomendada)** | Cada agente mantém a própria pasta e ganha acesso à **pasta da área** (`DATA_DIR/areas/<id>`) pelo prefixo `area/` nas ferramentas de arquivo. O resolvedor de caminhos continua o único caminho, agora com duas raízes confinadas; ler e escrever na pasta da área são permissões separadas por agente. | Isolamento continua valendo para o que é pessoal; o compartilhado é explícito. | Mexe no resolvedor de caminhos (C-17): exige revisão de segurança, testes de fuga para a raiz nova e atualização do `SECURITY.md`. |
+| B | Os agentes de uma área passam a usar uma única pasta. | Simples. | Acaba com o isolamento entre agentes; um agente pode apagar o trabalho do outro sem nenhum controle. |
+| C | Só anexos na tarefa (cópias de arquivos). | Sem raiz nova no resolvedor. | Trabalho real (código, planilhas) tem muitos arquivos; copiar a cada passagem é frágil e caro. |
+
+**D7 — Como o modelo pronto é definido.** Recomendado: modelos **em código**, em
+`packages/shared` (etapas, transições, papéis com instruções e ferramentas
+sugeridas), versionados e testados com o resto. Aplicar um modelo cria a área,
+as etapas e os agentes; o usuário escolhe o modelo de IA de cada agente.
+Permissões sugeridas entram todas como `ask` (a mesma regra da importação de
+agentes): o usuário libera o que quiser. Alternativa: modelos no banco, editáveis
+na interface; fica para a Fase 18 ("salvar a minha área como modelo").
+
+### Escopo proposto (depois de aprovado)
+
+1. Contrato e banco: tarefas (`tasks`: área, título, descrição, critérios de
+   aceite, etapa, responsável, estado, prioridade, contadores de voltas e
+   execuções), histórico só de inserção (`task_events`: criada, movida,
+   comentada, aprovada, execução iniciada e terminada), fluxo (D2), coluna
+   `runs.task_id`; migração com teste sobre dados existentes; rotas em
+   `/api/areas/:id/workflow` e `/api/tasks`.
+2. Motor de tarefas: gatilho, fila por agente, montagem do contexto, tetos de
+   voltas e execuções, tarefa parada quando a execução falha ou termina sem mover.
+3. Ferramentas `move_task` e `comment_task`, com regras de passagem validadas no
+   servidor, auditoria e testes de permissão.
+4. Pasta da área (D6), com os testes de fuga do resolvedor estendidos.
+5. Interface: quadro por área (colunas = etapas), detalhe da tarefa (histórico,
+   notas, execuções ligadas, arquivos da pasta da área), criar e mover à mão,
+   editor de fluxo, pontos de aprovação na tela de Aprovações.
+6. Escritório: agente trabalhando numa tarefa aparece na mesa com o título dela
+   no balão; agente com fila mostra quantas tarefas esperam.
+7. Modelo "Desenvolvimento" (responsável pelo produto → desenvolvimento →
+   testes → concluído, com devolução de testes para desenvolvimento e
+   aprovação sua antes de concluir).
+8. E2E com o provedor simulado (tarefa atravessa o fluxo, com uma devolução e
+   uma aprovação), validação manual com um modelo real, `npm run check:full` e
+   documentação viva (`SPEC.md` com requisitos novos, `ARCHITECTURE.md`,
+   `SECURITY.md`, `TESTING.md`, `docs/GUIA.md`).
+
+**Segurança.** Texto de tarefa, nota de passagem e comentário de agente são dado
+não confiável: renderizados pelo componente `Markdown` e levados ao modelo
+rotulados como dados. Um agente pode tentar convencer o próximo a fazer algo
+indevido (injeção de prompt entre agentes); quem contém isso continua sendo o
+`PermissionEngine` de cada agente e as regras de passagem, nunca o texto.
+
+### O que foi feito
+
+- Contrato em `packages/shared`: `tasks.ts` (fluxo, tarefas, quadro, limites) e `workflow-templates.ts` (o modelo Desenvolvimento, com papéis, instruções, ferramentas sugeridas, etapas e passagens).
+- Banco: migrações `0004_areas_tasks` (tabelas `workflow_stages`, `workflow_transitions`, `tasks`, `task_events`; colunas `agents.area_access` e `runs.task_id`; só cria, sem reconstruir tabela) e `0005_task_events_append_only` (gatilhos). Testadas sobre dados existentes.
+- Servidor: módulo `modules/tasks` (repositório, regras e rotas em `/api/areas/:id/workflow`, `/api/areas/:id/board`, `/api/areas/:id/tasks`, `/api/tasks/...`, `/api/workflow-templates`, `/api/areas/from-template`); o despachante abre a execução da tarefa quando o agente da etapa está livre e reage ao fim de cada execução pelo `EventBus`; ferramentas `move_task` e `comment_task`; pasta da área no resolvedor de caminhos; balão do Escritório mostra a tarefa.
+- Interface: menu Tarefas com o quadro por área, a página da tarefa (pedido, histórico, mover, comentar, retomar, cancelar), o editor de fluxo, a criação de área a partir de modelo, o campo "Pasta compartilhada da área" no agente e "Tarefas esperando você" na tela Aprovações.
+- E2E novo (`tasks.spec.ts`): uma área do modelo, uma tarefa que os agentes passam sozinhos até a revisão do usuário, que conclui.
+
+### Decisões tomadas durante a implementação
+
+- **Ferramentas do quadro sem concessão por agente.** `move_task` e `comment_task` passam pelo `PermissionEngine` com uma regra própria: permitidas só numa execução de tarefa e negadas fora dela, nunca concedidas por agente. Exigir "Pede aprovação" a cada passagem pararia o fluxo a cada etapa; a proteção delas é a regra do fluxo, conferida no servidor (C-26).
+- **Ponto de aprovação é uma etapa do usuário.** No lugar de uma marca "exige aprovação para sair" (D2), uma etapa do tipo "Você" segura a tarefa até o usuário movê-la. É mais visível no quadro e não precisa de um mecanismo à parte.
+- **Volta é passagem para uma etapa anterior na ordem do fluxo**, e só conta quando o agente a faz; a do usuário é decisão dele.
+- **Área com tarefas não pode ser excluída**, e uma tarefa é cancelada, nunca apagada: o histórico, que só aceita inserção, continua legível.
+- **Acesso à pasta da área é um campo do agente** (nenhum, leitura, leitura e escrita), não uma ferramenta; ler e escrever continuam dependendo das ferramentas de arquivo concedidas. Na importação ele sempre entra como "nenhum", com aviso.
+- **O script continua só na pasta pessoal**: um caminho `area/` no script é recusado com explicação, em vez de apontar para uma subpasta pessoal chamada "area".
+
+### Não validado
+
+- Nenhum modelo real atravessou um fluxo: os testes usam o provedor simulado, em processo e no E2E. Se um modelo real escreve notas úteis e usa `move_task` no momento certo é a primeira coisa a ver com o Claude Code conectado.
+- O editor de fluxo foi exercitado por testes de componente, não pelo E2E nem em celular.
+
+**Fora do escopo.** Pedidos entre áreas e tarefas filhas (Fase 17); outros
+modelos e "salvar como modelo" (Fase 18); agendamento por horário; agente em
+mais de uma área; ferramentas novas além de `move_task` e `comment_task`.
+
+**Riscos.** A qualidade do trabalho depende do modelo: modelos locais pequenos
+não sustentam um fluxo de desenvolvimento. Um fluxo com idas e voltas faz muitas
+chamadas e, pelo harness, cada passo com ferramenta executa o programa de novo:
+os tetos de D4 e o limite de tokens por execução são o que segura o consumo.
+
+## Fase 17 — Pedidos entre áreas (concluída)
+
+**Objetivo.** Uma área pede trabalho a outra, como numa empresa: o marketing
+pede um número à área de dados, o produto envia uma especificação ao
+desenvolvimento. A resposta volta para quem pediu.
+
+**Decisões a aprovar (resumo; detalhadas ao abrir a fase).**
+
+- **D1 — Forma do pedido.** Recomendado: o pedido cria uma **tarefa filha** na
+  primeira etapa do fluxo da outra área (`tasks.parent_task_id`); a tarefa de
+  origem fica "aguardando outra área" e volta a andar quando a filha chega à
+  etapa final, com o resultado e os arquivos entregues anexados. Alternativa:
+  mensagem entre áreas, sem tarefa, que não deixa estado nem histórico.
+- **D2 — Quem pode pedir a quem.** Recomendado: uma regra por par de áreas
+  ("Marketing pode pedir a Dados"), configurada pelo usuário e validada no
+  servidor; pedido sem regra é recusado. Pode exigir a sua aprovação antes de
+  entrar no quadro da outra área.
+- **D3 — Arquivos entre áreas.** Recomendado: a entrega vai como anexo copiado
+  para a pasta da área que pediu, nunca acesso direto à pasta da outra área.
+- **D4 — Proteção contra laços.** Profundidade máxima de tarefas filhas (padrão
+  3) e recusa de pedido que volte a uma área que já está na cadeia daquela tarefa.
+
+**Escopo.** Ferramenta `request_from_area`, regras por par de áreas, tarefa
+filha ligada à de origem, tela de pedidos abertos entre áreas, ligação entre as
+salas no Escritório (um agente "leva" o pedido à sala da outra área), testes e
+documentação viva.
+
+**Decisões aprovadas em 2026-11-16 (D1 a D5, todas como recomendadas).** D1: o
+pedido é uma tarefa filha na primeira etapa da outra área; a tarefa que pediu
+espera e volta a andar com a entrega; pedido cancelado a para; até 5 pedidos
+abertos por tarefa; pedem o agente (`request_from_area`) e o usuário. D2: regra
+por par de áreas (`area_links`), com "exige minha aprovação" ligado por padrão;
+recusa deixa a tarefa que pediu seguir. D3: arquivos sempre copiados
+(`pedidos/`, `entregas/`, `recebidos/`), com teto de 200 arquivos e 50 MB. D4:
+cadeia de até 3 níveis, sem voltar a uma área da cadeia. D5: tela "Pedidos
+entre áreas", tarefa de origem e filhas na página da tarefa, regras editáveis,
+agente que vai à sala da outra área no Escritório.
+
+### O que foi feito
+
+- Contrato: `REQUEST_LIMITS`, esquemas de regra, pedido, recusa e lista de pedidos; resumo e detalhe da tarefa com `parentTaskId`, `waitingOn`, tarefa de origem, filhas e áreas que podem ser acionadas; estado `pending` e eventos `requested`, `request_approved`, `request_refused`, `delivered`; `visit` no agente do Escritório.
+- Banco: migração `0006_area_requests` (tabela `area_links`; colunas `tasks.parent_task_id` e `task_events.related_task_id`; só cria e acrescenta coluna, o histórico continua só de inserção). Testada sobre dados existentes.
+- Servidor: `requestWork` (regra, laço, profundidade, pedidos abertos, cópia dos arquivos), aprovar, recusar, entrega na etapa final, espera da tarefa que pediu no despachante e no fim da execução; `modules/tasks/area-files.ts` para as cópias; ferramenta `request_from_area`; rotas `/api/area-links`, `/api/requests`, `/api/tasks/:id/requests`, `/approve-request`, `/refuse-request`; briefing com as áreas que podem ser acionadas e as pastas do pedido.
+- Interface: tela "Pedidos entre áreas" (`/tarefas/pedidos`), painéis "Pedidos a outras áreas" e "Pedido de outra área" na tarefa, aprovar e recusar com motivo, andamento "Aguardando outra área" no quadro, pedidos a aprovar na tela Aprovações, e o lugar "sala de outra área" no Escritório.
+- E2E novo (`requests.spec.ts`): regra criada pela tela, pedido feito pela tarefa, aprovação, conclusão na outra área e entrega no histórico de quem pediu.
+
+### Decisões tomadas durante a implementação
+
+- **Arquivos do agente vêm da pasta dele ou da área.** O agente pode mandar com o pedido arquivos da própria pasta ou de `area/`, sempre pelo resolvedor (C-17); o usuário, da pasta da área.
+- **Pedido reaberto entrega de novo.** Se o usuário tira o pedido da etapa final, a tarefa que pediu volta a esperar e recebe uma nova entrega quando ele for concluído outra vez; entregar uma vez só a deixaria esperando para sempre.
+- **Cancelar a tarefa que pediu não cancela os pedidos.** O trabalho da outra área pode ser útil; a entrega é copiada mesmo assim.
+- **Pedido esperando aprovação não pode ser movido**: primeiro aprovar ou recusar.
+- **`request_from_area` tem risco médio**: cria trabalho em outra área; continua não concedida por agente (regra do quadro, C-26), protegida pela regra do usuário (C-27).
+- **A visita ao Escritório dura 20 s** e é derivada do histórico (evento `requested`), nunca gravada; sem sala da outra área no layout, o agente fica na mesa.
+
+### Não validado
+
+- Nenhum modelo real pediu trabalho a outra área: os testes usam o provedor simulado (em processo) e o E2E faz o pedido pela interface.
+- A ida do agente à sala da outra área foi testada como função (lugar e ponto na sala), não vista em movimento nem pelo E2E.
+
+## Fase 18 — Catálogo de fluxos prontos (proposta)
+
+**Objetivo.** Mais modelos com boas práticas e a possibilidade de o usuário
+salvar e reaproveitar os próprios fluxos.
+
+**Modelos candidatos** (cada um com etapas, papéis, instruções e permissões
+sugeridas, revisados antes de entrar):
+
+| Modelo | Fluxo | Boa prática embutida |
+|---|---|---|
+| Desenvolvimento (Fase 16) | Produto → Desenvolvimento → Testes → Concluído | Testes devolvem ao desenvolvimento; critérios de aceite obrigatórios |
+| Marketing | Briefing → Redação → Revisão → Sua aprovação → Publicado | Nada é publicado sem a sua aprovação |
+| Dados | Pedido → Análise → Validação → Entregue | Outro agente confere os números antes da entrega |
+| Produto | Ideia → Especificação → Priorização → Enviado a uma área | A especificação vira pedido para outra área (Fase 17) |
+| Conteúdo e documentação | Rascunho → Revisão técnica → Revisão de texto → Publicado | Dois revisores com focos diferentes |
+
+**Decisões a aprovar ao abrir a fase.** Onde ficam os modelos do usuário (banco,
+com exportação e importação em arquivo como os agentes, RF-20); o que um modelo
+salvo leva (etapas, transições, papéis e instruções, nunca chaves, endereços ou
+permissões `allow`); e quais ferramentas novas cada modelo realmente exige. Uma
+ferramenta nova (busca na web, leitura de planilha, execução de testes) é
+decisão própria, com nível de risco, testes de permissão e controle no
+`SECURITY.md`; executar testes de código, em particular, depende do executor
+isolado em contêiner, que está nas melhorias futuras.
 
 ## Pendências ao final do projeto
 

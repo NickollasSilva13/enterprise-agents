@@ -136,6 +136,11 @@ export const officeAgentSchema = z.object({
    * Derived, never stored: it decides who has gone to the pantry (RF-80).
    */
   idleSince: z.string().nullable(),
+  /**
+   * The agent is taking a request to another area's room until `until`
+   * (Phase 17). Derived from the task history, never stored.
+   */
+  visit: z.object({ areaId: z.string(), until: z.string() }).nullable().default(null),
 });
 export type OfficeAgent = z.infer<typeof officeAgentSchema>;
 

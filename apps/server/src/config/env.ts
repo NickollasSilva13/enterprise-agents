@@ -50,6 +50,8 @@ export interface AppConfig {
   readonly maxDelegationDepth: number;
   /** Parent of every agent's working folder (SECURITY C-17). */
   readonly workspacesDir: string;
+  /** Parent of every area's shared folder (Phase 16, D6). Confined like a workspace. */
+  readonly areasDir: string;
   /** 'os': the system credential vault. 'memory': lost on exit; for tests only. */
   readonly secretStore: 'os' | 'memory';
   /** Accepted values of the Host header (SECURITY C-02). */
@@ -98,6 +100,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     maxConcurrentRuns: values.MAX_CONCURRENT_RUNS,
     maxDelegationDepth: values.MAX_DELEGATION_DEPTH,
     workspacesDir: join(dataDir, 'workspaces'),
+    areasDir: join(dataDir, 'areas'),
     secretStore: values.SECRET_STORE,
     allowedHosts,
     allowedOrigins,

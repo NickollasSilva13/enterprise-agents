@@ -78,6 +78,7 @@ export function buildGeometry(layout: OfficeLayout, agents: readonly DeskSeeker[
     features: {
       meeting: areaOfKind(layout, 'meeting') !== -1,
       lounge: areaOfKind(layout, 'lounge') !== -1,
+      rooms: new Set(layout.areas.flatMap((area) => (area.projectId ? [area.projectId] : []))),
     },
     spot(agentId: string, place: Place, slot: number): Point | null {
       switch (place.kind) {
@@ -93,6 +94,10 @@ export function buildGeometry(layout: OfficeLayout, agents: readonly DeskSeeker[
         case 'lounge':
         case 'meeting':
           return inKind(place.kind, slot);
+        case 'room': {
+          const area = layout.areas.findIndex((entry) => entry.projectId === place.areaId);
+          return area === -1 ? null : pick(standIn(area), slot);
+        }
         case 'visit': {
           const seat = seats.get(place.hostId);
           if (!seat) return null;

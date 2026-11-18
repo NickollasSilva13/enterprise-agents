@@ -2,7 +2,7 @@ import { mkdir, open, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { type ToolDefinition, toolError } from '../types';
-import { PATH_LIMIT, resolveInWorkspace, toWorkspacePath } from '../workspace';
+import { PATH_LIMIT, resolveToolPath, toToolPath } from '../workspace';
 
 // Size limits of SECURITY C-18.
 export const FILE_LIMITS = {
@@ -20,11 +20,11 @@ export const readFileTool: ToolDefinition<{ path: string }> = {
   title: 'Ler arquivo',
   summary: 'Lê arquivos de texto da pasta de trabalho do agente.',
   description:
-    'Lê um arquivo de texto da sua pasta de trabalho. Use um caminho relativo, por exemplo "notas/resumo.md".',
+    'Lê um arquivo de texto da sua pasta de trabalho. Use um caminho relativo, por exemplo "notas/resumo.md". Com acesso à pasta compartilhada da área, use o prefixo "area/", por exemplo "area/especificacao.md".',
   risk: 'low',
   inputSchema: z.strictObject({ path }),
   async execute(input, context) {
-    const absolute = resolveInWorkspace(context.workspaceDir, input.path);
+    const { absolute } = resolveToolPath(context, input.path, 'read');
     let handle;
     try {
       handle = await open(absolute, 'r');
@@ -58,11 +58,11 @@ export const listDirTool: ToolDefinition<{ path?: string | undefined }> = {
   title: 'Listar pasta',
   summary: 'Lista os arquivos e pastas da pasta de trabalho do agente.',
   description:
-    'Lista o conteúdo de uma pasta da sua pasta de trabalho. Sem "path", lista a raiz. Pastas terminam com "/".',
+    'Lista o conteúdo de uma pasta da sua pasta de trabalho. Sem "path", lista a raiz. Pastas terminam com "/". Com acesso à pasta compartilhada da área, "area" lista a raiz dela.',
   risk: 'low',
   inputSchema: z.strictObject({ path: path.optional() }),
   async execute(input, context) {
-    const absolute = resolveInWorkspace(context.workspaceDir, input.path ?? '.');
+    const { absolute } = resolveToolPath(context, input.path ?? '.', 'read');
     let entries;
     try {
       entries = await readdir(absolute, { withFileTypes: true });
@@ -97,7 +97,7 @@ export const writeFileTool: ToolDefinition<{ path: string; content: string }> = 
   title: 'Escrever arquivo',
   summary: 'Cria ou substitui arquivos de texto na pasta de trabalho do agente.',
   description:
-    'Cria ou substitui um arquivo de texto na sua pasta de trabalho. Pastas que faltam são criadas. Use um caminho relativo.',
+    'Cria ou substitui um arquivo de texto na sua pasta de trabalho. Pastas que faltam são criadas. Use um caminho relativo; com permissão de escrita na pasta compartilhada da área, use o prefixo "area/".',
   risk: 'medium',
   inputSchema: z.strictObject({
     path,
@@ -109,7 +109,7 @@ export const writeFileTool: ToolDefinition<{ path: string; content: string }> = 
       ),
   }),
   async execute(input, context) {
-    const absolute = resolveInWorkspace(context.workspaceDir, input.path);
+    const { absolute } = resolveToolPath(context, input.path, 'write');
     const existing = await stat(absolute).catch(() => null);
     if (existing && !existing.isFile()) {
       return toolError(`"${input.path}" é uma pasta, não um arquivo.`);
@@ -117,10 +117,10 @@ export const writeFileTool: ToolDefinition<{ path: string; content: string }> = 
     await mkdir(dirname(absolute), { recursive: true });
     // The folders were just created: check again that none of them is a link
     // leading out of the workspace before anything is written.
-    const checked = resolveInWorkspace(context.workspaceDir, input.path);
-    await writeFile(checked, input.content, { encoding: 'utf8', signal: context.signal });
+    const checked = resolveToolPath(context, input.path, 'write');
+    await writeFile(checked.absolute, input.content, { encoding: 'utf8', signal: context.signal });
     return {
-      content: `Arquivo "${toWorkspacePath(context.workspaceDir, checked)}" ${existing ? 'substituído' : 'criado'} (${Buffer.byteLength(input.content)} bytes).`,
+      content: `Arquivo "${toToolPath(checked)}" ${existing ? 'substituído' : 'criado'} (${Buffer.byteLength(input.content)} bytes).`,
     };
   },
 };
