@@ -118,6 +118,24 @@ describe('OfficeEditorPage', () => {
     expect(body.items.filter((item) => item.agentId === 'a1')).toHaveLength(1);
   });
 
+  it('gives a colour to the pieces that can take one (Phase 23)', async () => {
+    const view = render();
+    await screen.findByRole('list', { name: 'Áreas' });
+    const pieces = within(screen.getByRole('list', { name: 'Móveis' }));
+    fireEvent.click(pieces.getAllByRole('button', { name: /^Mesa de trabalho/ })[0]!);
+    expect(props().queryByRole('combobox', { name: 'Cor' })).toBeNull();
+    fireEvent.click(pieces.getAllByRole('button', { name: /^Banqueta/ })[0]!);
+    fireEvent.change(props().getByRole('combobox', { name: 'Cor' }), {
+      target: { value: 'teal' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(view.writes()).toHaveLength(1));
+    const body = view.writes()[0]?.body as OfficeLayoutInput;
+    expect(body.items.filter((item) => item.color === 'teal')).toMatchObject([
+      { kind: 'bar_stool' },
+    ]);
+  });
+
   it('applies a ready-made layout and goes back to the automatic one on request', async () => {
     const view = render({ 'DELETE /api/office/layout': () => new Response(null, { status: 204 }) });
     await screen.findByRole('list', { name: 'Áreas' });

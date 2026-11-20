@@ -39,7 +39,7 @@ const thing = (
   y: number,
   facing: Side = 's',
   label: string | null = null,
-): Omit<OfficeItem, 'id'> => ({ kind, x, y, facing, agentId: null, label });
+): Omit<OfficeItem, 'id'> => ({ kind, x, y, facing, agentId: null, label, color: 'default' });
 
 const MAX_DESKS_PER_ROW = 8;
 
@@ -86,10 +86,16 @@ function reception(plants: boolean): Block {
     door: 3,
     items: [
       thing('entrance', 3, 4),
+      // The desk of the reception, a chair behind it, and a corner to wait (Phase 26).
       thing('counter', 1, 1, 's'),
       thing('counter', 2, 1, 's'),
+      thing('chair', 1, 0, 's'),
+      thing('chair', 2, 0, 's'),
       thing('mural', 4, 0, 's', 'Boas ideias!'),
-      ...(plants ? [thing('plant_large', 0, 0), thing('plant', 6, 4)] : []),
+      thing('armchair', 6, 2, 'w'),
+      thing('coffee_table', 5, 2),
+      thing('armchair', 6, 3, 'w'),
+      ...(plants ? [thing('plant_large', 0, 0), thing('plant', 6, 4), thing('plant', 0, 4)] : []),
     ],
   };
 }
@@ -104,13 +110,18 @@ function pantry(plants: boolean): Block {
     projectId: null,
     door: 3,
     items: [
+      thing('fridge', 0, 0),
       thing('counter', 1, 0),
       thing('coffee_machine', 2, 0),
       thing('counter', 3, 0),
-      thing('counter', 4, 0),
+      thing('vending_machine', 4, 0),
       thing('water_cooler', 6, 0),
+      // Stools at the counter, as in a pantry with a bar (Phase 23).
+      thing('bar_stool', 1, 1),
+      thing('bar_stool', 2, 1),
+      thing('bar_stool', 3, 1),
       thing('coffee_table', 5, 2),
-      ...(plants ? [thing('plant', 0, 0)] : []),
+      ...(plants ? [thing('plant', 6, 4), thing('plant_large', 0, 4)] : []),
     ],
   };
 }
@@ -126,10 +137,19 @@ function meeting(): Block {
     door: 0,
     items: [
       thing('whiteboard', 3, 0),
+      thing('wall_tv', 1, 0),
       thing('meeting_table', 2, 2),
+      // Chairs all around the table (Phase 26).
       thing('chair', 2, 1, 's'),
+      thing('chair', 3, 1, 's'),
       thing('chair', 4, 1, 's'),
+      thing('chair', 2, 3, 'n'),
+      thing('chair', 3, 3, 'n'),
+      thing('chair', 4, 3, 'n'),
+      thing('chair', 1, 2, 'e'),
+      thing('chair', 5, 2, 'w'),
       thing('plant', 6, 0),
+      thing('plant', 6, 4),
     ],
   };
 }
@@ -144,11 +164,16 @@ function lounge(plants: boolean): Block {
     projectId: null,
     door: 0,
     items: [
+      // Two sofas around a low table, facing the TV; shelves on the back wall (Phase 26).
       thing('rug', 2, 1),
-      thing('sofa', 2, 0),
-      thing('tv', 5, 1, 'w'),
       thing('bookshelf', 0, 0),
-      thing('bean_bag', 4, 3),
+      thing('bookshelf', 1, 0),
+      thing('sofa', 1, 1, 'e'),
+      thing('coffee_table', 3, 1),
+      thing('sofa', 2, 3, 'n'),
+      thing('tv', 5, 2, 'w'),
+      thing('bean_bag', 4, 1),
+      thing('floor_lamp', 5, 4),
       ...(plants ? [thing('plant_large', 5, 0)] : []),
     ],
   };
@@ -220,5 +245,28 @@ export function buildPresetLayout(
     width = Math.max(width, x);
   }
   const height = Math.max(OFFICE_LIMITS.grid.min, Math.min(max, y + rowHeight + gap));
-  return { width: Math.min(max, width), height, surroundings: 'building', areas, items };
+  const finalWidth = Math.min(max, width);
+  if (shape.plants) {
+    // Plants along the front and right edges of the corridor, so the open
+    // floor is not left bare (Phase 26); never inside a room, never two together.
+    const inArea = (tx: number, ty: number) =>
+      areas.some(
+        (area) =>
+          tx >= area.x && tx < area.x + area.width && ty >= area.y && ty < area.y + area.height,
+      );
+    const taken = new Set(items.map((item) => `${item.x},${item.y}`));
+    const spots: [number, number][] = [];
+    for (let tx = 1; tx < finalWidth - 1; tx += 4) spots.push([tx, height - 1]);
+    for (let ty = 1; ty < height - 1; ty += 4) spots.push([finalWidth - 1, ty]);
+    spots.push([finalWidth - 1, height - 1]);
+    for (const [tx, ty] of spots) {
+      if (inArea(tx, ty) || taken.has(`${tx},${ty}`)) continue;
+      taken.add(`${tx},${ty}`);
+      items.push({
+        ...thing(tx % 8 === 1 ? 'plant_large' : 'plant', tx, ty),
+        id: `preset-item-${items.length}`,
+      });
+    }
+  }
+  return { width: finalWidth, height, surroundings: 'building', areas, items };
 }

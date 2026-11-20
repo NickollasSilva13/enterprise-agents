@@ -17,6 +17,18 @@ const occupant = (overrides: Partial<OfficeAgent> & { id: string; name: string }
   ...overrides,
 });
 
+/** A run in progress, with the facts the card shows (Phase 29, D4). */
+const run = (overrides: Partial<NonNullable<OfficeAgent['currentRun']>> & { id: string }) => ({
+  conversationId: null,
+  status: 'running' as const,
+  prompt: null,
+  startedAt: null,
+  steps: 0,
+  maxSteps: 20,
+  task: null,
+  ...overrides,
+});
+
 const projects = [
   { id: 'p1', name: 'Atendimento', description: 'Responde clientes' },
   { id: 'p2', name: 'Arquivo', description: '' },
@@ -43,7 +55,7 @@ const office = officeWith([
     id: 'a5',
     name: 'Fila',
     state: 'working',
-    currentRun: { id: 'r2', conversationId: null, status: 'queued', prompt: null },
+    currentRun: run({ id: 'r2', status: 'queued' }),
   }),
   occupant({ id: 'a4', name: 'Leitor', state: 'failed', lastError: 'O provedor não respondeu.' }),
   occupant({ id: 'a3', name: 'Rascunho', state: 'inactive', projectId: null }),
@@ -52,48 +64,177 @@ const office = officeWith([
     id: 'a1',
     name: 'Triagem',
     state: 'working',
-    currentRun: { id: 'r1', conversationId: 'c1', status: 'running', prompt: 'Pedido 42' },
+    currentRun: run({
+      id: 'r1',
+      conversationId: 'c1',
+      prompt: 'Pedido 42',
+      startedAt: new Date(Date.now() - 125_000).toISOString(),
+      steps: 4,
+    }),
   }),
 ]);
 
 const panel = () => within(screen.getByRole('region', { name: /^Agentes no escritório/ }));
 const entry = (id: string) => document.querySelector(`[data-agent="${id}"]`);
 
-const render = (data: Office = office) =>
-  renderApp('/escritorio', { '/api/dashboard/summary': emptySummary, '/api/office': data });
+const render = (data: Office = office, extra: Record<string, unknown> = {}) =>
+  renderApp('/escritorio', {
+    '/api/dashboard/summary': emptySummary,
+    '/api/office': data,
+    '/api/activity': { entries: [] },
+    ...extra,
+  });
 
 describe('OfficePage', () => {
   it('lists every agent with its state, where it is and what it is doing (RF-07, RF-08)', async () => {
     render();
     await screen.findByRole('region', { name: 'Agentes no escritório (5)' });
-    expect(
-      panel()
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual([
-      'CalmoOciosoNa mesa, em Sem projeto',
-      'FilaTrabalhandoNa mesa, em AtendimentoNa fila, já começo…',
-      'LeitorCom falhaNa mesa, em AtendimentoO provedor não respondeu.',
-      'RascunhoInativoFora do escritório',
-      'RespostasAguardando vocêNa mesa, em AtendimentoPreciso da sua aprovação',
-      'TriagemTrabalhandoNa mesa, em AtendimentoRespondendo: “Pedido 42”',
+    // Who needs the user first, then who failed, who works, who rests, who is off (Phase 29, D2).
+    const cards = panel()
+      .getAllByRole('article')
+      .map((card) => [
+        card.querySelector('h3')?.textContent,
+        [...card.querySelectorAll('p')].map((line) => line.textContent),
+      ]);
+    expect(cards).toEqual([
+      ['Respostas', ['Na mesa, em Atendimento', 'Preciso da sua aprovação']],
+      ['Leitor', ['Na mesa, em Atendimento', 'O provedor não respondeu.']],
+      ['Fila', ['Na mesa, em Atendimento', 'Na fila, já começo…', 'Na fila']],
+      [
+        'Triagem',
+        ['Na mesa, em Atendimento', 'Respondendo: “Pedido 42”', 'passo 4 de até 20 · 2 min 05 s'],
+      ],
+      ['Calmo', ['Na mesa, em Sem projeto', 'Sem tarefa no momento.']],
+      ['Rascunho', ['Fora do escritório', 'Sem tarefa no momento.']],
     ]);
+    // The state is said in words on each card.
+    expect(entry('a2')?.textContent).toContain('RespostasAguardando você');
+    expect(entry('a3')?.textContent).toContain('RascunhoInativo');
+  });
+
+  it('lights the card of an agent picked in the scene, and keeps the conversation on the card (D3)', async () => {
+    render();
+    await screen.findByRole('region', { name: /^Agentes no escritório/ });
+    const card = () => entry('a1')?.querySelector('article');
+    expect(card()?.className).not.toContain('border-glow');
+    const sitter = document.querySelector('[data-sitter="a1"]');
+    if (!sitter) throw new Error('Triagem is not seated in the scene');
+    fireEvent.click(sitter);
+    // Picking does not leave the office: the card lights up instead.
+    expect(screen.getByRole('heading', { name: 'Escritório', level: 1 })).toBeTruthy();
+    expect(card()?.className).toContain('border-glow');
+    expect(entry('a1')?.querySelector('a')?.getAttribute('aria-current')).toBe('true');
+  });
+
+  it('tells the recent activity in sentences, each leading to where it happened (D5)', async () => {
+    render(office, {
+      '/api/activity': {
+        entries: [
+          {
+            kind: 'failure',
+            id: 'r9',
+            at: '2026-11-19T12:05:00.000Z',
+            runId: 'r9',
+            agentName: 'Leitor',
+            taskTitle: 'Planilha',
+          },
+          {
+            kind: 'approval',
+            id: 'ap1',
+            at: '2026-11-19T12:04:00.000Z',
+            agentName: 'Respostas',
+            toolTitle: 'Escrever arquivo',
+            status: 'pending',
+          },
+          {
+            kind: 'delivery',
+            id: 'e3',
+            at: '2026-11-19T12:03:00.000Z',
+            taskId: 't3',
+            title: 'Página de preços',
+            fromArea: 'Site',
+            toArea: 'Vendas',
+          },
+          {
+            kind: 'scheduled',
+            id: 'e2',
+            at: '2026-11-19T12:02:00.000Z',
+            taskId: 't2',
+            title: 'Fechamento',
+            areaName: 'Vendas',
+          },
+          {
+            kind: 'task_done',
+            id: 'e1',
+            at: '2026-11-19T12:01:00.000Z',
+            taskId: 't1',
+            title: 'Relatório',
+            areaName: 'Vendas',
+            agentName: 'Triagem',
+          },
+        ],
+      },
+    });
+    // The feed is a query of its own, answered after the office: it may take longer.
+    const feed = within(
+      await screen.findByRole('list', { name: 'Atividade recente' }, { timeout: 3000 }),
+    );
+    expect(
+      feed.getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['Leitor falhou em “Planilha”', '/logs/r9'],
+      ['Respostas pede para usar “Escrever arquivo”', '/aprovacoes'],
+      ['Site entregou “Página de preços” a Vendas', '/tarefas/t3'],
+      ['Um agendamento criou “Fechamento” em Vendas', '/tarefas/t2'],
+      ['Triagem concluiu “Relatório” em Vendas', '/tarefas/t1'],
+    ]);
+  });
+
+  it('says what the activity will show while there is none', async () => {
+    render();
+    expect(
+      await screen.findByText(/Tarefas concluídas, entregas entre áreas/, {}, { timeout: 3000 }),
+    ).toBeTruthy();
+  });
+
+  it('offers the next things to do, off with the reason when there is no area (D6)', async () => {
+    const view = render();
+    const quick = within(
+      await screen.findByRole('region', { name: 'Ações rápidas' }, { timeout: 3000 }),
+    );
+    expect(quick.getByRole('link', { name: /Criar tarefa/ }).getAttribute('href')).toBe(
+      '/tarefas?nova=1',
+    );
+    expect(quick.getByRole('link', { name: /Novo agente/ }).getAttribute('href')).toBe(
+      '/agentes/novo',
+    );
+    expect(quick.getByRole('link', { name: /Agendar tarefa/ }).getAttribute('href')).toBe(
+      '/tarefas/agendamentos?novo=1',
+    );
+    view.unmount();
+
+    render({ ...officeWith([]), projects: [] });
+    const off = within(await screen.findByRole('region', { name: 'Ações rápidas' }));
+    const create = off.getByRole('link', { name: /Criar tarefa/ });
+    expect(create.getAttribute('aria-disabled')).toBe('true');
+    expect(create.textContent).toContain('Crie uma área primeiro');
+    expect(off.getByRole('link', { name: /Novo agente/ }).getAttribute('aria-disabled')).toBeNull();
   });
 
   it('opens the conversation of an agent from the list', async () => {
     render();
     await screen.findByRole('region', { name: /^Agentes no escritório/ });
-    const links = [...document.querySelectorAll('[data-agent] > a')].map((link) =>
+    const links = [...document.querySelectorAll('[data-agent] article a')].map((link) =>
       link.getAttribute('href'),
     );
     // An agent in the middle of a run opens that conversation; the others, a new one.
     expect(links).toEqual([
-      '/agentes/a6/conversa',
-      '/agentes/a5/conversa',
-      '/agentes/a4/conversa',
-      '/agentes/a3/conversa',
       '/agentes/a2/conversa',
+      '/agentes/a4/conversa',
+      '/agentes/a5/conversa',
       '/agentes/a1/conversa/c1',
+      '/agentes/a6/conversa',
+      '/agentes/a3/conversa',
     ]);
     expect(
       panel()
@@ -106,8 +247,9 @@ describe('OfficePage', () => {
     render();
     await screen.findByRole('region', { name: /^Agentes no escritório/ });
     const sitter = (id: string) => document.querySelector(`[data-sitter="${id}"]`);
-    expect(sitter('a1')?.querySelector('.desk-type-a')).not.toBeNull();
-    expect(sitter('a2')?.querySelector('.desk-wave')).not.toBeNull();
+    // Phase 22: typing and waving are frames of the character itself.
+    expect(sitter('a1')?.querySelector('.pixel-type-1')).not.toBeNull();
+    expect(sitter('a2')?.querySelector('.pixel-wave-1')).not.toBeNull();
     expect(sitter('a4')?.querySelector('.desk-shake')).not.toBeNull();
     expect(sitter('a6')?.querySelector('.desk-breathe')).not.toBeNull();
     expect(sitter('a3')).toBeNull();
@@ -245,6 +387,7 @@ describe('OfficePage', () => {
   it('shows an error when the office cannot be loaded', async () => {
     renderApp('/escritorio', {
       '/api/dashboard/summary': emptySummary,
+      '/api/activity': { entries: [] },
       '/api/office': () => json(500, { code: 'internal_error', message: 'Erro interno.' }),
     });
     const alert = await screen.findByRole('alert');
@@ -256,14 +399,14 @@ describe('OfficePage', () => {
       id: 'a1',
       name: 'Coordenador',
       state: 'working',
-      currentRun: { id: 'r1', conversationId: 'c1', status: 'running', prompt: 'Relatório' },
+      currentRun: run({ id: 'r1', conversationId: 'c1', prompt: 'Relatório' }),
       delegatingTo: ['a2'],
     }),
     occupant({
       id: 'a2',
       name: 'Revisor',
       state: 'working',
-      currentRun: { id: 'r2', conversationId: 'c2', status: 'running', prompt: 'Revise' },
+      currentRun: run({ id: 'r2', conversationId: 'c2', prompt: 'Revise' }),
     }),
   ];
 
@@ -291,17 +434,18 @@ describe('OfficePage', () => {
   it('lets a waiting agent be answered from the list (RF-09)', async () => {
     const view = renderApp('/escritorio', {
       '/api/dashboard/summary': emptySummary,
+      '/api/activity': { entries: [] },
       '/api/office': officeWith([
         occupant({
           id: 'a1',
           name: 'Escritor',
           state: 'waiting',
-          currentRun: {
+          currentRun: run({
             id: 'r1',
             conversationId: 'c1',
             status: 'waiting_approval',
             prompt: 'Salve',
-          },
+          }),
           pendingApproval: { id: 'ap1', toolTitle: 'Escrever arquivo' },
         }),
       ]),
@@ -332,7 +476,7 @@ describe('OfficePage', () => {
     expect(panel().getByText('Posso usar “Escrever arquivo”?')).toBeTruthy();
     // The bell counts what waits for the user.
     expect(await screen.findByRole('link', { name: 'Aprovações pendentes: 1' })).toBeTruthy();
-    // The button is not inside the link that opens the conversation.
+    // The button is not inside the card's link, which opens the conversation.
     const button = panel().getByRole('button', { name: 'Decidir o pedido de Escritor' });
     expect(button.closest('a')).toBeNull();
 

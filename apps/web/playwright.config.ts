@@ -6,6 +6,7 @@ import {
   EMPTY_PORT,
   FAKE_PROVIDER_KEY,
   FAKE_PROVIDER_PORT,
+  FIRST_USE_PORT,
   SEEDED_PORT,
   TOOLS_PORT,
 } from './e2e/servers';
@@ -49,6 +50,7 @@ export default defineConfig({
     server('seeded', SEEDED_PORT, true),
     server('crud', CRUD_PORT, false),
     server('tools', TOOLS_PORT, false),
+    server('first-use', FIRST_USE_PORT, false),
     {
       command: 'node e2e/fake-provider.mjs',
       url: `http://127.0.0.1:${FAKE_PROVIDER_PORT}/api/version`,

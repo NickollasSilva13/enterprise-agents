@@ -19,6 +19,7 @@ const VOLUME = {
   conversations: 2_000,
   messagesPerConversation: 20,
   bigRunSteps: 400,
+  tasks: 20_000,
 } as const;
 
 const SAMPLES = 40;
@@ -137,6 +138,47 @@ async function main(): Promise<void> {
         if (index === VOLUME.runs - 1) bigRunId = id;
       }
     })();
+    // Tasks for the global search (Phase 21), spread over the areas; the done
+    // ones entered their area's done stage over the last two weeks, for the
+    // indicators (Phase 30).
+    const insertStage = sqlite.prepare(
+      'insert into workflow_stages (id, project_id, position, name, kind) values (?, ?, ?, ?, ?)',
+    );
+    const insertTask = sqlite.prepare(
+      'insert into tasks (id, project_id, title, stage_id, state) values (?, ?, ?, ?, ?)',
+    );
+    const insertEvent = sqlite.prepare(
+      "insert into task_events (id, task_id, kind, actor, to_stage, created_at) values (?, ?, 'moved', 'agent', 'Pronto', ?)",
+    );
+    sqlite.transaction(() => {
+      const stageIds = projectIds.map((projectId) => {
+        const queue = newId();
+        const done = newId();
+        insertStage.run(queue, projectId, 0, 'Fila', 'human');
+        insertStage.run(done, projectId, 1, 'Pronto', 'done');
+        return { queue, done };
+      });
+      const twoWeeks = 14 * 24 * 60 * 60 * 1000;
+      for (let index = 0; index < VOLUME.tasks; index += 1) {
+        const area = index % projectIds.length;
+        const open = index % 4 === 0;
+        const taskId = newId();
+        const stages = stageIds[area];
+        insertTask.run(
+          taskId,
+          projectIds[area],
+          `Relatório ${index} de vendas`,
+          open ? stages?.queue : stages?.done,
+          open ? 'open' : 'done',
+        );
+        if (!open)
+          insertEvent.run(
+            newId(),
+            taskId,
+            new Date(Date.now() - ((index * 7919) % twoWeeks)).toISOString(),
+          );
+      }
+    })();
     const count = (table: string) =>
       (sqlite.prepare(`select count(*) as n from ${table}`).get() as { n: number }).n;
     console.log(
@@ -175,6 +217,9 @@ async function main(): Promise<void> {
     await measure('Conversa com 20 mensagens', `/api/conversations/${sampleConversationId}`);
     await measure('Conversas de um agente', `/api/agents/${agentIds[0]}/conversations`);
     await measure('Aprovações', '/api/approvals');
+    await measure(`Busca em ${VOLUME.tasks} tarefas`, '/api/search?q=relatorio');
+    await measure(`Indicadores sobre ${VOLUME.tasks} tarefas`, '/api/indicators');
+    await measure('Atividade recente', '/api/activity');
 
     // ---- A long streamed answer --------------------------------------------
     const post = async (payload: object) => {

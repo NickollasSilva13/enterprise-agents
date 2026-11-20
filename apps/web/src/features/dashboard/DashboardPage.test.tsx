@@ -56,15 +56,15 @@ const busySummary: DashboardSummary = {
 
 describe('DashboardPage', () => {
   it('shows a loading state, then zeros and guidance on an empty installation', async () => {
-    renderApp('/', {
+    renderApp('/relatorios', {
       '/api/dashboard/summary': {
         ...emptySummary,
         alerts: [{ kind: 'no_provider', severity: 'info', count: 0 }],
       },
     });
-    expect(screen.getByText('Carregando o painel…')).toBeTruthy();
+    expect(screen.getByText('Carregando os relatórios…')).toBeTruthy();
 
-    expect(await screen.findByRole('heading', { name: 'Painel', level: 1 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Relatórios', level: 1 })).toBeTruthy();
     await screen.findByRole('group', { name: 'Agentes' });
     expect(figure('Agentes', 'Agentes cadastrados')).toBe('0');
     expect(figure('Agentes', 'Com falha')).toBe('0');
@@ -73,11 +73,11 @@ describe('DashboardPage', () => {
 
     expect(screen.getByText('Nenhuma execução ainda.')).toBeTruthy();
     expect(screen.getByText(/Nenhum provedor de modelos conectado/)).toBeTruthy();
-    expect(screen.queryByText('Carregando o painel…')).toBeNull();
+    expect(screen.queryByText('Carregando os relatórios…')).toBeNull();
   });
 
   it('shows the figures, recent runs and alerts it receives', async () => {
-    renderApp('/', { '/api/dashboard/summary': busySummary });
+    renderApp('/relatorios', { '/api/dashboard/summary': busySummary });
     await screen.findByRole('group', { name: 'Agentes' });
 
     expect(figure('Agentes', 'Agentes cadastrados')).toBe('6');
@@ -106,12 +106,12 @@ describe('DashboardPage', () => {
   });
 
   it('says so when nothing needs attention', async () => {
-    renderApp('/', { '/api/dashboard/summary': emptySummary });
+    renderApp('/relatorios', { '/api/dashboard/summary': emptySummary });
     expect(await screen.findByText('Nada pede a sua atenção agora.')).toBeTruthy();
   });
 
   it('says so when no agent has done anything yet', async () => {
-    renderApp('/', { '/api/dashboard/summary': emptySummary });
+    renderApp('/relatorios', { '/api/dashboard/summary': emptySummary });
     const panel = (await screen.findByRole('heading', { name: 'Atividade dos agentes' })).closest(
       'section',
     );
@@ -120,7 +120,7 @@ describe('DashboardPage', () => {
   });
 
   it('tells what the agents did in plain language, linking to each run (RF-04)', async () => {
-    renderApp('/', {
+    renderApp('/relatorios', {
       '/api/dashboard/summary': {
         ...emptySummary,
         activity: [
@@ -173,7 +173,7 @@ describe('DashboardPage', () => {
 
   it('shows the error and recovers when the user retries', async () => {
     let attempts = 0;
-    renderApp('/', {
+    renderApp('/relatorios', {
       '/api/dashboard/summary': () => {
         attempts += 1;
         return attempts === 1
@@ -183,7 +183,7 @@ describe('DashboardPage', () => {
     });
 
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('Não foi possível carregar o painel.');
+    expect(alert.textContent).toContain('Não foi possível carregar os relatórios.');
     expect(alert.textContent).toContain('Erro interno do servidor.');
     expect(screen.getByText('Sem conexão com o servidor')).toBeTruthy();
 

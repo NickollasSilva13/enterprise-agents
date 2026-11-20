@@ -27,6 +27,8 @@ import {
   useTaskAction,
 } from '../../lib/task-queries';
 import { PriorityBadge, TaskStatus } from './TaskBadges';
+import { BACK_LINK, LINK } from '../../components/TextLink';
+import { FormError, Notice } from '../../components/Notice';
 
 function who(event: TaskEvent): string {
   if (event.actor === 'user') return 'Você';
@@ -76,10 +78,7 @@ function History({ events }: { events: readonly TaskEvent[] }) {
             {event.runId && (
               <>
                 {' · '}
-                <Link
-                  to={`/logs/${event.runId}`}
-                  className="text-info underline underline-offset-4"
-                >
+                <Link to={`/logs/${event.runId}`} className={LINK}>
                   Execução
                 </Link>
               </>
@@ -157,11 +156,7 @@ function MoveForm({ detail }: { detail: TaskDetail }) {
         onChange={(event) => setNote(event.target.value)}
         hint="Opcional. Ao devolver uma tarefa, diga o que precisa mudar."
       />
-      {move.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(move.error)}
-        </p>
-      )}
+      {move.error && <FormError>{errorMessage(move.error)}</FormError>}
       <Button variant="primary" type="submit" disabled={move.isPending}>
         {move.isPending ? 'Movendo…' : 'Mover'}
       </Button>
@@ -186,11 +181,7 @@ function CommentForm({ taskId }: { taskId: string }) {
         onChange={(event) => setText(event.target.value)}
         hint="O próximo agente que trabalhar na tarefa lê os comentários."
       />
-      {comment.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(comment.error)}
-        </p>
-      )}
+      {comment.error && <FormError>{errorMessage(comment.error)}</FormError>}
       <Button type="submit" disabled={comment.isPending || text.trim() === ''}>
         Comentar
       </Button>
@@ -222,12 +213,9 @@ function Situation({ detail }: { detail: TaskDetail }) {
         </dd>
       </dl>
       {task.attention && (
-        <p
-          role="status"
-          className="mx-4 mb-3 rounded-md border border-wait/60 bg-wait/10 p-3 text-sm"
-        >
+        <Notice tone="wait" role="status" className="mx-4 mb-3">
           {task.attention}
-        </p>
+        </Notice>
       )}
       {task.state === 'pending' && <RequestDecision detail={detail} />}
       {task.state === 'open' && (
@@ -249,11 +237,7 @@ function Situation({ detail }: { detail: TaskDetail }) {
           <Button onClick={() => setCancelling(true)}>Cancelar tarefa</Button>
         </div>
       )}
-      {action.error && (
-        <p role="alert" className="px-4 pb-3 text-sm text-fail">
-          {errorMessage(action.error)}
-        </p>
-      )}
+      {action.error && <FormError className="px-4 pb-3">{errorMessage(action.error)}</FormError>}
       {cancelling && (
         <ConfirmDialog
           title={`Cancelar "${task.title}"?`}
@@ -287,9 +271,9 @@ function RequestDecision({ detail }: { detail: TaskDetail }) {
   const from = detail.parent?.areaName ?? 'outra área';
   return (
     <div className="space-y-3 px-4 pb-3">
-      <p role="status" className="rounded-md border border-wait/60 bg-wait/10 p-3 text-sm">
+      <Notice tone="wait" role="status">
         Pedido da área {from}. Ele só entra no quadro desta área depois da sua aprovação.
-      </p>
+      </Notice>
       <TextAreaField
         label="Motivo, se recusar"
         rows={2}
@@ -323,11 +307,7 @@ function RequestDecision({ detail }: { detail: TaskDetail }) {
           Recusar
         </Button>
       </div>
-      {decide.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(decide.error)}
-        </p>
-      )}
+      {decide.error && <FormError>{errorMessage(decide.error)}</FormError>}
     </div>
   );
 }
@@ -342,7 +322,7 @@ const LINKED_STATE: Record<LinkedTask['state'], string> = {
 function LinkedTaskItem({ task }: { task: LinkedTask }) {
   return (
     <li className="px-4 py-3 text-sm">
-      <Link to={`/tarefas/${encodeURIComponent(task.id)}`} className="font-semibold text-info">
+      <Link to={`/tarefas/${encodeURIComponent(task.id)}`} className={`font-semibold ${LINK}`}>
         {task.title}
       </Link>
       <p className="text-dim">
@@ -427,11 +407,7 @@ function RequestForm({ detail }: { detail: TaskDetail }) {
         onChange={(event) => setFiles(event.target.value)}
         hint={`Opcional. Um caminho da pasta da área por linha (até ${REQUEST_LIMITS.paths}); uma cópia vai com o pedido.`}
       />
-      {send.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(send.error)}
-        </p>
-      )}
+      {send.error && <FormError>{errorMessage(send.error)}</FormError>}
       <Button variant="primary" type="submit" disabled={send.isPending || title.trim() === ''}>
         {send.isPending ? 'Enviando…' : 'Enviar pedido'}
       </Button>
@@ -458,7 +434,7 @@ function Requests({ detail }: { detail: TaskDetail }) {
         detail.task.state === 'open' && (
           <p className="border-t border-line px-4 py-3 text-sm text-dim">
             Esta área ainda não pode pedir trabalho a nenhuma outra.{' '}
-            <Link to="/tarefas/pedidos" className="text-info underline underline-offset-4">
+            <Link to="/tarefas/pedidos" className={LINK}>
               Criar uma regra
             </Link>
           </p>
@@ -487,10 +463,7 @@ export function TaskPage() {
 
   return (
     <>
-      <Link
-        to={`/tarefas?area=${encodeURIComponent(task.areaId)}`}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-info underline underline-offset-4"
-      >
+      <Link to={`/tarefas?area=${encodeURIComponent(task.areaId)}`} className={BACK_LINK}>
         <ArrowLeft className="size-4" aria-hidden />
         Quadro de {task.areaName}
       </Link>
@@ -531,10 +504,7 @@ export function TaskPage() {
             <Panel title="Agendamento">
               <p className="px-4 py-3 text-sm">
                 Criada pelo agendamento{' '}
-                <Link
-                  to="/tarefas/agendamentos"
-                  className="font-semibold text-info underline underline-offset-4"
-                >
+                <Link to="/tarefas/agendamentos" className={`font-semibold ${LINK}`}>
                   {data.schedule.title}
                 </Link>
                 .

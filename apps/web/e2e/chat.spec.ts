@@ -10,6 +10,13 @@ import { CRUD_URL, FAKE_PROVIDER_URL } from './servers';
 
 test.describe.configure({ mode: 'serial' });
 
+// The run is watched from the 3D office too: drawn in software (SwiftShader),
+// two of these pages at once starve the server and the chat of the processor,
+// so the graphics card is switched on, as in office.spec.ts and tools.spec.ts.
+test.use({
+  launchOptions: { args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] },
+});
+
 const messages = (page: Page) => page.getByRole('list', { name: 'Mensagens' });
 const composer = (page: Page) => page.getByRole('textbox', { name: 'Mensagem' });
 
@@ -135,8 +142,8 @@ test('an agent answers in a chat, can be interrupted, and leaves a trail', async
   await expect(runRows).toHaveCount(1);
   await expectNoHorizontalScroll(page);
 
-  // The dashboard tells the same story (RF-03, RF-04).
-  await navigateTo(page, 'Painel');
+  // The reports tell the same story (RF-03, RF-04).
+  await navigateTo(page, 'Relatórios');
   const feed = page.getByRole('list', { name: 'Atividade dos agentes' }).getByRole('listitem');
   await expect(feed.filter({ hasText: `${agentName} foi interrompido por você` })).toHaveCount(1);
   await expect(feed.filter({ hasText: `${agentName} concluiu a execução` })).toHaveCount(3);

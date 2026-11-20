@@ -47,13 +47,16 @@ describe('agent list', () => {
     expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
-  it('shows each agent with its project, model and state', async () => {
+  it('shows each agent as a card with its project, model and state (Phase 31, D3)', async () => {
     renderApp('/agentes', api());
     const [first, second, third] = await rows();
+    expect(first?.querySelector('[data-agent-card]')).toBeTruthy();
     expect(first?.textContent).toContain('Leitor');
-    expect(first?.textContent).toContain('Pesquisa, Llama 3');
+    expect(first?.textContent).toContain('Pesquisa · Llama 3');
     expect(first?.textContent).toContain('Trabalhando');
-    expect(second?.textContent).toContain('Sem projeto, sem modelo');
+    expect(second?.textContent).toContain('Sem projeto · sem modelo de IA');
+    // What the user must fix is said in words, not only in a colour.
+    expect(second?.textContent).toContain('escolha um para ele poder trabalhar');
     expect(second?.textContent).toContain('Inativo');
     expect(third?.textContent).toContain('Com falha');
 

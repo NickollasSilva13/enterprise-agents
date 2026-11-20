@@ -17,6 +17,9 @@ import {
   useSetToolEnabled,
   useTools,
 } from '../../lib/tool-queries';
+import { LINK } from '../../components/TextLink';
+import { FormError, Notice } from '../../components/Notice';
+import { Tip } from '../../components/Tip';
 
 const PERMISSIONS: { value: ToolPermission; label: string; hint: string }[] = [
   { value: 'deny', label: 'Bloqueada', hint: 'O agente não pode usar.' },
@@ -134,7 +137,7 @@ function PermissionRow({
                 unavailable ? 'Ferramentas de risco alto sempre pedem aprovação.' : option.hint
               }
               className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm ${
-                checked ? 'border-info bg-sheet-raised text-chalk' : 'border-line text-dim'
+                checked ? 'border-glow bg-sheet-raised text-chalk' : 'border-line text-dim'
               } ${unavailable ? 'cursor-not-allowed opacity-50' : 'hover:text-chalk'}`}
             >
               <input
@@ -181,18 +184,21 @@ function AgentPermissions({ tools, saved }: { tools: readonly ToolInfo[]; saved:
   return (
     <>
       {saved.modelSupportsTools === false && (
-        <p role="status" className="border-b border-line px-4 py-3 text-sm text-wait">
+        <Notice tone="wait" role="status" className="m-4">
           O modelo deste agente não aceita ferramentas: as permissões ficam guardadas, mas só passam
           a valer com um modelo que aceite.{' '}
-          <Link to={`/agentes/${saved.agentId}`} className="text-info underline underline-offset-4">
+          <Link to={`/agentes/${saved.agentId}`} className={LINK}>
             Trocar o modelo
           </Link>
-        </p>
+        </Notice>
       )}
       {saved.modelSupportsTools === null && (
-        <p role="status" className="border-b border-line px-4 py-3 text-sm text-wait">
-          Este agente ainda não tem um modelo.
-        </p>
+        <Notice tone="wait" role="status" className="m-4">
+          Este agente ainda não tem um modelo.{' '}
+          <Link to={`/agentes/${saved.agentId}`} className={LINK}>
+            Escolher um modelo
+          </Link>
+        </Notice>
       )}
 
       <div className="divide-y divide-line">
@@ -215,11 +221,7 @@ function AgentPermissions({ tools, saved }: { tools: readonly ToolInfo[]; saved:
           </p>
           <p className="break-all font-mono text-xs">{saved.workspacePath}</p>
         </div>
-        {save.error && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(save.error)}
-          </p>
-        )}
+        {save.error && <FormError>{errorMessage(save.error)}</FormError>}
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" onClick={submit} disabled={!dirty || save.isPending}>
             Salvar permissões
@@ -250,6 +252,11 @@ export function ToolsPage() {
         title="Ferramentas"
         description="O que os agentes podem fazer além de conversar. Tudo começa bloqueado: cada agente só usa o que você liberar aqui."
       />
+
+      <Tip id="tools-locked" className="mb-4">
+        Tudo começa bloqueado: um agente só usa a ferramenta que você liberar para ele, e as de
+        risco alto sempre pedem a sua aprovação.
+      </Tip>
 
       {tools.isPending && <LoadingState label="Carregando as ferramentas…" />}
       {tools.error && !tools.data && (

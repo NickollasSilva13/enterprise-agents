@@ -63,16 +63,49 @@ test('a task crosses the flow of an area on its own and waits for the user', asy
   await expect(review.getByText('Esperando você')).toBeVisible();
   await expectNoHorizontalScroll(page);
 
-  // The user reads what happened and finishes it.
-  await review.getByRole('link', { name: /Página de contato/ }).click();
+  // The user finishes it from the board (Phase 31): by dragging the card on a
+  // computer, by its "Mover para…" button on a phone. Either way it asks first.
+  const card = review.getByRole('listitem').filter({ hasText: 'Página de contato' });
+  const done = page.getByRole('region', { name: 'Concluído', exact: true });
+  const moveDialog = page.getByRole('dialog', { name: 'Mover "Página de contato"' });
+  const stage = moveDialog.getByRole('combobox', { name: 'Para a etapa' });
+  if (tag === 'desktop') {
+    // The last columns of a long flow sit past the right edge of the board.
+    await done.scrollIntoViewIfNeeded();
+    await card.dragTo(done);
+  } else {
+    await card.getByRole('button', { name: 'Mover "Página de contato" para outra etapa' }).click();
+    await stage.selectOption({ label: 'Concluído' });
+  }
+  await expect(stage.locator('option:checked')).toHaveText('Concluído');
+  await moveDialog.getByRole('button', { name: 'Mover' }).click();
+  await expect(moveDialog).toHaveCount(0);
+  const finished = done.getByRole('link', { name: /Página de contato/ });
+  await expect(finished).toBeVisible();
+  await expectNoHorizontalScroll(page);
+
+  // The task tells the whole story.
+  await finished.click();
   const history = page.getByRole('list', { name: 'Histórico da tarefa' });
   await expect(history.getByText(/passou de "Testes" para "Sua revisão"/)).toBeVisible();
   await expect(history.getByText('Etapa feita pelo provedor simulado.').first()).toBeVisible();
-  const move = page.getByRole('region', { name: 'Mover' });
-  await move.getByRole('combobox', { name: 'Para a etapa' }).selectOption({ label: 'Concluído' });
-  await move.getByRole('button', { name: 'Mover' }).click();
+  await expect(history.getByText(/passou de "Sua revisão" para "Concluído"/)).toBeVisible();
   await expect(page.getByRole('region', { name: 'Situação' }).getByText('Concluída')).toBeVisible();
   await expectNoHorizontalScroll(page);
+
+  // The indicators count it, from the history (Phase 30). Desktop and mobile share the
+  // server, so today's count is at least this one task.
+  await navigateTo(page, 'Relatórios');
+  const indicator = (name: string) =>
+    page
+      .getByRole('region', { name: 'Indicadores' })
+      .getByRole('region', { name })
+      // The figure itself: the other lines are its change and how it is computed.
+      .locator('p.text-3xl');
+  await expect(indicator('Concluídas hoje')).toHaveText(/^[1-9]\d*$/);
+  await expect(indicator('Concluídas na semana')).toHaveText(/^[1-9]\d*$/);
+  await expect(indicator('Tempo médio por tarefa')).toHaveText(/\d+(,\d)? (ms|s|min)/);
+  await expect(indicator('Execuções sem falha')).toHaveText(/^\d+%$/);
 
   expect(problems).toEqual([]);
 });

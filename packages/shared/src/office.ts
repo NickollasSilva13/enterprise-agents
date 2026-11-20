@@ -121,8 +121,42 @@ export const ITEM_KINDS = [
   'whiteboard',
   'mural',
   'rug',
+  // Phase 23
+  'vending_machine',
+  'fridge',
+  'bar_stool',
+  'wall_tv',
+  'glass_partition',
+  'floor_lamp',
 ] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
+
+/**
+ * Colours a piece of furniture can take (Phase 23, D6): a fixed palette,
+ * never a free colour. "default" is the colour each kind always had.
+ */
+export const ITEM_COLORS = [
+  'default',
+  'orange',
+  'violet',
+  'blue',
+  'teal',
+  'green',
+  'pink',
+  'gray',
+] as const;
+export type ItemColor = (typeof ITEM_COLORS)[number];
+
+export const ITEM_COLOR_LABELS: Record<ItemColor, string> = {
+  default: 'Padrão',
+  orange: 'Laranja',
+  violet: 'Violeta',
+  blue: 'Azul',
+  teal: 'Verde-água',
+  green: 'Verde',
+  pink: 'Rosa',
+  gray: 'Cinza',
+};
 
 export interface ItemKindInfo {
   readonly label: string;
@@ -134,6 +168,8 @@ export interface ItemKindInfo {
   readonly unique?: boolean;
   /** Carries a short text the user writes. */
   readonly hasLabel?: boolean;
+  /** Its colour can be chosen (Phase 23, D6). */
+  readonly colorable?: boolean;
 }
 
 export const ITEM_KIND_INFO: Record<ItemKind, ItemKindInfo> = {
@@ -141,20 +177,26 @@ export const ITEM_KIND_INFO: Record<ItemKind, ItemKindInfo> = {
   entrance: { label: 'Entrada', size: { w: 1, d: 1 }, blocks: false, unique: true },
   plant: { label: 'Planta', size: { w: 1, d: 1 }, blocks: true },
   plant_large: { label: 'Planta grande', size: { w: 1, d: 1 }, blocks: true },
-  sofa: { label: 'Sofá', size: { w: 2, d: 1 }, blocks: true },
-  armchair: { label: 'Poltrona', size: { w: 1, d: 1 }, blocks: true },
+  sofa: { label: 'Sofá', size: { w: 2, d: 1 }, blocks: true, colorable: true },
+  armchair: { label: 'Poltrona', size: { w: 1, d: 1 }, blocks: true, colorable: true },
   coffee_table: { label: 'Mesa de centro', size: { w: 1, d: 1 }, blocks: true },
   meeting_table: { label: 'Mesa de reunião', size: { w: 3, d: 1 }, blocks: true },
-  chair: { label: 'Cadeira', size: { w: 1, d: 1 }, blocks: true },
+  chair: { label: 'Cadeira', size: { w: 1, d: 1 }, blocks: true, colorable: true },
   bookshelf: { label: 'Estante', size: { w: 1, d: 1 }, blocks: true },
-  counter: { label: 'Bancada', size: { w: 1, d: 1 }, blocks: true },
+  counter: { label: 'Bancada', size: { w: 1, d: 1 }, blocks: true, colorable: true },
   coffee_machine: { label: 'Cafeteira', size: { w: 1, d: 1 }, blocks: true },
   water_cooler: { label: 'Bebedouro', size: { w: 1, d: 1 }, blocks: true },
-  bean_bag: { label: 'Pufe', size: { w: 1, d: 1 }, blocks: true },
+  bean_bag: { label: 'Pufe', size: { w: 1, d: 1 }, blocks: true, colorable: true },
   tv: { label: 'TV e videogame', size: { w: 1, d: 1 }, blocks: true },
   whiteboard: { label: 'Quadro branco', size: { w: 1, d: 1 }, blocks: true },
   mural: { label: 'Mural', size: { w: 2, d: 1 }, blocks: true, hasLabel: true },
-  rug: { label: 'Tapete', size: { w: 2, d: 2 }, blocks: false },
+  rug: { label: 'Tapete', size: { w: 2, d: 2 }, blocks: false, colorable: true },
+  vending_machine: { label: 'Máquina de lanches', size: { w: 1, d: 1 }, blocks: true },
+  fridge: { label: 'Geladeira', size: { w: 1, d: 1 }, blocks: true },
+  bar_stool: { label: 'Banqueta', size: { w: 1, d: 1 }, blocks: true, colorable: true },
+  wall_tv: { label: 'TV de parede', size: { w: 1, d: 1 }, blocks: false },
+  glass_partition: { label: 'Divisória de vidro', size: { w: 1, d: 1 }, blocks: true },
+  floor_lamp: { label: 'Luminária', size: { w: 1, d: 1 }, blocks: true },
 };
 
 const coordinate = z.number().int().min(0).max(OFFICE_LIMITS.grid.max);
@@ -197,6 +239,8 @@ const itemFields = {
   facing: z.enum(SIDES),
   /** For a desk: the agent it belongs to; null means free for the room's agents. */
   agentId: id.nullable(),
+  /** Colour of the piece, from a fixed palette (Phase 23); older layouts have none. */
+  color: z.enum(ITEM_COLORS).default('default'),
   /** For a mural: what is written on it. */
   label: z
     .string()
@@ -272,6 +316,7 @@ export function layoutInputOf(layout: OfficeLayout): OfficeLayoutInput {
       facing: item.facing,
       agentId: item.agentId,
       label: item.label,
+      color: item.color,
     })),
   };
 }

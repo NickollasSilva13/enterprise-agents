@@ -15,7 +15,9 @@ test.describe('installation with agents', () => {
     await page.goto(`${SEEDED_URL}/agentes`);
     const rows = page.getByRole('list', { name: 'Agentes' }).getByRole('listitem');
     await expect(rows).toHaveCount(5);
-    await expect(rows.filter({ hasText: 'Resumidor' })).toContainText('Pesquisa, sem modelo');
+    await expect(rows.filter({ hasText: 'Resumidor' })).toContainText(
+      'Pesquisa · sem modelo de IA',
+    );
     await expect(rows.filter({ hasText: 'Triagem' })).toContainText('Ocioso');
 
     await page.getByRole('searchbox', { name: 'Buscar' }).fill('pesquisa');
@@ -25,9 +27,9 @@ test.describe('installation with agents', () => {
     await expectNoHorizontalScroll(page);
   });
 
-  test('the dashboard reflects what is in the database', async ({ page }) => {
+  test('the reports reflect what is in the database', async ({ page }) => {
     const problems = watchForProblems(page);
-    await page.goto(SEEDED_URL);
+    await page.goto(`${SEEDED_URL}/relatorios`);
 
     await expect(figure(page, 'Agentes', 'Agentes cadastrados')).toHaveText('5');
     await expect(figure(page, 'Agentes', 'Ativos')).toHaveText('4');
@@ -82,15 +84,16 @@ test.describe('installation with agents', () => {
       await expect(scene).toContainText(name);
     }
 
-    // The same, in words: every agent, where it is and what it says.
+    // The same, in words: every agent, where it is and what it says, who failed first (Phase 29).
     const people = page.getByRole('region', { name: 'Agentes no escritório (4)' });
     await expect(people.getByRole('listitem')).toHaveText([
-      /^LeitorCom falhaNa mesa, em PesquisaA última execução falhou/,
-      /^RascunhoInativoFora do escritório/,
-      // Idle since the server started: at their desks, until they go for a coffee.
-      /^RespostasOciosoNa mesa, em Atendimento/,
-      /^ResumidorOciosoNa descompressão/,
-      /^TriagemOciosoNa mesa, em Atendimento/,
+      /LeitorCom falhaNa mesa, em PesquisaA última execução falhou/,
+      // Idle since the server started: at their desks, until they go for a coffee two
+      // minutes later. The whole suite takes longer than that, so either place is right.
+      /RespostasOcioso(Na mesa, em Atendimento|Na copa)/,
+      /ResumidorOciosoNa descompressão/,
+      /TriagemOcioso(Na mesa, em Atendimento|Na copa)/,
+      /RascunhoInativoFora do escritório/,
     ]);
     // Clicking an agent opens its conversation.
     await expect(people.getByRole('listitem').first().getByRole('link')).toHaveAttribute(

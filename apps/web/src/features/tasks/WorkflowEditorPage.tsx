@@ -20,6 +20,8 @@ import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useAgents, useProjects } from '../../lib/queries';
 import { useSaveTemplate, useSaveWorkflow, useWorkflow } from '../../lib/task-queries';
 import { STAGE_KIND_LABEL } from './TaskBadges';
+import { BACK_LINK, LINK } from '../../components/TextLink';
+import { FormError, Notice } from '../../components/Notice';
 
 interface StageDraft {
   key: string;
@@ -160,10 +162,10 @@ function Editor({
     <div className="space-y-6">
       <Panel title="Etapas" aside={`${stages.length} de até ${WORKFLOW_LIMITS.stages}`}>
         {areaAgents.length === 0 && (
-          <p className="px-4 pt-3 text-sm text-wait">
+          <Notice tone="wait" className="mx-4 mt-3">
             Esta área ainda não tem agentes. Crie agentes e coloque-os no projeto {areaName} para
             escolher quem trabalha em cada etapa.
-          </p>
+          </Notice>
         )}
         <ol className="divide-y divide-line">
           {stages.map((stage, index) => (
@@ -345,7 +347,7 @@ function Editor({
       </Panel>
 
       {(problems.length > 0 || save.error) && (
-        <div role="alert" className="rounded-md border border-fail/60 bg-fail/10 p-3 text-sm">
+        <Notice tone="fail" role="alert">
           {problems.length > 0 ? (
             <ul className="list-disc pl-5">
               {problems.map((problem) => (
@@ -355,7 +357,7 @@ function Editor({
           ) : (
             errorMessage(save.error)
           )}
-        </div>
+        </Notice>
       )}
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" onClick={submit} disabled={save.isPending}>
@@ -363,7 +365,7 @@ function Editor({
         </Button>
         <Link
           to={`/tarefas?area=${encodeURIComponent(areaId)}`}
-          className="self-center text-sm text-info underline underline-offset-4"
+          className={`self-center text-sm ${LINK}`}
         >
           Voltar sem salvar
         </Link>
@@ -453,12 +455,10 @@ function SaveTemplateDialog({
           rows={3}
         />
         {save.error && !errors.name && !errors.description && !errors.practices && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(save.error)}
-          </p>
+          <FormError>{errorMessage(save.error)}</FormError>
         )}
         <p className="text-sm">
-          <Link to="/tarefas/modelos" className="text-info underline underline-offset-4">
+          <Link to="/tarefas/modelos" className={LINK}>
             Ver os modelos de fluxo
           </Link>
         </p>
@@ -477,10 +477,7 @@ export function WorkflowEditorPage() {
 
   return (
     <>
-      <Link
-        to={`/tarefas?area=${encodeURIComponent(areaId ?? '')}`}
-        className="mb-3 inline-flex items-center gap-1 text-sm text-info underline underline-offset-4"
-      >
+      <Link to={`/tarefas?area=${encodeURIComponent(areaId ?? '')}`} className={BACK_LINK}>
         <ArrowLeft className="size-4" aria-hidden />
         Quadro
       </Link>

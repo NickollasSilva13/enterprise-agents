@@ -6,6 +6,7 @@ import { Modal } from '../../components/Modal';
 import { useToast } from '../../components/Toast';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useCreateTask } from '../../lib/task-queries';
+import { FormError } from '../../components/Notice';
 
 export function NewTaskDialog({ areaId, onClose }: { areaId: string; onClose: () => void }) {
   const create = useCreateTask();
@@ -82,9 +83,7 @@ export function NewTaskDialog({ areaId, onClose }: { areaId: string; onClose: ()
           trabalhar assim que estiver livre.
         </p>
         {create.error && Object.keys(errors).length === 0 && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(create.error)}
-          </p>
+          <FormError>{errorMessage(create.error)}</FormError>
         )}
       </form>
     </Modal>

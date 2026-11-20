@@ -24,6 +24,10 @@ import {
 } from '../../lib/provider-queries';
 import { ExternalNotice } from './ExternalNotice';
 import { ProviderDialog } from './ProviderDialog';
+import { useAddressFlag } from '../../lib/address-flag';
+import { FormError } from '../../components/Notice';
+import { StatusPill } from '../../components/StatusPill';
+import { TONES } from '../../lib/tone';
 
 function ModelRow({ model, manualTools }: { model: ProviderModel; manualTools: boolean }) {
   const update = useUpdateModel();
@@ -124,7 +128,7 @@ function TestResult({ result }: { result: ConnectionTest }) {
   return (
     <p role="status" className="flex items-start gap-2 px-4 pb-3 text-sm">
       <Icon
-        className={`mt-0.5 size-4.5 shrink-0 ${result.ok ? 'text-ok' : 'text-fail'}`}
+        className={`mt-0.5 size-4.5 shrink-0 ${TONES[result.ok ? 'ok' : 'fail'].ink}`}
         aria-hidden
       />
       <span>
@@ -173,12 +177,11 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
           <h2 id={headingId} className="truncate text-lg font-semibold">
             {provider.name}
           </h2>
-          <p className="text-sm text-dim">
+          <p className="flex flex-wrap items-center gap-2 text-sm text-dim">
             {info.label}
-            {', '}
-            <span className={provider.isExternal ? 'text-wait' : 'text-ok'}>
+            <StatusPill tone={provider.isExternal ? 'wait' : 'ok'}>
               {provider.isExternal ? 'externo' : 'neste computador'}
-            </span>
+            </StatusPill>
           </p>
         </div>
         <div className="flex">
@@ -229,9 +232,7 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
 
       {test.data && !test.isPending && <TestResult result={test.data} />}
       {test.error && !test.isPending && (
-        <p role="alert" className="px-4 pb-3 text-sm text-fail">
-          {errorMessage(test.error)}
-        </p>
+        <FormError className="px-4 pb-3">{errorMessage(test.error)}</FormError>
       )}
 
       <div className="border-t border-line">
@@ -275,7 +276,8 @@ function DeleteProviderDialog({ provider, onClose }: { provider: Provider; onClo
 
 export function ModelsPage() {
   const { data: providers, error, isPending, refetch } = useProviders();
-  const [adding, setAdding] = useState(false);
+  // "Conectar um provedor" in the first steps opens the form here (Phase 32).
+  const [adding, setAdding] = useAddressFlag('novo');
   const [editing, setEditing] = useState<Provider | null>(null);
   const [deleting, setDeleting] = useState<Provider | null>(null);
 

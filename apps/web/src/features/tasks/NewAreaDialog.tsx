@@ -9,6 +9,7 @@ import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useModels } from '../../lib/queries';
 import { useCreateAreaFromTemplate, useWorkflowTemplates } from '../../lib/task-queries';
 import { TemplateDetails } from './TemplateDetails';
+import { FormError } from '../../components/Notice';
 
 const GROUPS = [
   { origin: 'builtin', label: 'Modelos prontos' },
@@ -123,9 +124,7 @@ export function NewAreaDialog({ onClose }: { onClose: () => void }) {
             Ferramentas o que quiser deixar automático.
           </p>
           {create.error && !errors.name && !errors.modelId && (
-            <p role="alert" className="text-sm text-fail">
-              {errorMessage(create.error)}
-            </p>
+            <FormError>{errorMessage(create.error)}</FormError>
           )}
         </form>
       )}

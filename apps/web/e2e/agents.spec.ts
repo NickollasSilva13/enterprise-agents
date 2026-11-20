@@ -43,7 +43,7 @@ test('an agent can be created, edited, duplicated, deactivated and deleted', asy
 
   await expect(page).toHaveURL(`${CRUD_URL}/agentes`);
   await expect(page.getByText(`${agentName} criado.`)).toBeVisible();
-  await expect(agentRow(page, agentName)).toContainText(`${projectName}, sem modelo`);
+  await expect(agentRow(page, agentName)).toContainText(`${projectName} · sem modelo de IA`);
   await expect(agentRow(page, agentName)).toContainText('Ocioso');
   await expectNoHorizontalScroll(page);
 
@@ -62,7 +62,7 @@ test('an agent can be created, edited, duplicated, deactivated and deleted', asy
     .filter({ hasText: agentName });
   await expect(desk).toContainText(`${agentName}Ocioso`);
   await expect(desk).toContainText(`Na mesa, em ${projectName}`);
-  await navigateTo(page, 'Painel');
+  await navigateTo(page, 'Relatórios');
   await expect(page.getByText(/sem modelo e não/)).toBeVisible();
 
   // Edit: the form opens with what was saved, and survives a reload.

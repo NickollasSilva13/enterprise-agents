@@ -1,6 +1,13 @@
 import type { Board, TaskSummary, WorkflowStage } from '@ea/shared';
-import { ArrowLeftRight, CalendarClock, LayoutTemplate, Plus, Workflow } from 'lucide-react';
-import { useState } from 'react';
+import {
+  ArrowLeftRight,
+  CalendarClock,
+  LayoutTemplate,
+  MoveRight,
+  Plus,
+  Workflow,
+} from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, buttonClass } from '../../components/Button';
 import { SelectField } from '../../components/Form';
@@ -8,33 +15,114 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { plural } from '../../lib/format';
 import { useProjects } from '../../lib/queries';
+import { useAddressFlag } from '../../lib/address-flag';
 import { useBoard } from '../../lib/task-queries';
+import { type TaskMoves, movesOf } from './moves';
+import { MoveTaskDialog } from './MoveTaskDialog';
 import { NewAreaDialog } from './NewAreaDialog';
 import { NewTaskDialog } from './NewTaskDialog';
 import { PriorityBadge, STAGE_KIND_LABEL, TaskStatus } from './TaskBadges';
+import { Tip } from '../../components/Tip';
 
-function TaskCard({ task }: { task: TaskSummary }) {
+/** A move the user started from the board, waiting for the confirmation. */
+interface PendingMove {
+  task: TaskSummary;
+  targets: readonly WorkflowStage[];
+  initial?: string;
+}
+
+interface TaskCardProps {
+  task: TaskSummary;
+  moves: TaskMoves;
+  dragged: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onMove: () => void;
+}
+
+function TaskCard({ task, moves, dragged, onDragStart, onDragEnd, onMove }: TaskCardProps) {
+  const movable = moves.kind === 'open';
   return (
-    <li>
-      <Link
-        to={`/tarefas/${task.id}`}
-        data-task={task.id}
-        className="block rounded-md border border-line bg-ink px-3 py-2 hover:border-line-strong"
-      >
+    <li
+      data-task={task.id}
+      // Native drag and drop (D1): on a touch screen it never starts, and the
+      // "Mover para…" button below is the way there and for the keyboard (D2).
+      draggable={movable}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', task.id);
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={`rounded-xl border border-line bg-ink transition-colors hover:border-line-strong ${
+        movable ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${dragged ? 'opacity-50' : ''}`}
+    >
+      <Link to={`/tarefas/${task.id}`} draggable={false} className="block px-3 pt-2.5 pb-2">
         <span className="flex items-start justify-between gap-2">
           <span className="font-semibold">{task.title}</span>
           <PriorityBadge task={task} />
         </span>
-        <TaskStatus task={task} />
+        <span className="mt-1.5 block">
+          <TaskStatus task={task} />
+        </span>
       </Link>
+      {movable && (
+        <div className="border-t border-line px-1.5 py-1">
+          <button
+            type="button"
+            onClick={onMove}
+            aria-label={`Mover "${task.title}" para outra etapa`}
+            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-dim hover:bg-sheet-raised hover:text-chalk"
+          >
+            <MoveRight className="size-4" aria-hidden />
+            Mover para…
+          </button>
+        </div>
+      )}
     </li>
   );
 }
 
-function Column({ stage, tasks }: { stage: WorkflowStage; tasks: readonly TaskSummary[] }) {
+interface ColumnProps {
+  stage: WorkflowStage;
+  tasks: readonly TaskSummary[];
+  /** While a card is dragged: whether it may land here; null when nothing is dragged. */
+  accepts: boolean | null;
+  onDrop: () => void;
+  children: ReactNode;
+}
+
+function Column({ stage, tasks, accepts, onDrop, children }: ColumnProps) {
   const titleId = `stage-${stage.id}`;
+  const [over, setOver] = useState(false);
+  const frame =
+    accepts === null
+      ? 'border-line'
+      : accepts
+        ? `border-glow ${over ? 'bg-sheet-raised' : ''}`
+        : 'border-line opacity-50';
   return (
-    <section aria-labelledby={titleId} className="rounded-lg border border-line bg-sheet">
+    <section
+      aria-labelledby={titleId}
+      data-stage={stage.id}
+      data-accepts={accepts === null ? undefined : String(accepts)}
+      onDragOver={(event) => {
+        // Only a stage the flow allows takes the card: elsewhere the browser
+        // shows "not allowed" and dropping does nothing.
+        if (!accepts) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setOver(false);
+        if (accepts) onDrop();
+      }}
+      className={`rounded-xl border bg-sheet transition-[opacity,border-color,background-color] ${frame}`}
+    >
       <header className="border-b border-line px-3 py-2">
         <h2 id={titleId} className="font-semibold">
           {stage.name}
@@ -46,20 +134,43 @@ function Column({ stage, tasks }: { stage: WorkflowStage; tasks: readonly TaskSu
           · {plural(tasks.length, 'tarefa', 'tarefas')}
         </p>
       </header>
-      {tasks.length > 0 && (
+      {tasks.length > 0 ? (
         <ul className="space-y-2 p-3" aria-label={`Tarefas em ${stage.name}`}>
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
-          ))}
+          {children}
         </ul>
+      ) : (
+        // An empty column still needs room to drop a card on.
+        <p className="px-3 py-4 text-sm text-dim">Nenhuma tarefa aqui.</p>
       )}
     </section>
   );
 }
 
 function BoardView({ board }: { board: Board }) {
-  const [adding, setAdding] = useState(false);
+  // "Criar tarefa" in the office's quick actions opens the form here (Phase 29, D6).
+  const [params, setParams] = useSearchParams();
+  const [adding, setAdding] = useState(params.get('nova') === '1');
+  const stopAdding = () => {
+    setAdding(false);
+    if (params.has('nova'))
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete('nova');
+          return next;
+        },
+        { replace: true },
+      );
+  };
   const { stages } = board.workflow;
+  const [dragged, setDragged] = useState<TaskSummary | null>(null);
+  const [moving, setMoving] = useState<PendingMove | null>(null);
+  const draggedMoves = dragged ? movesOf(board.workflow, dragged) : null;
+  const accepts = (stage: WorkflowStage) =>
+    draggedMoves === null
+      ? null
+      : draggedMoves.kind === 'open' && draggedMoves.targets.some(({ id }) => id === stage.id);
+
   if (stages.length === 0) {
     return (
       <div className="rounded-lg border border-line bg-sheet">
@@ -88,16 +199,55 @@ function BoardView({ board }: { board: Board }) {
           Editar fluxo
         </Link>
       </div>
+      <Tip id="board-move" className="mb-4">
+        Arraste um cartão até outra etapa, ou use "Mover para…" no cartão. Só aceitam o cartão as
+        etapas que o fluxo permite, e nada muda antes de você confirmar.
+      </Tip>
       <div className="grid gap-4 md:auto-cols-[minmax(15rem,1fr)] md:grid-flow-col md:overflow-x-auto md:pb-2">
-        {stages.map((stage) => (
-          <Column
-            key={stage.id}
-            stage={stage}
-            tasks={board.tasks.filter((task) => task.stageId === stage.id)}
-          />
-        ))}
+        {stages.map((stage) => {
+          const tasks = board.tasks.filter((task) => task.stageId === stage.id);
+          return (
+            <Column
+              key={stage.id}
+              stage={stage}
+              tasks={tasks}
+              accepts={accepts(stage)}
+              onDrop={() => {
+                if (dragged && draggedMoves?.kind === 'open') {
+                  setMoving({ task: dragged, targets: draggedMoves.targets, initial: stage.id });
+                }
+                setDragged(null);
+              }}
+            >
+              {tasks.map((task) => {
+                const moves = movesOf(board.workflow, task);
+                return (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    moves={moves}
+                    dragged={dragged?.id === task.id}
+                    onDragStart={() => setDragged(task)}
+                    onDragEnd={() => setDragged(null)}
+                    onMove={() => {
+                      if (moves.kind === 'open') setMoving({ task, targets: moves.targets });
+                    }}
+                  />
+                );
+              })}
+            </Column>
+          );
+        })}
       </div>
-      {adding && <NewTaskDialog areaId={board.area.id} onClose={() => setAdding(false)} />}
+      {adding && <NewTaskDialog areaId={board.area.id} onClose={stopAdding} />}
+      {moving && (
+        <MoveTaskDialog
+          task={moving.task}
+          targets={moving.targets}
+          {...(moving.initial ? { initial: moving.initial } : {})}
+          onClose={() => setMoving(null)}
+        />
+      )}
     </>
   );
 }
@@ -106,7 +256,8 @@ function BoardView({ board }: { board: Board }) {
 export function TasksPage() {
   const projects = useProjects();
   const [params, setParams] = useSearchParams();
-  const [creatingArea, setCreatingArea] = useState(false);
+  // "Criar uma área" in the first steps opens the form here (Phase 32).
+  const [creatingArea, setCreatingArea] = useAddressFlag('nova-area');
   const areaId = params.get('area') ?? projects.data?.[0]?.id;
   const board = useBoard(areaId);
 

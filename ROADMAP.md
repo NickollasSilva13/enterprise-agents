@@ -25,6 +25,19 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 17 | Pedidos entre áreas | Concluída em 2026-11-16 |
 | 18 | Catálogo de fluxos prontos | Concluída em 2026-11-16 |
 | 19 | Agendamento de tarefas | Concluída em 2026-11-16 |
+| 20 | Sistema visual | Concluída em 2026-11-19 |
+| 21 | Moldura: menu, barra do topo e busca | Concluída em 2026-11-19 |
+| 22 | Personagens 32 bits | Concluída em 2026-11-19 |
+| 23 | Prédio, móveis e cidade | Concluída em 2026-11-19 |
+| 24 | Motor 3D e câmera | Concluída em 2026-11-19 |
+| 25 | Arquitetura, luz e cidade em 3D | Concluída em 2026-11-19 |
+| 26 | Móveis detalhados em 3D | Concluída em 2026-11-19 |
+| 27 | Personagens voxel 3D | Concluída em 2026-11-19 |
+| 28 | Interação e editor na cena 3D | Concluída em 2026-11-19 |
+| 29 | Escritório como tela inicial | Concluída em 2026-11-19 |
+| 30 | Indicadores reais | Concluída em 2026-11-19 |
+| 31 | Telas internas no mesmo padrão | Concluída em 2026-11-20 |
+| 32 | Primeiros passos e polimento | Concluída em 2026-11-20 |
 
 ## Fases concluídas
 
@@ -797,6 +810,566 @@ relógio no servidor (`setTimeout`, sem dependência nova). D6: tela
 - O disparo pelo relógio foi testado com horários já vencidos (ao ligar e ao reprogramar), não esperando um horário futuro chegar.
 - A troca de horário de verão não foi testada: a conta usa o horário local do JavaScript, e o Brasil não tem horário de verão hoje.
 - As telas novas não foram vistas em captura de tela.
+
+## Visão das Fases 20 a 27 — a interface da proposta
+
+Pedidas pelo usuário em 2026-11-16, a partir de uma imagem de proposta do
+Escritório como tela principal: menu à esquerda, a cena no centro (um andar de
+vidro sobre a cidade à noite), o time e a atividade à direita, indicadores e
+ações rápidas embaixo. O roteiro visual completo, com o que cada número da
+proposta exige, foi entregue como página à parte; aqui fica o controle. A
+direção vale para todas: fiel à proposta, mas nenhum número ou contador sem
+dado real por trás (regra 5).
+
+Antes das fases, uma correção já feita: os personagens apareciam com um braço
+só (na vista de três quartos, `character.tsx` desenhava só o braço de perto).
+O braço de trás entrou nos três trajes, de frente e de costas, com teste que
+reproduz o defeito. O balanço do braço ao andar fica para a Fase 22.
+
+| Fase | Entrega | Para decidir no início dela |
+|---|---|---|
+| 20 Sistema visual | Tokens revisados (três níveis de superfície, vidro com borda luminosa, cores de estado), escala de tipo com mínimo de 13 px, componentes (indicador com mini gráfico, pílula de estado, cartão de agente, item de atividade, ação rápida, avatar) e uma página de referência com cada estado. Pronta quando todo texto passa em contraste AA e cada componente tem vazio, carregando, erro e foco. | Fonte; mini gráfico; onde mora a página de referência; como testar o visual |
+| 21 Moldura | Menu com contadores, busca global (Ctrl K), sino com aprovações, tarefas paradas e pedidos, cartão "Você"; gaveta no celular. | Se o Painel continua ou vira "Relatórios" |
+| 22 Personagens 32 bits | Sprite de 32 × 64, três a quatro tons por material, quatro direções desenhadas sem espelho, andar em 4 quadros com braço balançando; todas as opções de aparência redesenhadas, sem o usuário refazer nada. | Proporção da cabeça; robôs; opções novas |
+| 23 Prédio, móveis e cidade | Plataforma de vidro com borda acesa, paredes translúcidas, escada, placas das salas; móveis redesenhados e novos, cor por móvel; cidade em camadas, árvores, postes, céu. O layout salvo continua igual. | Janelas acendendo; dia e noite; nome "Apoio IA" |
+| 24 Escritório como tela inicial | Cena no centro, cartões do time, atividade recente, ações rápidas; clicar num agente destaca o cartão. | Quantos agentes antes de "Ver todos"; tela inicial |
+| 25 Indicadores reais | Rota de indicadores calculada do histórico, série diária, "Como é calculado", estado sem dados. | O quarto indicador |
+| 26 Telas internas | Tarefas, Agentes, Automações, Aprovações, Logs, Modelos de IA e Ferramentas com os componentes da Fase 20. | Arrastar no quadro pelo celular |
+| 27 Primeiros passos | Roteiro de início, ajuda dentro da plataforma, dicas que somem, revisão de movimento e textos; auditoria WCAG 2.1 AA. | Se o roteiro pode ser pulado |
+
+## Visão das Fases 24 a 28 — o Escritório em 3D
+
+Pedidas pelo usuário em 2026-11-19, depois de comparar a cena SVG da Fase 23
+com a proposta: a referência é um ambiente 3D estilizado, de jogo de simulação
+empresarial, com volume, materiais, luz roxa e azul, sombras e muitos
+detalhes, e a cena atual parece uma planta isométrica. Primeiro a fidelidade
+visual, depois a interação. As fases de interface que estavam numeradas de 24
+a 27 passaram a 29 a 32, sem mudar de conteúdo.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D9, todas como recomendadas).**
+- D1: React Three Fiber, Drei e Three.js, com pós-processamento para brilho e oclusão; a cena carrega só quando o Escritório abre. Substitui a D1 da Fase 23 ("continuar em SVG").
+- D2: móveis, prédios e personagens montados em código (peças e voxels), arte original e versionada; nenhum modelo baixado de terceiros; GLB só se uma peça exigir.
+- D3: o motor da cena continua testado como função pura; uma lista espelho, fora da tela, leva os atributos que os testes e o leitor de tela leem; os E2E capturam a cena com WebGL no Chromium.
+- D4: sem WebGL, a cena SVG das Fases 14 a 23 aparece no lugar, sozinha.
+- D5: o editor continua em 2D até a Fase 28.
+- D6: sem botões de zoom e sem minimapa; a câmera se ajusta para mostrar o escritório inteiro.
+- D7: o ciclo de dia e noite da Fase 23 continua; a noite segue a referência.
+- D8: a biblioteca 3D aplica estilo por código (CSSOM), o que a CSP permite; nosso código continua sem `style`. Conferido e registrado no `SECURITY.md`.
+- D9: cartões e avatares fora da cena continuam com o retrato 2D até a Fase 27, que decide se ele passa a sair do personagem voxel.
+
+**Validação de toda fase visual:** rodar o projeto, capturar a tela em
+1536×864, comparar com a referência, listar as diferenças, corrigir e repetir.
+A fase só fecha sem diferença evidente, ou com a diferença nomeada e o motivo.
+
+| Fase | Entrega | Pronta quando |
+|---|---|---|
+| 24 Motor 3D e câmera | Cena em React Three Fiber, câmera ortográfica isométrica alta e diagonal, piso e paredes de vidro a partir do layout gravado, lista espelho dos agentes, alternativa SVG sem WebGL, sem zoom e minimapa, captura de 1536×864 nos E2E. | O layout aparece em 3D no enquadramento da referência, com 30 agentes a 60 quadros/s. |
+| 25 Arquitetura, luz e cidade | Plataforma com neon roxo, vidro com reflexo e tom azulado, luz ambiente roxa, sombras, oclusão de ambiente, brilho controlado; cidade noturna em volume com janelas acesas. | Sem diferença evidente de luz, profundidade e cidade. |
+| 26 Móveis detalhados | Os móveis em volume (sofá com almofadas, mesa com pernas, cadeira completa, monitor, teclado, computador, estante com livros, plantas com folhas), escala dos personagens, layouts padrão sem áreas vazias. | Cada sala da referência bate. |
+| 27 Personagens voxel | Personagens voxel das opções de aparência atuais; andar, sentar, digitar, conversar, acenar. | Parecem habitantes, não ícones. |
+| 28 Interação e editor | Clique no agente, balões, placas das salas, editor do escritório em 3D. | Tudo que a cena 2D fazia funciona na 3D. |
+
+## Fase 20 — Sistema visual (concluída)
+
+**Objetivo.** Antes de mexer nas telas, as peças: o que se repete na proposta
+vira componente com regra, para tudo sair igual e acessível. As telas atuais só
+mudam pelo que vem do tema; aplicar os componentes é das Fases 21, 24 e 26.
+
+**Decisões aprovadas em 2026-11-16 (D1 a D7, todas como recomendadas).** D1:
+manter a Bricolage Grotesque. D2: mini gráfico em SVG próprio, sem biblioteca.
+D3: estender os tokens de `theme.css` sem renomear (três níveis de superfície
+que já existiam, mais o vidro e a cor `glow`). D4: o menor tamanho de texto
+passa a 13 px pelo tema; o texto da cena do Escritório, que cresce com o zoom,
+fica de fora. D5: a página de referência (`/referencia`) só existe no
+desenvolvimento e na compilação dos testes de ponta a ponta, com valores
+marcados como exemplo. D6: teste de contraste AA lendo as cores reais do tema.
+D7: capturas de tela de referência no E2E, só no desktop.
+
+### O que foi feito
+
+- Tema (`theme.css`): `--color-glow` (borda acesa e anel de foco), superfície de vidro (`.surface-glass`), `--text-xs` de 13 px. Quatro tons ajustados porque não passavam em AA: `accent-strong` (fundo do botão principal com o mouse em cima, 3,9:1 com texto branco, agora mais escuro), `line-strong` (borda de campo, 2,2:1, agora mais clara), `fail` e `idle` (texto sobre a própria tinta de pílula e sobre o vidro).
+- Vocabulário de tons (`lib/tone.ts`) e o tom de cada estado de agente em `AGENT_STATE_STYLES`.
+- Componentes novos em `src/components/`: `StatusPill`, `Sparkline`, `IndicatorCard` (com dados, sem dados, carregando, erro e "Como é calculado"), `AgentCard` e `AgentCardSkeleton` (o cartão inteiro é um link; selecionado com a borda acesa), `Avatar` (busto com ponto de estado lido por leitor de tela), `ActivityFeed` e `ActivityItem` (com itens, vazia, carregando, erro) e `QuickAction` (desligada continua visível, diz o motivo e é alcançável pelo teclado).
+- Página de referência `features/reference/ReferencePage.tsx` com cores, tipo, superfícies e cada componente em cada estado. Script `build:e2e` (`vite build --mode e2e`); `npm run test:e2e` passa a usá-lo.
+- O código dentro de mensagens (`Markdown`) deixou de encolher para 90%, que ficava abaixo de 13 px.
+
+### Decisões tomadas durante a implementação
+
+- **A página de referência sai da compilação do produto pelo próprio Vite**: a rota depende de `import.meta.env.DEV` ou do modo `e2e`, que são trocados na compilação, e a página é carregada sob demanda; na compilação normal o código dela não é gerado (conferido pela ausência do arquivo).
+- **Vidro 94% opaco**: o contraste do texto foi calculado sobre o pior caso, o vidro sobre um ponto branco da cena.
+- **Itens de atividade são texto simples**, não `Markdown`: títulos digitados por pessoas e modelos aparecem escapados pelo React.
+
+### Não validado
+
+- As capturas de referência valem para esta máquina (Windows, Chromium); em outro sistema precisam ser geradas de novo.
+- Leitor de tela real não foi usado; os nomes acessíveis foram conferidos pelos testes.
+- Os componentes ainda não estão em nenhuma tela do produto (Fases 21, 24 e 26).
+
+## Fase 21 — Moldura: menu, barra do topo e busca (concluída)
+
+**Objetivo.** A moldura que aparece em toda tela, como na proposta: menu com
+contadores, ajuda e você embaixo; no topo, estado do time, busca e sino.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D7, todas como recomendadas).** D1:
+menu com Automações (os agendamentos da Fase 19) e "Modelos de IA";
+contadores só em Aprovações e Tarefas; "Precisa de ajuda?" no rodapé, marcado
+"Fase 27". D2: o Painel fica como está; vira "Relatórios" na Fase 24, quando o
+Escritório for a tela inicial. D3: busca global (Ctrl K) por `GET
+/api/search`, sem diferença de maiúsculas e acentos, até 5 por grupo; telas
+procuradas na interface. D4: sino montado na interface com as três listas que
+já existiam, sem "marcar como lida". D5: cartão "Você" com nome e personagem
+opcionais, guardado em `settings` (chave `profile`), editado em Configurações;
+não é login. D6: no celular, topo compacto e a gaveta de antes, redesenhada.
+D7: peças da Fase 20, testes de componente, de servidor e de ponta a ponta.
+
+### O que foi feito
+
+- Contrato (`packages/shared/src/frame.ts`): `searchQuerySchema`, `searchKey` e `searchRank` (começo do nome, depois começo de palavra, depois meio), `searchResultsSchema`, `profileSchema` e `PROFILE_LIMITS`.
+- Servidor (`modules/frame`): `GET /api/search`, `GET` e `PUT /api/profile`. A comparação é feita em JavaScript sobre as colunas que a busca mostra, não por `LIKE`: assim `%` e `_` são letras comuns e os acentos não contam. Agente excluído nunca aparece. O perfil gravado é conferido de novo ao ser lido.
+- Interface: menu (`navigation.ts`, `AppLayout.tsx`) com contadores e item atual por `isCurrent` (Tarefas não acende nas Automações); `SearchDialog.tsx` (caixa com lista, setas, Enter, Esc, tela cheia no celular); `Bell.tsx`; `YouCard.tsx`; `ProfilePanel.tsx` em Configurações; `useAttention` em `lib/frame-queries.ts`. As listas do sino entram na atualização ao vivo.
+- No celular, o topo mostra só "precisam de você"; os outros dois números continuam lá para leitor de tela.
+
+### Decisões tomadas durante a implementação
+
+- **Contador de Tarefas** = tarefas paradas esperando você + pedidos entre áreas a aprovar; o de Aprovações = aprovações de ferramenta pendentes. A tela Aprovações continua mostrando os três.
+- **O personagem do usuário** é desenhado a partir do texto fixo `voce`; escolher "Robô" no editor guarda um robô, não "sem personagem" (que é o interruptor "Usar um personagem").
+- **A busca espera 150 ms** depois da última tecla antes de perguntar ao servidor, e mostra o resultado anterior até o novo chegar.
+
+### Não validado
+
+- Leitor de tela real; o padrão de caixa com lista foi conferido pelos nomes e atributos nos testes.
+- ⌘K num Mac (só Ctrl K foi exercitado).
+- As capturas de referência valem para Windows com Chromium.
+
+## Fase 22 — Personagens 32 bits (concluída)
+
+**Objetivo.** O time redesenhado com mais resolução e mais tons por cor, o
+pixel ainda visível: sprite de 32 × 64 no lugar de 20 × 40, quatro direções
+sem detalhe do lado errado, andar em 4 quadros com o braço balançando.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D8, todas como recomendadas).** D1:
+32 × 64. D2: mesma altura na cena, o dobro de resolução. D3: corpo-base
+espelhado, detalhes com lado (mão que segura, mão levantada, crachá,
+microfone) postos depois no lado certo. D4: rampa de tons calculada da paleta
+atual. D5: cabeça do robô em pixel, frente e costas, com os traços de sempre.
+D6: animações só do que a cena já mostra. D7: nenhuma opção nova. D8: uma
+pessoa e um robô primeiro, para aprovar o traço.
+
+**Mudança pedida na conferência (D8).** Na primeira prévia (cabeça em 40% do
+corpo, estilo "chibi"), o usuário pediu algo mais parecido com o gênero de
+uma imagem de referência de um jogo social isométrico. O desenho continuou
+próprio (regra do projeto: arte própria), mas seguiu os traços do gênero:
+cabeça em cerca de um terço da altura, tronco e pernas longos, contorno
+escuro, sombreamento simples, rosto pequeno. Essa segunda prévia foi aprovada.
+
+### O que foi feito
+
+- `pixel-art/figure.ts`: o personagem como máscara de materiais, desenhada com elipses e traços numa grade de 32 × 64 (cabeça, 9 cabelos, barba, 3 acessórios, 3 roupas, estampas, pernas em 4 quadros, braços em cada pose, robô de frente e de costas). `screenSideOf` diz de que lado da tela está a mão direita ou a esquerda em cada direção.
+- `pixel-art/shade.ts`: sombreamento automático (contorno escuro na silhueta, brilho em cima à esquerda, sombra embaixo à direita e sob o que cobre) e `ramp`, que tira quatro tons das duas cores de cada opção.
+- `pixel-art/character.tsx`: `PixelCharacter` com os quadros empilhados e mostrados em vez por classes de CSS; `PixelBust` recortado na cabeça e nos ombros; `PixelStill` para um quadro parado.
+- Animações: andar em 4 quadros com o braço ao contrário da perna, digitando (2), acenando com a mão levantada (2), conversando na reunião ou numa visita (2). Com "reduzir movimento" fica só o primeiro quadro.
+- Cena: `talking` na vista de cada agente; o agente trabalhando digita em vez de balançar o corpo.
+- Página de referência: seções "Personagens" (as quatro direções, os quadros e as poses) e "Opções de aparência" (cada opção, de frente e de costas).
+
+### Decisões tomadas durante a implementação
+
+- **Partes e quadros guardados.** O teste de 30 agentes andando juntos caiu para 8 quadros por segundo com o desenho novo: montar e sombrear um quadro custava 2,2 ms, e 30 agentes começando a andar ou virando pediam centenas de quadros de uma vez. As partes que só dependem de poucas opções (cabelo, roupa, pernas, braços) são montadas uma vez, e os quadros prontos ficam guardados (até 1.500). Depois disso: 0,5 ms por quadro novo, nada para um quadro já visto, e 58 quadros por segundo no teste.
+- **O aceno da mão levantada** virou 2 quadros do próprio personagem, porque o braço não é mais uma peça separada que se possa girar.
+- **A falha de um agente** sacode o personagem inteiro sentado, não só a cabeça, pelo mesmo motivo.
+
+### Não validado
+
+- O movimento não foi visto por uma pessoa: conferido por quadros parados, capturas e testes.
+- As capturas de referência valem para Windows com Chromium.
+
+## Fase 23 — Prédio, móveis e cidade (concluída)
+
+**Objetivo.** O andar da proposta: uma plataforma que flutua sobre a cidade,
+com borda acesa, salas de paredes de vidro e móveis com cor e detalhe.
+
+**Respostas do usuário (2026-11-19).** As janelas da cidade seguem o dia e a
+noite; o andar ganha ciclo de dia e noite; "Apo IA" é uma sala criada pelo
+usuário, fora do layout padrão (nada a fazer); os móveis num tamanho que case
+com os personagens. O usuário pediu a plataforma "idêntica" à proposta: a
+direção é seguida, mas números da proposta sem dado real (92%, 24, 98%) só
+entram com dado real, na Fase 25.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D7, todas como recomendadas).** D1:
+continuar em SVG, sem motor 3D. D2: plataforma clara com borda acesa, paredes
+de vidro com quinas claras, degraus, painel com o logo, placas das salas. D3:
+dia e noite pelo relógio da máquina (noite das 18h às 6h, troca em uma hora),
+janelas que acendem uma a uma. D4: cidade em três camadas, árvores e postes,
+nada clicável. D5: os 18 móveis redesenhados e 6 novos. D6: cor por móvel numa
+paleta fixa, coluna `color` em `office_items` (migração 0009). D7: testes de
+todo móvel em toda direção e cor, do dia e da noite sem relógio, da migração
+sobre dados existentes, e capturas de dia e de noite.
+
+### O que foi feito
+
+- Contrato: `ITEM_COLORS` e `ITEM_COLOR_LABELS`; `colorable` no catálogo (sofá, poltrona, pufe, cadeira, bancada, tapete, banqueta); seis móveis novos (máquina de lanches, geladeira, banqueta, TV de parede, divisória de vidro, luminária); `color` em cada móvel, com "padrão" para layouts sem cor.
+- Banco: migração `0009_item_colors` (coluna `color`, padrão `default`), testada sobre um móvel gravado antes.
+- Arte: `IsoBox` com contorno e `tones()` (tons calculados como os dos personagens); paredes de vidro com montantes claros a cada dois ladrilhos e altura que casa com os personagens (44); móveis redesenhados, o notebook sobre a mesa de trabalho; `daylight.ts` (dia e noite, céu, janelas); entorno do prédio com céu, cidade em três camadas, chão lá embaixo com árvores, brilho sob a plataforma, borda neon, degraus e painel com o logo na parede da recepção.
+- Editor: "Cor" nas propriedades dos móveis que aceitam cor.
+- Layout padrão: copa com geladeira, máquina de lanches e banquetas; TV de parede na reunião; luminária na descompressão.
+
+### Decisões tomadas durante a implementação
+
+- **Janelas da cidade em dois caminhos por prédio** (acesas e apagadas): desenhadas uma a uma eram cerca de 20 mil elementos e deixaram os testes do editor lentos demais.
+- **A luminária saiu da frente da porta** da descompressão, onde a validação do layout acusou que a sala ficava sem acesso.
+- **Dia e noite são relidos a cada minuto** por cada camada do entorno; não há animação contínua, então "reduzir movimento" não precisa de tratamento especial além do que já existia.
+
+### Revisão pedida pelo usuário (2026-11-19)
+
+Ao ver o resultado, o usuário pediu algo mais próximo da proposta: plantas e
+árvores em volume (não figuras chapadas), um entorno com os detalhes da
+imagem e colado ao escritório, sem área morta, e um prédio que pareça prédio.
+Feito: folhagem em blocos sombreados (`art/foliage.tsx`) nas plantas e em
+todas as árvores, inclusive as da casa e do parque; prédios da cidade em duas
+fileiras logo atrás do escritório, com janelas em grade por andar desenhadas
+na face de cada prédio, topo com neon, antena ou casa de máquinas; base grossa
+com duas linhas neon; paredes de vidro mais altas (52) e frentes de vidro no
+lugar das grades baixas; degraus escuros até o chão; árvores só na frente da
+base (atrás de um prédio alto não seriam vistas) e escuras à noite; painel do
+logo maior; piso do corredor lilás.
+
+Segunda revisão (mesmo dia): as árvores ainda pareciam quadradas e a cidade,
+cheia demais, atrapalhava a vista do escritório. A copa virou um conjunto de
+tufos redondos com luz em cima, sombra embaixo e contorno, com sombra no chão
+e tronco que afina; a cidade virou três anéis espaçados (perto, meio, longe),
+com falhas entre os prédios e os mais distantes esmaecendo na cor do
+horizonte, sobre um chão que vai até ele.
+
+### Não validado
+
+- A troca de dia e noite foi vista por capturas com relógio simulado (12h e 22h), não acompanhando uma troca real.
+- As capturas de referência valem para Windows com Chromium.
+
+## Fase 24 — Motor 3D e câmera (concluída)
+
+**Objetivo.** Trocar o desenho SVG do Escritório por uma cena 3D de verdade,
+com a câmera da proposta, sem perder nada do que a cena fazia; a luz, a
+cidade, os móveis detalhados e os personagens voxel são das Fases 25 a 27.
+
+### O que foi feito
+
+- Dependências: `three` 0.187 e `@react-three/fiber` 9.8 (com `@types/three`). A cena (`three/OfficeCanvas.tsx`) é carregada só quando o Escritório abre, num pedaço próprio do pacote (927 kB, 246 kB comprimido).
+- Câmera (`three/view.ts`): ortográfica, a 38° de altura e na diagonal, olhando do canto da frente como o SVG; a vista é calculada à parte do three.js para que a câmera e a camada SVG por cima projetem cada ponto no mesmo pixel. Enquadra o andar inteiro, paredes e base, com 6% de folga, e se refaz quando o palco muda de tamanho.
+- Cena: base grossa com dois fios de neon, piso de cada sala, linhas do piso, paredes de vidro (altas atrás, baixas na frente, vão nas portas) com montantes e o vidro do prédio nas bordas de trás; cada móvel como alguns volumes no lugar, na altura e na cor que vão manter (`three/model.ts`); a tela de cada mesa acesa pelo estado do agente.
+- Personagens: os de 32 bits da Fase 22 pintados em texturas e de pé na cena, com os mesmos quadros de andar, digitar, conversar e acenar; o motor de posições é o mesmo (`useOfficeScene` ganhou `track`, que move qualquer coisa, não só elementos SVG).
+- Camada SVG por cima (`three/OfficeOverlay.tsx`): placas, murais e balões em HTML, o clique nos agentes e as marcas que os testes leem (`data-sitter`, `data-walker`, `data-area-floor`, `data-surroundings`), posicionadas pelo atributo `transform`.
+- Sem WebGL, a cena SVG das Fases 14 a 23 aparece sozinha, já enquadrada (D4); os testes de componente (jsdom) passam por ela.
+- Barra de zoom e minimapa removidos (D6); `Minimap.tsx` foi apagado. O editor continua com o seu zoom (D5).
+
+### Decisões tomadas durante a implementação
+
+- **Camada SVG em vez do `Html` do Drei:** o `Html` posiciona por estilo inline; a camada SVG faz o mesmo pelo atributo `transform`, que a regra do projeto já usava. Por isso o Drei não foi instalado; entra quando uma fase precisar dele.
+- **Volumes fundidos por material:** o andar inteiro vira poucas malhas (sólido, cada vidro, o que acende), para a cena seguir fluida com 30 agentes.
+- **Os E2E do Escritório usam a placa de vídeo** (`--enable-gpu --use-angle=d3d11`): sem isso o Chromium sem janela desenha WebGL por software (SwiftShader), e a contagem de quadros mediria o emulador (30 quadros/s) e não a cena (57 a 58 na placa).
+- **O link "Novo agente" saiu com a barra:** a criação continua em Agentes e no botão do painel quando não há agentes; as ações rápidas da proposta são da Fase 29.
+
+### Comparação com a referência (1536×864)
+
+A captura `escritorio-1536x864.png` (em `scenery.spec.ts`) foi comparada com a
+proposta. Igual: enquadramento, câmera alta e diagonal, andar inteiro no centro
+com o painel de agentes à direita, salas com paredes de vidro e placas, sem
+zoom e sem minimapa. Diferente, e da fase seguinte: céu, cidade e luz roxa com
+sombras e brilho (25); móveis ainda em volumes simples (26); personagens ainda
+planos e pequenos (27); atividade recente, indicadores e ações rápidas (29 e 30).
+
+### Não validado
+
+- A cena SVG de reserva (sem WebGL) só foi vista pelos testes de componente, não numa captura de navegador sem WebGL.
+- Os 57 a 58 quadros/s foram medidos nesta máquina (RTX 3050); numa placa integrada fraca podem ser menos.
+
+## Fase 25 — Arquitetura, luz e cidade em 3D (concluída)
+
+**Objetivo.** A luz e o entorno da proposta: neon roxo na borda, vidro com
+reflexo e tom azulado, luz ambiente roxa, sombras, oclusão de ambiente, brilho
+controlado e a cidade noturna em volume.
+
+### O que foi feito
+
+- Luz (`OfficeCanvas.tsx`, `Lights`): ambiente roxa, luz do céu, luz principal do alto à esquerda com sombras (mapa de 2048) e uma luz fria da direita, o azul do vidro; mais quente e mais forte de dia.
+- Materiais (`three/Blocks.tsx`): cada superfície é um material: fosco, polido (pisos de ladrilho e pedra e o corredor refletem um pouco), vidro (`MeshPhysicalMaterial` com reflexo, verniz e tom azul) e aceso (mais claro que o branco, para o brilho pegar: neon, telas, luminária, máquina de lanches, logo). Móveis e árvores projetam e recebem sombra; vidro e luz não.
+- Acabamento (`three/Effects.tsx`): reflexo de uma sala neutra (`RoomEnvironment`), oclusão de ambiente (`GTAOPass`) e brilho controlado (`UnrealBloomPass`, só acima do branco), tudo do próprio three.js, sem dependência nova.
+- Entorno (`three/city.ts`, puro, e `three/Surroundings.tsx`): céu em degradê com estrelas à noite; rua lá embaixo com um brilho roxo sob o andar; cidade em três anéis espaçados atrás e ao lado do escritório, mais altos os de longe, com janelas em grade nas fachadas (acesas em amarelo e algumas em azul, andares inteiros às vezes), coroas de neon, antenas com luz vermelha e casas de máquinas; névoa na cor do horizonte para dar profundidade sem nunca tocar o escritório; degraus da entrada até a rua; árvores redondas na frente da base, mais escuras à noite; painel com a marca na parede da recepção.
+- Base mais grossa (0,8 ladrilho) com a borda do piso acesa e dois fios de neon.
+
+### Decisões tomadas durante a implementação
+
+- **Sem `@react-three/postprocessing`:** os passes de efeito vêm de `three/examples`, já instalado com o three.js.
+- **O brilho só pega o que passa do branco:** com o limiar no branco, de dia a cena inteira estourava; as luzes foram baixadas e o que acende é multiplicado acima de 1.
+- **A névoa começa depois do canto mais distante do escritório**, calculada pela vista: a cidade some no horizonte, o escritório nunca.
+- **Janelas da cidade por textura:** um desenho de fachada repetido, deslocado por prédio, em vez de uma janela por objeto; acende mais à noite pela intensidade.
+
+### Comparação com a referência (1536×864)
+
+Igual: cidade noturna em volume com janelas acesas e alturas variadas,
+profundidade pelos anéis e pela névoa, luz roxa, neon na borda, vidro azulado,
+sombras dos móveis e das árvores, brilho nas luzes. Diferente, e da fase
+seguinte: móveis ainda em volumes simples (26), personagens planos e pequenos
+(27), atividade recente, indicadores e ações rápidas (29 e 30). Os prédios mais
+altos passam do topo do palco; na proposta o palco é mais alto e mostra mais
+céu (a altura do palco é da Fase 29).
+
+### Não validado
+
+- Quadros por segundo numa placa de vídeo integrada.
+- O brilho e a oclusão no Chromium sem placa (SwiftShader) foram vistos só nas capturas dos testes.
+
+## Fase 26 — Móveis detalhados em 3D (concluída)
+
+**Objetivo.** Trocar os volumes simples por móveis modelados, na escala dos
+personagens, e tirar as áreas vazias das salas padrão.
+
+### O que foi feito
+
+- Modelos (`three/model.ts`): cada móvel montado de peças num referencial de frente e fundo (`frameOf`), que serve para qualquer direção. Mesa com pernas, painel, tampo polido, monitor com pé e tela (acesa pelo estado do agente), teclado, mouse, papel e gabinete; cadeira de escritório com base de cinco pontas, rodinhas, coluna, assento e encosto estofados e braços; sofá e poltrona com pés, base, encosto, braços, almofadas e travesseiros; estante com prateleiras, livros de alturas e cores variadas e vasinhos; bancada com portas e puxador, tampo de madeira e notebook ou fruteira; cafeteira, bebedouro, geladeira, máquina de lanches com produtos atrás do vidro, TV com rack e console, TV de parede com gráfico aceso, quadro branco com anotações, jardim vertical, divisória, luminária, tapete com borda, mesa de centro com revista e caneca, mesa de reunião com notebooks, papéis e jarra.
+- Plantas com folhas em volume: lâminas em três camadas abrindo para fora e inclinadas para cima; a planta grande tem tronco e duas copas.
+- Peças novas do desenho (`three/Blocks.tsx`): caixa de cantos arredondados (`RoundedBoxGeometry` do three.js), folha (elipsoide achatado) e rotação de cada peça.
+- Layouts padrão (`packages/shared/src/office-presets.ts`): recepção com cadeiras atrás do balcão e um canto de espera com duas poltronas e mesa de centro; copa com três banquetas e uma planta grande; reunião com oito cadeiras em volta da mesa; descompressão com duas estantes, dois sofás em volta da mesa de centro de frente para a TV e pufe; plantas ao longo das bordas da frente e da direita do corredor.
+
+### Decisões tomadas durante a implementação
+
+- **Escala:** tampo da mesa a 0,44 ladrilho, assento a 0,24, estante a 1,2; o personagem em pé tem 1,05. Um teste confere essas relações.
+- **O layout salvo pelo usuário não muda:** os móveis novos aparecem nele, mas a disposição das salas padrão só vale para quem usa o layout automático (ou volta a ele no editor).
+- **Telas redesenhadas à parte e materiais compartilhados:** reconstruir todos os móveis a cada tela que acende, e descartar o material junto, recompilava o shader e travava a cena; com isso, 30 agentes andando voltaram a 57 a 59 quadros/s.
+- **Sem projetos, a frente do andar continua aberta:** a grade tem no mínimo 12 ladrilhos e, sem salas de projeto, o corredor da frente sobra; as plantas nas bordas diminuem o vazio, e cada projeto novo ocupa esse espaço com a sua sala.
+
+### Comparação com a referência (1536×864)
+
+Igual: sofás laranja com almofadas, estante com livros, TV, mesa de centro;
+mesas com monitores, teclados e cadeiras completas; bancada de madeira com
+banquetas; reunião com cadeiras em volta da mesa; plantas com folhas; salas
+cheias. Diferente, e da fase seguinte: personagens planos e pequenos (27);
+painéis da direita e de baixo (29 e 30).
+
+### Não validado
+
+- Os móveis foram vistos de perto só nas quatro direções que os testes desenham, em capturas da noite.
+
+## Fase 27 — Personagens voxel 3D (concluída)
+
+**Objetivo.** Trocar os personagens planos da cena 3D por personagens voxel,
+habitantes do escritório e não ícones, sem que ninguém precise escolher a
+aparência de novo.
+
+### O que foi feito
+
+- Modelo (`three/voxel.ts`, puro): o personagem é montado das mesmas opções de aparência das Fases 14, 15 e 22, em sete partes que se movem (tronco com a cabeça, dois braços, duas coxas e duas canelas penduradas nas coxas). Cabeça com olhos (branco, íris e brilho), sobrancelhas, nariz, boca, bochechas e orelhas; os nove cabelos (curto, longo, ondulado, cacheado, black power, coque, rabo de cavalo, espetado, raspado); barba, bigode e barba por fazer; óculos, fone com microfone e boné; camiseta (antebraço à mostra), moletom (capuz, bolso e cordões) e camisa (gola e botões); estampa listrada ou crachá; calça, cinto e sapatos com sola. Robôs têm cabeça de metal com tela, olhos e boca acesos e uma ou duas antenas.
+- Poses (`poseAt`, pura): em pé, andando (pernas e braços em oposição, com balanço), sentado (coxas para a frente, canelas penduradas), digitando, conversando, acenando para pedir aprovação e balançando a cabeça na falha; o que leva na mão (papel ou café) vai na mão direita.
+- Cena (`three/VoxelCharacter.tsx`): cada parte é uma malha que projeta sombra; personagens de mesma aparência dividem a geometria; as poses vivas (digitar, conversar, acenar, balançar a cabeça) redesenham a cena a 24 quadros/s, e com "reduzir movimento" o personagem fica na primeira pose.
+- Altura do personagem em pé: 1,15 ladrilho, acima da mesa (0,44) e abaixo da estante (1,2).
+
+### Decisões tomadas durante a implementação
+
+- **D9 (retratos): os cartões e avatares fora da cena continuam com o retrato 2D da Fase 22.** Um retrato voxel exigiria um desenho WebGL por avatar, em todas as telas; o retrato 2D usa as mesmas opções, as mesmas cores, e já está na proposta.
+- **O desenho em textura da Fase 24 saiu** (`characterFrames`), substituído pelo personagem voxel.
+
+### Comparação com a referência (1536×864)
+
+Igual: personagens em volume, com cabeça e cabelo detalhados, roupas de cores
+distintas, braços e pernas, sentados às mesas, em pé e andando, com animação
+discreta. Diferente, e da fase seguinte: o clique e as placas já funcionam
+(camada SVG da Fase 24), e o editor em 3D é da Fase 28; os painéis da direita
+e de baixo são das Fases 29 e 30.
+
+### Não validado
+
+- Todas as combinações de aparência foram montadas pelos testes, mas vistas de perto só cinco delas, sentadas, e duas em pé.
+
+## Fase 28 — Interação e editor na cena 3D (concluída)
+
+**Objetivo.** Tudo o que a cena 2D fazia funcionar na 3D. O clique nos
+agentes, os balões e as placas das salas já estavam na camada SVG da Fase 24;
+faltava o editor do escritório, que até aqui mostrava a planta 2D (D5).
+
+### O que foi feito
+
+- Editor em 3D (`three/EditorCanvas.tsx`): o mesmo piso, paredes, móveis, luz, cidade e efeitos do Escritório, sem os personagens, com as telas das mesas apagadas. O que se arrasta aparece no 3D enquanto é arrastado.
+- Camada SVG do editor, por cima do 3D, nos pixels da vista inteira: recebe o ponteiro, desenha a seleção, os problemas, o retângulo da área nova, o ladrilho sob o ponteiro e as placas das salas (`RoomSigns`, agora compartilhado com o Escritório), e marca o piso de cada área e de cada móvel (`data-editor-area`, `data-editor-item`) para os testes.
+- Do pixel ao ladrilho: `unproject` na vista da câmera (`three/view.ts`), o inverso exato de `project`, no plano do piso. Selecionar, arrastar, desenhar área, abrir porta e apagar usam o mesmo ladrilho que antes.
+- Zoom e arraste da vista do editor continuam (roda do mouse, botões, "Mostrar o escritório inteiro"): mudam o `viewBox` da camada, e a câmera segue o mesmo retângulo (`zoomedView`), de modo que marca e desenho ficam juntos em qualquer zoom.
+- Sem WebGL, o editor mostra a planta SVG de antes (D4); os testes de componente continuam por ela.
+- Defeito da Fase 26 corrigido de passagem: cada volume arredondado gerava um aviso no console (centenas por página); o teste `Blocks.test.ts` o reproduz.
+
+### Decisões tomadas durante a implementação
+
+- **O editor mantém zoom e arraste.** A D6 tirou o zoom do Escritório, que mostra tudo; no editor, aproximar ajuda a pôr móvel em ladrilho certo numa grade grande, e o critério da fase é que tudo o que a cena 2D fazia funcione na 3D.
+- **A escolha do ladrilho é no plano do piso, como na planta 2D.** Clicar no alto de uma estante escolhe o ladrilho atrás dela, como antes; o contorno do ladrilho sob o ponteiro mostra qual é.
+
+### Comparação com a referência (1536×864)
+
+O editor mostra o escritório como a referência e como o Escritório, com o
+painel de propriedades ao lado. A tela inicial com painéis à direita e
+embaixo é das Fases 29 e 30.
+
+### Não validado
+
+- O editor em 3D no celular foi aberto pelo E2E (cabe na tela, sem rolagem lateral), mas arrastar com o dedo não foi testado.
+
+## Fase 29 — Escritório como tela inicial (concluída)
+
+**Objetivo.** A tela da proposta: a cena no centro, o time e a atividade à
+direita, as ações rápidas embaixo; a cena e os cartões ligados entre si.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D8, todas como recomendadas).**
+D1: `/` abre o Escritório; o Painel vira "Relatórios", em `/relatorios`
+(como a D2 da Fase 21 previa). D2: todos os agentes em cartões, numa coluna
+com rolagem, por urgência (espera você, falhou, trabalha, ocioso, inativo),
+com "Ver todos os agentes" no pé. D3: clicar num agente na cena acende o
+cartão dele e o traz à vista; apontar ou focar um cartão acende um anel aos
+pés do agente; o cartão abre a conversa e o "Decidir" continua nele. D4:
+"passo N de até M · tempo" e a tarefa no cartão, sem porcentagem. D5:
+atividade recente por `GET /api/activity`. D6: ações rápidas "Criar
+tarefa", "Novo agente" e "Agendar tarefa", apagadas com o motivo quando não
+são possíveis. D7: nenhuma faixa reservada aos indicadores da Fase 30. D8:
+cena com pelo menos metade da tela em 1366×768; no celular, abas Time e
+Atividade.
+
+### O que foi feito
+
+- Contrato (`packages/shared/src/activity.ts`): `activityEntrySchema` (tarefa concluída, entrega entre áreas, tarefa criada por agendamento, pedido de aprovação e resposta, execução que falhou), `ACTIVITY_LIMIT` (20). A execução atual do agente em `/api/office` ganhou `startedAt`, `steps` (chamadas de modelo feitas), `maxSteps` (o limite do agente) e `task`.
+- Servidor (`modules/activity`): cada fonte lida do histórico que já existia (`task_events`, `approvals`, `runs`), do mais novo ao mais antigo, juntada e cortada em 20. A tarefa concluída é a que entra numa etapa do tipo "concluída" da área; a entrega é contada uma vez, na tarefa pedida.
+- Interface: `/` leva a `/escritorio`; menu com Escritório primeiro e Relatórios. A página do Escritório tem a cena, as ações rápidas embaixo e, ao lado, o time em cartões (`AgentCard`) e a atividade recente (`ActivityFeed`); no celular, abas. Selecionar na cena acende o cartão; apontar o cartão acende o anel (3D, em `VoxelCharacter`) e marca `data-lit` na camada SVG.
+- "Criar tarefa" abre o formulário do quadro (`/tarefas?nova=1`) e "Agendar tarefa", o de agendamento (`/tarefas/agendamentos?novo=1`).
+
+### Decisões tomadas durante a implementação
+
+- **A atividade guarda o nome de um agente excluído depois**, como a atividade do Painel: é histórico, não lista de agentes.
+- **"Criar tarefa" numa área sem fluxo leva ao quadro**, que pede para montar o fluxo antes (uma área nova não nasce com etapas).
+- **Clique na cena não abre mais a conversa nem o pedido de aprovação**: os dois ficam no cartão (D3).
+- **A descrição da página ficou mais curta**, para a cena e as ações rápidas caberem em 1536×864 sem rolar; o que ela dizia sobre a copa e a reunião continua no guia.
+
+### Comparação com a referência (1536×864)
+
+Igual: menu, topo, cena no centro, time em cartões e atividade à direita,
+ações rápidas embaixo. Diferente, e da fase seguinte: os indicadores do
+rodapé (Fase 30). Diferente de propósito: os cartões dizem passos e tempo em
+vez de barra de progresso, e não há botão "Nova área" no cabeçalho (as áreas
+são criadas em Tarefas).
+
+### Não validado
+
+- Leitor de tela real nas abas do celular e no anel da cena.
+- A atividade com um modelo real trabalhando; foi exercitada com dados gravados no teste e com o provedor simulado no E2E (pedido aprovado e negado).
+
+## Fase 30 — Indicadores reais (concluída)
+
+**Objetivo.** Os cartões do rodapé da proposta, cada um com uma conta que se
+explica e um estado honesto sem dados.
+
+**Decisões aprovadas em 2026-11-19 (D1 a D6, todas como recomendadas).** D1:
+"Concluídas hoje" (contra ontem), "Tempo médio por tarefa" (7 dias),
+"Execuções sem falha" (7 dias, sem as interrompidas pelo usuário ou pelo
+servidor) e, no lugar de "Produtividade", "Concluídas na semana" (contra os
+7 dias anteriores), cada um com série de 7 dias. D2: dias do relógio desta
+máquina. D3: `GET /api/indicators`, calculado a cada leitura, no teste de
+desempenho. D4: cartões abaixo da cena; ações rápidas compactas no pé da
+coluna da direita. D5: os mesmos cartões no topo de Relatórios. D6: testes
+de cada conta com dados conhecidos, de componente e E2E.
+
+### O que foi feito
+
+- Contrato (`packages/shared/src/indicators.ts`): `indicatorsSchema`, `INDICATOR_DAYS` (7); série com `null` no dia sem nada a medir.
+- Servidor (`modules/indicators`): o repositório lê duas semanas de conclusões (entrada em etapa "concluída") e de execuções que terminaram sozinhas; `countIndicators` é pura, recebe o relógio, separa por dia local e conta cada tarefa uma vez, no primeiro dia em que foi concluída.
+- Interface: `features/indicators/IndicatorRow.tsx` (`indicatorViews` diz valor, comparação, tom, série e o texto do leitor de tela de cada cartão); no Escritório abaixo da cena e em Relatórios no topo. `QuickAction` ganhou a forma compacta (`compact`), que deixa a descrição de fora, mas nunca o motivo de estar apagada.
+- Teste de desempenho: a semente passou a ter etapas "concluída" e 15 mil conclusões em duas semanas; os indicadores e a atividade recente entraram nas medições.
+
+### Decisões tomadas durante a implementação
+
+- **Mais tarefas concluídas é "boa notícia" (verde), menos é "vale olhar" (amarelo)**, e igual é neutro; o tempo médio e as execuções não ganham cor de comparação, porque não comparam com nada.
+- **Dia sem nada a medir fica fora da linha do mini gráfico** e é dito como "sem dado" ao leitor de tela; trocá-lo por zero diria que o tempo médio foi zero.
+- **A cena desceu para 46% da altura da janela**, para cena, cartões e coluna caberem em 1536×864 sem rolar.
+
+### Comparação com a referência (1536×864)
+
+Igual: menu, topo, cena, time e atividade à direita, indicadores embaixo da
+cena, ações rápidas no canto inferior direito. Diferente de propósito: o
+quarto indicador ("Concluídas na semana" no lugar de "Produtividade") e as
+comparações em números, não em porcentagem.
+
+### Não validado
+
+- Em 1366×768 a cena tem 51% da largura e 46% da altura, e a página rola 44 px até o fim dos cartões; o critério da Fase 29 ("pelo menos metade da tela") vale para a largura, não para a altura.
+- Uma virada de horário de verão real (a conta arredonda o dia; o teste usa um dia comum).
+
+## Fase 31 — Telas internas no mesmo padrão (concluída)
+
+**Objetivo.** As telas internas com as peças do sistema visual da Fase 20,
+para a plataforma inteira parecer uma coisa só, e o quadro de tarefas com
+arrastar entre etapas.
+
+**Decisões aprovadas em 2026-11-20 (D1 a D8, todas como recomendadas).** D1:
+arrastar no quadro com o recurso nativo do navegador, sem biblioteca; só as
+etapas que o fluxo permite ficam acesas; tarefa com agente trabalhando, pedido
+não aprovado ou cancelada não sai do lugar; soltar abre uma confirmação com
+nota opcional. D2: no celular e pelo teclado, o botão "Mover para…" em cada
+cartão, com as mesmas etapas. D3: Agentes em grade de `AgentCard`, com as
+ações de hoje no pé. D4: estado sempre por `StatusPill` com o tom de `TONES`.
+D5: nenhum número novo nas telas internas. D6: estado vazio com o próximo
+passo. D7: painéis no nível elevado; vidro só sobre a cena. D8: teste que
+barra cor de estado solta nas telas, testes de componente do arrastar e do
+menu, E2E de arrastar (desktop) e de mover pelo menu (celular), capturas.
+
+### O que foi feito
+
+- Quadro (`features/tasks`): `moves.ts` (`movesOf`, puro: a mesma regra do servidor, lida do fluxo que o quadro já tem), `MoveTaskDialog.tsx` (a confirmação, com nota), cartões arrastáveis e colunas que aceitam ou recusam (`data-accepts`), coluna vazia com "Nenhuma tarefa aqui." para receber o cartão.
+- Agentes: grade de `AgentCard`; o cartão ganhou `actions` (faixa no pé, acima do link que cobre o cartão), `dimmed` e a linha de atividade opcional.
+- Peças novas do sistema visual: `Notice` (aviso em caixa no tom), `FormError`, `ToneText`, `TextLink`/`LINK`/`BACK_LINK` e `RunStatusPill`; `TONES` ganhou `edge` (borda no tom). Todas na página `/referencia`, seção "Avisos e links".
+- Estados por pílula: execuções (Logs, Relatórios, página da execução), tarefas e prioridade, aprovações decididas, risco de ferramenta, provedor externo ou local.
+- Vazios com próximo passo: Aprovações (ir a Ferramentas), Automações (criar o primeiro agendamento ou uma área), Logs (conversar com um agente ou limpar os filtros), Agentes filtrados (limpar a busca).
+- Teste novo em `app/theme.test.ts`: nenhuma tela (`features/` e `app/`, fora a cena e a referência) usa classe de cor de estado direto.
+
+### Decisões tomadas durante a implementação
+
+- **"Em andamento" virou tom de informação (azul) e "Concluída" virou verde**; antes, a concluída era texto branco e a em andamento, verde. Assim o verde quer dizer "deu certo" em toda tela.
+- **Selecionado é `glow`, não cor de estado**: a execução atual na árvore e a permissão marcada em Ferramentas usavam a borda azul de informação.
+- **Os cartões de Agentes não mostram o que o agente faz agora**: a lista não acompanha execuções, e uma linha "Sem tarefa no momento." seria falsa enquanto ele trabalha. A linha aparece só para o que o usuário precisa corrigir (agente sem modelo).
+- **Os vazios que já ficam ao lado do formulário ou do botão que resolve** (projetos, regras de pedidos, modelos de fluxo, modelos de um provedor) ficaram como estavam: o texto diz o que fazer e o controle está logo abaixo.
+
+### Não validado
+
+- O arrasto foi feito pelo Playwright, não por uma pessoa com mouse; a rolagem automática do quadro ao arrastar até uma coluna fora da tela não foi testada (o E2E rola a coluna para a vista antes).
+- Leitor de tela no quadro durante o arrasto (o caminho acessível é o "Mover para…", testado).
+
+## Fase 32 — Primeiros passos e polimento (concluída)
+
+**Objetivo.** Quem abre pela primeira vez chega ao primeiro agente
+trabalhando sem ler manual; a plataforma passa na auditoria WCAG 2.1 AA.
+
+**Decisões aprovadas em 2026-11-20 (D1 a D8, todas como recomendadas).** D1:
+cartão "Primeiros passos" no Escritório, acima do time, com quatro etapas
+lidas dos dados. D2: pode ser pulado e retomado pela Ajuda. D3: "pulei" e
+dicas fechadas no servidor (`settings`, chave `guide`; `GET`/`PUT
+/api/guide`). D4: Ajuda com o próprio `docs/GUIA.md`, títulos com âncora e
+tabelas (`remark-gfm`), sem HTML nem imagens. D5: cinco dicas que somem com
+"Entendi" e voltam pela Ajuda. D6: revisão de movimento (teste) e de textos.
+D7: auditoria com `@axe-core/playwright` em todas as telas, nos dois perfis,
+sem falha crítica ou séria, e o primeiro passo feito só pelo teclado. D8: E2E
+do primeiro uso, contando ações e tempo com o provedor simulado; o tempo de
+uma pessoa com modelo real é validação do usuário. Retratos fora da cena
+continuam 2D.
+
+### O que foi feito
+
+- Contrato (`packages/shared/src/guide.ts`): `TIP_IDS`, `guideSchema` (o que se grava), `GUIDE_STEPS` e `guideStateSchema` (o que a rota responde, com `done` de cada etapa).
+- Servidor (`modules/frame`): `GET`/`PUT /api/guide`; `guideProgress` lê dos dados se há provedor, modelo habilitado, etapa de fluxo e tarefa; o que está gravado é conferido de novo ao ler.
+- Interface: `features/guide/FirstSteps.tsx` (o cartão e `useFirstStepsOpen`), `features/help/` (`HelpPage`, `GuideDocument` com `anchorOf`), `components/Tip.tsx`, `lib/address-flag.ts` (`?novo=1` em Modelos e `?nova-area=1` em Tarefas abrem os formulários); a Ajuda saiu das áreas planejadas (`PLANNED_AREAS` ficou vazia).
+- Acessibilidade (achados do axe, todos sérios, nenhum crítico): o botão de busca passou a ter como nome o texto que mostra; o `StatBoard` tirou o papel de grupo do próprio `<dl>`; as áreas que rolam (time e atividade do Escritório, tabelas do guia) recebem foco pelo teclado.
+- E2E novos: `accessibility.spec.ts` (14 telas, instalação nova e com dados, desktop e celular) e `first-use.spec.ts` (servidor próprio na porta 4396).
+
+### Decisões tomadas durante a implementação
+
+- **Enquanto o roteiro está aberto, as ações rápidas saem do Escritório**: em 1536×864 o cartão, o time, a atividade e as ações não cabiam juntos e se sobrepunham; numa instalação nova duas das três ações estão apagadas e o cartão já leva ao passo seguinte.
+- **O progresso é calculado a cada leitura**, nunca gravado: apagar a última tarefa faz o passo voltar a aparecer.
+- **A consulta do guia é relida sempre que o Escritório abre**: os passos são feitos em outras telas.
+- **As dicas são texto fixo da interface**; só os ids ficam no contrato, e um teste confere que todo id tem o seu lugar.
+
+### Não validado
+
+- O tempo de uma pessoa de verdade, com um modelo real, da instalação à primeira tarefa (o E2E mede 19 ações e 15,6 s com o provedor simulado).
+- Leitor de tela real (NVDA ou Narrador) no roteiro e na Ajuda; a auditoria é automática e o teclado foi conferido só no primeiro passo.
 
 ## Pendências ao final do projeto
 

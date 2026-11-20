@@ -32,6 +32,9 @@ import {
 } from '../../lib/run-queries';
 import { useApprovals } from '../../lib/tool-queries';
 import { RunTimeline } from '../logs/RunTimeline';
+import { LINK } from '../../components/TextLink';
+import { FormError, Notice } from '../../components/Notice';
+import { TONES } from '../../lib/tone';
 
 const chatPath = (agentId: string, conversationId?: string) =>
   `/agentes/${agentId}/conversa${conversationId ? `/${conversationId}` : ''}`;
@@ -72,14 +75,14 @@ function RunNote({ run }: { run: RunSummary }) {
   return (
     <li className="text-sm text-dim">
       {problem && (
-        <p role={failed ? 'alert' : undefined} className={failed ? 'text-fail' : ''}>
+        <p role={failed ? 'alert' : undefined} className={failed ? TONES.fail.text : ''}>
           {problem}
         </p>
       )}
       <p>
         {facts.join(' · ')}
         {facts.length > 0 && ' · '}
-        <Link to={`/logs/${run.id}`} className="text-info underline underline-offset-4">
+        <Link to={`/logs/${run.id}`} className={LINK}>
           Ver passos
         </Link>
       </p>
@@ -107,20 +110,16 @@ function activityText(status: RunSummary['status'], stream: RunStream): string {
 /** The answer being written right now, with its steps as they happen. */
 function LiveAnswer({ stream, run }: { stream: RunStream; run: RunSummary | undefined }) {
   const status = stream.status ?? run?.status ?? 'queued';
-  const waiting = status === 'waiting_approval';
+  const tone = TONES[status === 'waiting_approval' ? 'wait' : 'ok'];
   return (
     <li className="flex justify-start">
-      <div className="max-w-[min(42rem,92%)] rounded-lg border border-ok/50 bg-sheet px-3.5 py-2.5">
+      <div
+        className={`max-w-[min(42rem,92%)] rounded-lg border bg-sheet px-3.5 py-2.5 ${TONES.ok.edge}`}
+      >
         <p className="sr-only">Agente:</p>
         {stream.text !== '' && <Markdown text={stream.text} />}
-        <p
-          role="status"
-          className={`flex items-center gap-2 text-sm ${waiting ? 'text-wait' : 'text-ok'}`}
-        >
-          <span
-            className={`size-2 animate-lamp rounded-full ${waiting ? 'bg-wait' : 'bg-ok'}`}
-            aria-hidden
-          />
+        <p role="status" className={`flex items-center gap-2 text-sm ${tone.text}`}>
+          <span className={`size-2 animate-lamp rounded-full ${tone.dot}`} aria-hidden />
           {activityText(status, stream)}
         </p>
         {stream.steps.length > 0 && (
@@ -232,7 +231,7 @@ function blockedNotice(agent: Agent) {
     return (
       <>
         Este agente está inativo e não responde.{' '}
-        <Link to="/agentes" className="text-info underline underline-offset-4">
+        <Link to="/agentes" className={LINK}>
           Ativar na lista de agentes
         </Link>
       </>
@@ -242,7 +241,7 @@ function blockedNotice(agent: Agent) {
     return (
       <>
         Este agente ainda não tem um modelo.{' '}
-        <Link to={`/agentes/${agent.id}`} className="text-info underline underline-offset-4">
+        <Link to={`/agentes/${agent.id}`} className={LINK}>
           Escolher um modelo
         </Link>
       </>
@@ -297,20 +296,12 @@ function Composer({
   return (
     <form onSubmit={submit} className="space-y-2 border-t border-line p-3 sm:p-4">
       {blocked && (
-        <p role="status" className="text-sm text-wait">
+        <Notice tone="wait" role="status">
           {blocked}
-        </p>
+        </Notice>
       )}
-      {send.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(send.error)}
-        </p>
-      )}
-      {cancel.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(cancel.error)}
-        </p>
-      )}
+      {send.error && <FormError>{errorMessage(send.error)}</FormError>}
+      {cancel.error && <FormError>{errorMessage(cancel.error)}</FormError>}
       <div className="flex items-end gap-2">
         <label htmlFor="chat-message" className="sr-only">
           Mensagem
@@ -547,7 +538,7 @@ export function ChatPage() {
           <p className="font-semibold">Agente não encontrado.</p>
           <p className="mt-1 text-sm text-dim">
             Ele pode ter sido excluído. As execuções antigas continuam nos{' '}
-            <Link to="/logs" className="text-info underline underline-offset-4">
+            <Link to="/logs" className={LINK}>
               logs
             </Link>
             .

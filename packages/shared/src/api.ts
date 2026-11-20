@@ -123,6 +123,13 @@ export const officeAgentSchema = z.object({
       status: z.enum(RUN_STATUSES),
       /** Start of the message being answered; shown in the activity balloon. */
       prompt: z.string().nullable(),
+      /** When it started working; null while queued (Phase 29). */
+      startedAt: z.string().nullable(),
+      /** Model calls made so far, and the agent's limit: "passo 4 de até 20" (D4). */
+      steps: count,
+      maxSteps: z.number().int().positive(),
+      /** The board task it works on, if any. */
+      task: z.object({ id: z.string(), title: z.string() }).nullable(),
     })
     .nullable(),
   /** Why the last run failed, when the agent is in the failed state. */

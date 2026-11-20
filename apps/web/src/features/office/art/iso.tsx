@@ -1,3 +1,5 @@
+import { mix } from '../../../components/pixel-art/shade';
+
 // Isometric projection (2:1) of the office grid. Tile coordinates go in; SVG
 // user units come out. A tile is 32 units wide and 16 high on screen; `z`
 // lifts a point straight up, in the same units.
@@ -49,6 +51,8 @@ export interface BoxColors {
   readonly left: string;
   /** The face toward the bottom right of the screen (facing +x). */
   readonly right: string;
+  /** A dark outline around each face, as the characters have (Phase 23). */
+  readonly edge?: string;
 }
 
 /**
@@ -75,6 +79,9 @@ export function IsoBox({
   className?: string;
 }) {
   const top = z + h;
+  const stroke = colors.edge
+    ? { stroke: colors.edge, strokeWidth: 0.6, strokeLinejoin: 'round' as const }
+    : {};
   return (
     <g className={className}>
       <polygon
@@ -85,6 +92,7 @@ export function IsoBox({
           [x, y + d, top],
         ])}
         fill={colors.left}
+        {...stroke}
       />
       <polygon
         points={points([
@@ -94,8 +102,9 @@ export function IsoBox({
           [x + w, y, top],
         ])}
         fill={colors.right}
+        {...stroke}
       />
-      <polygon points={floorPoints(x, y, w, d, top)} fill={colors.top} />
+      <polygon points={floorPoints(x, y, w, d, top)} fill={colors.top} {...stroke} />
     </g>
   );
 }
@@ -105,4 +114,19 @@ export const shades = (top: string, left: string, right: string): BoxColors => (
   top,
   left,
   right,
+});
+
+const WARM_LIGHT = '#fff6e8';
+const NIGHT = '#1d1530';
+
+/**
+ * The faces of a box from one colour, in the tones of the characters (Phase
+ * 23): a lit top, the colour itself toward the viewer's left, a shadow on the
+ * right, and a dark outline.
+ */
+export const tones = (base: string): BoxColors => ({
+  top: mix(base, WARM_LIGHT, 0.28),
+  left: base,
+  right: mix(base, NIGHT, 0.22),
+  edge: mix(base, NIGHT, 0.75),
 });

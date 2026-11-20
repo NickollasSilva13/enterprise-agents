@@ -17,10 +17,17 @@ const RECONNECT_MS = 3000;
 const LIVE_QUERY_KEYS = [
   ['dashboard'],
   ['office'],
+  // The office's recent activity (Phase 29).
+  ['activity'],
+  // The indicators (Phase 30).
+  ['indicators'],
   ['agents'],
   ['runs'],
   ['conversations'],
   ['approvals'],
+  // The bell and the menu counters (Phase 21).
+  ['tasks-waiting'],
+  ['requests'],
 ];
 
 const liveEventsSupported = () => typeof EventSource !== 'undefined';

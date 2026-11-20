@@ -4,7 +4,11 @@ import { ptBR } from 'zod/locales';
 // Validation messages reach the user, so they are in Portuguese everywhere.
 z.config(ptBR());
 
+export * from './activity';
 export * from './enums';
+export * from './frame';
+export * from './guide';
+export * from './indicators';
 export * from './api';
 export * from './agents';
 export * from './appearance';

@@ -1,14 +1,13 @@
 import { type Agent, AGENT_STATES, type AgentState } from '@ea/shared';
 import { Copy, History, MessageSquare, Pencil, Plus, Trash2, Wrench } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
-import { AgentAvatar } from '../../components/AgentAvatar';
-import { buttonClass, IconButton } from '../../components/Button';
+import { AgentCard } from '../../components/AgentCard';
+import { Button, buttonClass, IconButton } from '../../components/Button';
 import { SelectField, Switch, TextField } from '../../components/Form';
 import { ConfirmDialog } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
-import { StateLamp } from '../../components/StateLamp';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
 import { AGENT_STATE_STYLES } from '../../lib/agent-state';
@@ -53,73 +52,81 @@ function AgentRow({ agent, onDelete }: { agent: Agent; onDelete: (agent: Agent) 
       onError: (error) => notify(errorMessage(error), 'fail'),
     });
 
+  const iconLink = (to: string, label: string, title: string, icon: ReactNode) => (
+    <Link
+      to={to}
+      aria-label={label}
+      title={title}
+      className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
+    >
+      {icon}
+    </Link>
+  );
+
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-      <AgentAvatar agentId={agent.id} appearance={agent.appearance} dimmed={!agent.enabled} />
-      <div className="min-w-0 flex-1 basis-52">
-        <Link
-          to={`/agentes/${agent.id}`}
-          className="block truncate font-semibold underline-offset-4 hover:underline"
-        >
-          {agent.name}
-        </Link>
-        <p className="truncate text-sm text-dim">
-          {agent.projectName ?? 'Sem projeto'}
-          {', '}
-          <span className={agent.modelName ? '' : 'text-wait'}>
-            {agent.modelName ?? 'sem modelo'}
-          </span>
-        </p>
-      </div>
-      <div className="w-36">
-        <StateLamp state={agent.state} />
-      </div>
-      <Switch
-        checked={agent.enabled}
-        onChange={toggle}
-        disabled={update.isPending}
-        label={`${agent.name} ativo`}
+    <li>
+      <AgentCard
+        agentId={agent.id}
+        name={agent.name}
+        role={`${agent.projectName ?? 'Sem projeto'} · ${agent.modelName ?? 'sem modelo de IA'}`}
+        appearance={agent.appearance}
+        state={agent.state}
+        // Only what the user must fix shows here: the list does not follow runs.
+        {...(agent.modelName
+          ? {}
+          : { activity: 'Sem modelo de IA: escolha um para ele poder trabalhar.' })}
+        {...(agent.description ? { meta: agent.description } : {})}
+        to={`/agentes/${agent.id}`}
+        dimmed={!agent.enabled}
+        actions={
+          <>
+            <Switch
+              checked={agent.enabled}
+              onChange={toggle}
+              disabled={update.isPending}
+              label={`${agent.name} ativo`}
+            >
+              <span className="text-dim">{agent.enabled ? 'Ativo' : 'Desligado'}</span>
+            </Switch>
+            <span className="ml-auto flex flex-wrap">
+              {iconLink(
+                `/agentes/${agent.id}/conversa`,
+                `Conversar com ${agent.name}`,
+                'Conversar',
+                <MessageSquare className="size-4.5" aria-hidden />,
+              )}
+              {iconLink(
+                `/logs?agente=${agent.id}`,
+                `Histórico de ${agent.name}`,
+                'Histórico de execuções',
+                <History className="size-4.5" aria-hidden />,
+              )}
+              {iconLink(
+                `/ferramentas?agente=${agent.id}`,
+                `Ferramentas de ${agent.name}`,
+                'Ferramentas e permissões',
+                <Wrench className="size-4.5" aria-hidden />,
+              )}
+              {iconLink(
+                `/agentes/${agent.id}`,
+                `Editar ${agent.name}`,
+                'Editar',
+                <Pencil className="size-4.5" aria-hidden />,
+              )}
+              <IconButton
+                label={`Duplicar ${agent.name}`}
+                onClick={copy}
+                disabled={duplicate.isPending}
+              >
+                <Copy className="size-4.5" aria-hidden />
+              </IconButton>
+              <IconButton label={`Excluir ${agent.name}`} onClick={() => onDelete(agent)}>
+                <Trash2 className="size-4.5" aria-hidden />
+              </IconButton>
+            </span>
+          </>
+        }
       />
-      <div className="flex">
-        <Link
-          to={`/agentes/${agent.id}/conversa`}
-          aria-label={`Conversar com ${agent.name}`}
-          title="Conversar"
-          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
-        >
-          <MessageSquare className="size-4.5" aria-hidden />
-        </Link>
-        <Link
-          to={`/logs?agente=${agent.id}`}
-          aria-label={`Histórico de ${agent.name}`}
-          title="Histórico de execuções"
-          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
-        >
-          <History className="size-4.5" aria-hidden />
-        </Link>
-        <Link
-          to={`/ferramentas?agente=${agent.id}`}
-          aria-label={`Ferramentas de ${agent.name}`}
-          title="Ferramentas e permissões"
-          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
-        >
-          <Wrench className="size-4.5" aria-hidden />
-        </Link>
-        <Link
-          to={`/agentes/${agent.id}`}
-          aria-label={`Editar ${agent.name}`}
-          title="Editar"
-          className="grid size-10 place-items-center rounded-md text-dim hover:bg-sheet-raised hover:text-chalk"
-        >
-          <Pencil className="size-4.5" aria-hidden />
-        </Link>
-        <IconButton label={`Duplicar ${agent.name}`} onClick={copy} disabled={duplicate.isPending}>
-          <Copy className="size-4.5" aria-hidden />
-        </IconButton>
-        <IconButton label={`Excluir ${agent.name}`} onClick={() => onDelete(agent)}>
-          <Trash2 className="size-4.5" aria-hidden />
-        </IconButton>
-      </div>
     </li>
   );
 }
@@ -231,9 +238,21 @@ export function AgentsPage() {
               </div>
 
               {visible.length === 0 ? (
-                <EmptyState title="Nenhum agente corresponde aos filtros." />
+                <EmptyState
+                  title="Nenhum agente corresponde aos filtros."
+                  action={
+                    <Button
+                      onClick={() => {
+                        setSearch('');
+                        setState('all');
+                      }}
+                    >
+                      Limpar a busca
+                    </Button>
+                  }
+                />
               ) : (
-                <ul className="divide-y divide-line" aria-label="Agentes">
+                <ul className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Agentes">
                   {visible.map((agent) => (
                     <AgentRow key={agent.id} agent={agent} onDelete={setDeleting} />
                   ))}

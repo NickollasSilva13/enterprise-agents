@@ -7,6 +7,9 @@ import {
   FLOOR_LABELS,
   FLOORS,
   footprint,
+  ITEM_COLOR_LABELS,
+  ITEM_COLORS,
+  type ItemColor,
   ITEM_KIND_INFO,
   ITEM_KINDS,
   type ItemKind,
@@ -46,6 +49,9 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  lazy,
+  Suspense,
+  useCallback,
   useMemo,
   useReducer,
   useRef,
@@ -64,7 +70,11 @@ import { useOffice, useResetLayout, useSaveLayout } from '../../../lib/queries';
 import { areaName, sceneBounds, wallsByBand } from '../art/architecture';
 import { Chair, Furniture, isFlat } from '../art/furniture';
 import { floorPoints, unproject } from '../art/iso';
+import { useDaylight } from '../daylight';
 import { Around, AroundFront, Floor, Perimeter, Signs } from '../OfficeScene';
+import { RoomSigns } from '../three/OfficeOverlay';
+import { hasWebGL, useElementSize } from '../three/support';
+import { officeView, type OfficeView } from '../three/view';
 import { useViewport } from '../viewport';
 import {
   areaAt,
@@ -75,10 +85,17 @@ import {
   toInput,
   wallAt,
 } from './editor-state';
+import { TONES } from '../../../lib/tone';
 
 // The office editor (Phase 14): rooms drawn on the grid, doors, furniture
 // from the catalog, all saved at once. Everything the pointer does here can
-// also be done with the keyboard and the forms of the side panel.
+// also be done with the keyboard and the forms of the side panel. Since
+// Phase 28 the picture is the 3D office (EditorCanvas), with an SVG layer on
+// top, in the pixels of the whole view, that takes the pointer and draws the
+// marks; zoom and pan move that layer's `viewBox`, and the camera follows it.
+// Without WebGL the SVG drawing of Phases 14 to 23 is the picture.
+
+const EditorCanvas = lazy(() => import('../three/EditorCanvas'));
 
 type Tool =
   | { readonly kind: 'select' }
@@ -167,11 +184,33 @@ function Editor({ office }: { office: Office }) {
     : layout;
   const issues = useMemo(() => validateLayout(layout), [layout]);
 
-  const stage = useRef<HTMLDivElement>(null);
+  const [webgl] = useState(hasWebGL);
+  const light = useDaylight();
+  const stage = useRef<HTMLDivElement | null>(null);
+  const measured = useElementSize();
+  const measure = measured.ref;
+  const stageRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      stage.current = element;
+      measure(element);
+    },
+    [measure],
+  );
   const svg = useRef<SVGSVGElement>(null);
+  const size = measured.size;
+  const base = useMemo(
+    () =>
+      webgl && size
+        ? officeView({ width: layout.width, height: layout.height }, size.width, size.height)
+        : null,
+    [webgl, layout.width, layout.height, size],
+  );
   const bounds = useMemo(
-    () => sceneBounds({ width: layout.width, height: layout.height }),
-    [layout.width, layout.height],
+    () =>
+      webgl
+        ? base && { x: 0, y: 0, width: base.width, height: base.height }
+        : sceneBounds({ width: layout.width, height: layout.height }),
+    [webgl, base, layout.width, layout.height],
   );
 
   const pointOf = (clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -179,8 +218,12 @@ function Editor({ office }: { office: Office }) {
     const matrix = element?.getScreenCTM?.();
     if (!element || !matrix) return null;
     const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    if (webgl) return base ? base.unproject(point.x, point.y) : null;
     return unproject({ x: point.x, y: point.y });
   };
+  /** The `points` of a rectangle of the floor, `lift` above it, in the layer's units. */
+  const floorOf = (x: number, y: number, w: number, d: number, lift: number) =>
+    base ? floorPolygon(base, x, y, w, d, lift / 40) : floorPoints(x, y, w, d, lift);
   const tileOf = (point: { x: number; y: number }): Tile | null => {
     const tile = { x: Math.floor(point.x), y: Math.floor(point.y) };
     return tile.x >= 0 && tile.y >= 0 && tile.x < layout.width && tile.y < layout.height
@@ -425,25 +468,34 @@ function Editor({ office }: { office: Office }) {
         <p className="text-sm text-dim">{TOOL_HINT[tool.kind]}</p>
 
         <div
-          ref={stage}
+          ref={stageRef}
           tabIndex={0}
           role="application"
           aria-label="Planta do escritório. Com algo selecionado: setas movem, R gira, Delete apaga; Ctrl+Z desfaz."
           onKeyDown={keyDown}
           className="office-stage relative h-[min(70dvh,46rem)] min-h-80 overflow-hidden rounded-xl border border-line"
         >
+          {base && (
+            <Suspense fallback={null}>
+              <EditorCanvas layout={shown} base={base} follow={viewport.subscribe} light={light} />
+            </Suspense>
+          )}
           <svg
             ref={svg}
-            className="absolute inset-0 size-full touch-none select-none"
+            className={`absolute inset-0 size-full touch-none select-none ${base ? 'office-overlay' : ''}`}
             preserveAspectRatio="xMidYMid meet"
             onPointerDown={down}
             onPointerMove={move}
             onPointerUp={up}
             onPointerLeave={() => setHover(null)}
             aria-hidden
-            data-editor-canvas
+            data-editor-canvas={webgl ? '3d' : 'svg'}
           >
-            <EditorPicture layout={shown} projects={office.projects} />
+            {base ? (
+              <EditorMarks layout={shown} projects={office.projects} view={base} />
+            ) : (
+              <EditorPicture layout={shown} projects={office.projects} />
+            )}
             <g pointerEvents="none">
               {shown.areas.map((area, index) => {
                 const selected = state.selection?.kind === 'area' && state.selection.id === area.id;
@@ -451,7 +503,7 @@ function Editor({ office }: { office: Office }) {
                 return (
                   <polygon
                     key={area.id}
-                    points={floorPoints(area.x, area.y, area.width, area.height, 0.5)}
+                    points={floorOf(area.x, area.y, area.width, area.height, 0.5)}
                     fill={selected ? '#7c5cff' : '#ff7b72'}
                     fillOpacity="0.18"
                     stroke={selected ? '#b9a8ff' : '#ff7b72'}
@@ -467,7 +519,7 @@ function Editor({ office }: { office: Office }) {
                     {footprint(item).map((tile) => (
                       <polygon
                         key={`${tile.x},${tile.y}`}
-                        points={floorPoints(tile.x, tile.y, 1, 1, 0.6)}
+                        points={floorOf(tile.x, tile.y, 1, 1, 0.6)}
                         fill="none"
                         stroke={selected ? '#f4f1ff' : '#ff7b72'}
                         strokeWidth="1.2"
@@ -475,7 +527,7 @@ function Editor({ office }: { office: Office }) {
                     ))}
                     {item.kind === 'desk' && selected && (
                       <polygon
-                        points={floorPoints(
+                        points={floorOf(
                           chairOf(item).x + 0.2,
                           chairOf(item).y + 0.2,
                           0.6,
@@ -491,7 +543,7 @@ function Editor({ office }: { office: Office }) {
               })}
               {rect && (
                 <polygon
-                  points={floorPoints(
+                  points={floorOf(
                     Math.min(rect.from.x, rect.to.x),
                     Math.min(rect.from.y, rect.to.y),
                     Math.abs(rect.to.x - rect.from.x) + 1,
@@ -506,7 +558,7 @@ function Editor({ office }: { office: Office }) {
               )}
               {hover && !rect && (
                 <polygon
-                  points={floorPoints(hover.x, hover.y, 1, 1, 0.7)}
+                  points={floorOf(hover.x, hover.y, 1, 1, 0.7)}
                   fill="none"
                   stroke="#f4f1ff"
                   strokeWidth="0.8"
@@ -590,7 +642,7 @@ function Editor({ office }: { office: Office }) {
           </div>
           {(issues.length > 0 || serverIssues.length > 0) && (
             <div className="mt-3" role="alert">
-              <p className="text-sm font-semibold text-fail">
+              <p className={`text-sm font-semibold ${TONES.fail.text}`}>
                 Corrija antes de salvar ({issues.length + serverIssues.length}):
               </p>
               <ul className="mt-1 max-h-40 space-y-1 overflow-y-auto text-sm">
@@ -598,7 +650,7 @@ function Editor({ office }: { office: Office }) {
                   <li key={`${issue.message}-${index}`}>
                     <button
                       type="button"
-                      className="text-left text-fail underline-offset-2 hover:underline"
+                      className={`text-left underline-offset-2 hover:underline ${TONES.fail.text}`}
                       onClick={() => {
                         const area =
                           issue.area === undefined ? undefined : layout.areas[issue.area];
@@ -615,7 +667,7 @@ function Editor({ office }: { office: Office }) {
                   </li>
                 ))}
                 {serverIssues.map((message) => (
-                  <li key={message} className="text-fail">
+                  <li key={message} className={TONES.fail.text}>
                     {message}
                   </li>
                 ))}
@@ -766,6 +818,69 @@ const TOOL_HINT: Record<Tool['kind'], string> = {
   door: 'Clique no ladrilho da borda de uma área para abrir ou fechar a porta daquela parede.',
   erase: 'Clique num móvel ou numa área para apagar. Ctrl+Z desfaz.',
 };
+
+/** A rectangle of the floor at height `z`, as the `points` of a polygon in the view's pixels. */
+function floorPolygon(view: OfficeView, x: number, y: number, w: number, d: number, z = 0) {
+  return [view.project(x, y, z), view.project(x + w, y, z), view.project(x + w, y + d, z)]
+    .concat(view.project(x, y + d, z))
+    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ');
+}
+
+/** The rectangle of tiles a piece of furniture takes. */
+function itemBox(item: OfficeItem) {
+  const tiles = footprint(item);
+  const x = Math.min(...tiles.map((tile) => tile.x));
+  const y = Math.min(...tiles.map((tile) => tile.y));
+  return {
+    x,
+    y,
+    w: Math.max(...tiles.map((tile) => tile.x)) + 1 - x,
+    d: Math.max(...tiles.map((tile) => tile.y)) + 1 - y,
+  };
+}
+
+/**
+ * What the SVG layer adds to the 3D picture: the room signs, and the floor of
+ * each room and the tiles of each piece of furniture, unpainted, as marks the
+ * tests find on screen.
+ */
+function EditorMarks({
+  layout,
+  projects,
+  view,
+}: {
+  layout: OfficeLayout;
+  projects: Office['projects'];
+  view: OfficeView;
+}) {
+  return (
+    <g>
+      <g pointerEvents="none">
+        {layout.areas.map((area) => (
+          <polygon
+            key={area.id}
+            data-editor-area={area.id}
+            points={floorPolygon(view, area.x, area.y, area.width, area.height)}
+            fill="none"
+          />
+        ))}
+        {layout.items.map((item) => {
+          const box = itemBox(item);
+          return (
+            <polygon
+              key={item.id}
+              data-editor-item={item.id}
+              points={floorPolygon(view, box.x, box.y, box.w, box.d)}
+              fill="none"
+            />
+          );
+        })}
+      </g>
+      <RoomSigns layout={layout} projects={projects} view={view} />
+    </g>
+  );
+}
 
 /** The editor's picture: the same drawing as the office, without the people. */
 function EditorPicture({
@@ -1167,6 +1282,19 @@ function ItemForm({
           {office.agents.map((agent) => (
             <option key={agent.id} value={agent.id}>
               {agent.name}
+            </option>
+          ))}
+        </SelectField>
+      )}
+      {info.colorable && (
+        <SelectField
+          label="Cor"
+          value={item.color}
+          onChange={(event) => onChange({ color: event.target.value as ItemColor })}
+        >
+          {ITEM_COLORS.map((color) => (
+            <option key={color} value={color}>
+              {ITEM_COLOR_LABELS[color]}
             </option>
           ))}
         </SelectField>

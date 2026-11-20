@@ -9,11 +9,14 @@ export const CRUD_PORT = 4393;
 /** A fake model provider (see fake-provider.mjs). */
 export const FAKE_PROVIDER_PORT = 4394;
 export const TOOLS_PORT = 4395;
+/** A fresh installation that only the first-use test walks through (Phase 32). */
+export const FIRST_USE_PORT = 4396;
 
 export const EMPTY_URL = `http://127.0.0.1:${EMPTY_PORT}`;
 export const SEEDED_URL = `http://127.0.0.1:${SEEDED_PORT}`;
 export const CRUD_URL = `http://127.0.0.1:${CRUD_PORT}`;
 export const TOOLS_URL = `http://127.0.0.1:${TOOLS_PORT}`;
+export const FIRST_USE_URL = `http://127.0.0.1:${FIRST_USE_PORT}`;
 export const FAKE_PROVIDER_URL = `http://127.0.0.1:${FAKE_PROVIDER_PORT}`;
 /** Not a real credential: only the fake provider accepts it. */
 export const FAKE_PROVIDER_KEY = 'e2e-fake-key-0123456789';

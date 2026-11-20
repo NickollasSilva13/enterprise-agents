@@ -13,7 +13,7 @@ Tudo roda na sua máquina, em `http://127.0.0.1:4317`. Não há contas: quem usa
 5. [Ferramentas e permissões](#5-ferramentas-e-permissões)
 6. [Aprovações](#6-aprovações)
 7. [Delegação entre agentes](#7-delegação-entre-agentes)
-8. [Acompanhar o trabalho: Painel, Escritório e Logs](#8-acompanhar-o-trabalho-painel-escritório-e-logs)
+8. [Acompanhar o trabalho: Escritório, Relatórios e Logs](#8-acompanhar-o-trabalho-escritório-relatórios-e-logs)
 9. [Exportar, importar e cópia de segurança](#9-exportar-importar-e-cópia-de-segurança)
 10. [Segurança, privacidade e solução de problemas](#10-segurança-privacidade-e-solução-de-problemas)
 
@@ -35,11 +35,13 @@ O segundo comando compila a interface, cria o banco em `data/app.db` se ele não
 
 **Configuração (opcional).** Copie `.env.example` para `.env` para mudar a porta (`APP_PORT`), a pasta de dados (`DATA_DIR`), o nível de log ou os limites de execuções simultâneas e de delegação. Um valor inválido impede a inicialização, com uma mensagem que aponta a variável. Chaves de API **não** vão no `.env`.
 
-Em uma instalação nova, o Painel mostra zeros e avisa o que falta. O caminho é: provedor, modelo, agente, conversa.
+O Escritório é a tela inicial. Em uma instalação nova, o cartão **Primeiros passos**, acima do time, leva você por quatro etapas: conectar um provedor, habilitar um modelo, criar uma área a partir de um modelo pronto e criar a primeira tarefa. Cada etapa fica marcada quando os seus dados mostram que ela foi feita, e o botão da etapa seguinte abre o formulário certo. **Pular por agora** guarda o cartão; ele volta pela **Ajuda**.
+
+**Ajuda.** "Precisa de ajuda?", no pé do menu, abre este guia dentro da plataforma, mostra onde estão os primeiros passos e traz de volta as dicas que você fechou. As dicas são frases curtas que aparecem uma vez onde ajudam (no Escritório, no quadro, em Ferramentas, em Aprovações e em Automações) e somem quando você clica em **Entendi**.
 
 ## 2. Conectar um provedor de modelos
 
-Um agente só responde se tiver um modelo, e os modelos vêm de um provedor. Na tela **Modelos**:
+Um agente só responde se tiver um modelo, e os modelos vêm de um provedor. Na tela **Modelos de IA**:
 
 1. Escolha **Adicionar provedor**.
 2. Dê um nome, escolha o tipo e informe o endereço:
@@ -167,7 +169,7 @@ Para trabalho que passa de mão em mão, como numa empresa, use o menu **Tarefas
 3. **Crie uma tarefa** com título, descrição e critérios de aceite. Ela entra na primeira etapa. Quando chega à etapa de um agente, ele começa a trabalhar sozinho e, ao terminar, passa a tarefa adiante com uma nota, só pelas passagens que você liberou. Cada agente trabalha numa tarefa por vez; as outras esperam na fila dele.
 4. **A pasta compartilhada da área** é onde os agentes trocam arquivos, pelo prefixo `area/` (por exemplo, `area/especificacao.md`). Na configuração de cada agente, escolha se ele não tem acesso, só lê ou lê e escreve.
 
-Uma tarefa **para e espera você** quando chega a uma etapa sua, quando a execução falha, quando o agente termina sem passar a tarefa adiante, ou quando ela volta mais de 3 vezes entre etapas ou chega a 20 execuções (proteção contra dois agentes devolvendo trabalho um ao outro sem fim). Essas tarefas aparecem na tela **Aprovações**, em "Tarefas esperando você". Na página da tarefa você lê o histórico com as notas de cada agente, comenta, move, retoma ou cancela. Uma tarefa cancelada sai do quadro, mas o histórico fica; por isso uma área com tarefas não pode ser excluída.
+Uma tarefa **para e espera você** quando chega a uma etapa sua, quando a execução falha, quando o agente termina sem passar a tarefa adiante, ou quando ela volta mais de 3 vezes entre etapas ou chega a 20 execuções (proteção contra dois agentes devolvendo trabalho um ao outro sem fim). Essas tarefas aparecem na tela **Aprovações**, em "Tarefas esperando você". Na página da tarefa você lê o histórico com as notas de cada agente, comenta, move, retoma ou cancela. No quadro, você também pode arrastar o cartão até outra etapa (no computador) ou usar o botão **Mover para…** do cartão (no celular ou pelo teclado): só as etapas que o fluxo permite aceitam o cartão, e a mudança só vale depois de você confirmar, com uma nota opcional para quem vem depois. Uma tarefa cancelada sai do quadro, mas o histórico fica; por isso uma área com tarefas não pode ser excluída.
 
 > Validado com o provedor simulado dos testes, não com um modelo real atravessando um fluxo inteiro.
 
@@ -186,7 +188,7 @@ O modelo Produto termina mandando a especificação como pedido para outra área
 
 ### Agendamentos
 
-Em Tarefas → **Agendamentos**, uma tarefa é criada sozinha no quadro de uma área em horários marcados, como um relatório toda segunda às 9h.
+Em **Automações** (no menu; também em Tarefas → Agendamentos), uma tarefa é criada sozinha no quadro de uma área em horários marcados, como um relatório toda segunda às 9h.
 
 1. **Novo agendamento**: escolha a área, escreva a tarefa como faria à mão (título, descrição, critérios de aceite, prioridade) e a repetição: uma vez, todo dia, toda semana (nos dias que marcar) ou todo mês (num dia; em meses mais curtos, vale o último dia). O horário é o desta máquina.
 2. **Na hora marcada**, a tarefa entra na primeira etapa do fluxo da área e segue como qualquer outra. A página dela mostra de qual agendamento veio, e o histórico diz para quando estava marcada.
@@ -208,9 +210,9 @@ Se você recusar um pedido, a tarefa que pediu segue sem ele, com o motivo no hi
 
 > Validado com o provedor simulado e pela interface, não com um modelo real pedindo trabalho.
 
-## 8. Acompanhar o trabalho: Painel, Escritório e Logs
+## 8. Acompanhar o trabalho: Escritório, Relatórios e Logs
 
-**Painel.** Quantos agentes há em cada estado, execuções em andamento e à espera de aprovação, indicadores das últimas 24 horas (concluídas, taxa de sucesso, tokens), a atividade recente e os alertas: falhas, aprovações pendentes, agente sem modelo, provedor inacessível. Atualiza sozinho.
+**Relatórios** (antes "Painel"). Quantos agentes há em cada estado, execuções em andamento e à espera de aprovação, indicadores das últimas 24 horas (concluídas, taxa de sucesso, tokens), a atividade recente e os alertas: falhas, aprovações pendentes, agente sem modelo, provedor inacessível. Atualiza sozinho.
 
 **Estados de um agente:**
 
@@ -227,11 +229,13 @@ Se você recusar um pedido, a tarefa que pediu segue sem ele, com o motivo no hi
 - quem está ocioso há 2 minutos vai à copa, e há 10 minutos, à descompressão (se o layout tiver uma);
 - agente inativo fica fora do escritório;
 - quem delega se reúne com quem recebeu a tarefa na sala de reunião; sem sala de reunião, vai até a mesa do colega;
-- o painel "Agentes no escritório", ao lado, diz em texto onde cada um está e o que está fazendo, e tem o botão "Decidir" de quem espera a sua aprovação. O sino no alto conta as aprovações pendentes.
+- a coluna ao lado tem um cartão por agente, quem precisa de você primeiro: onde está, o que está fazendo ("passo 4 de até 20 · 3 min" enquanto trabalha) e o botão "Decidir" de quem espera a sua aprovação. Clicar no cartão abre a conversa; apontar para ele acende o agente na cena. Embaixo, a atividade recente: tarefas concluídas, entregas entre áreas, agendamentos, pedidos de aprovação e falhas. No celular, os dois ficam em abas;
+- embaixo da cena, quatro indicadores: concluídas hoje (contra ontem), tempo médio por tarefa, execuções sem falha e concluídas na semana, cada um com o gráfico dos últimos 7 dias e o "?" que explica a conta. Sem nada a contar, o cartão diz isso em vez de mostrar zero. Os mesmos cartões ficam no topo dos Relatórios;
+- no pé da coluna, as ações rápidas: criar tarefa, novo agente e agendar tarefa. O sino no alto conta as aprovações pendentes.
 
-Arraste o chão para andar pela planta, use a roda do mouse ou os botões da barra para aproximar e afastar, e clique no minimapa para ir a um ponto. Clicar em um agente abre a conversa (ou o pedido de aprovação, se ele estiver esperando). Se o seu sistema estiver com "reduzir movimento" ligado, os agentes mudam de lugar sem caminhar.
+O escritório aparece inteiro, em 3D, visto do alto na diagonal; ele se ajusta sozinho ao tamanho da janela. Se o seu navegador não tiver WebGL, aparece o desenho plano das versões anteriores. Clicar em um agente na cena acende o cartão dele na coluna ao lado. Se o seu sistema estiver com "reduzir movimento" ligado, os agentes mudam de lugar sem caminhar.
 
-**Editar o escritório.** O botão "Editar escritório" abre o editor. Enquanto você não salvar nada, o layout é montado sozinho a partir dos projetos (e ganha uma sala a cada projeto novo). No editor:
+**Editar o escritório.** O botão "Editar escritório" abre o editor, que mostra o escritório em 3D como ele vai ficar (sem os agentes). A roda do mouse aproxima e afasta, e arrastar o chão vazio move a vista. Enquanto você não salvar nada, o layout é montado sozinho a partir dos projetos (e ganha uma sala a cada projeto novo). No editor:
 
 - "Nova área" desenha uma sala arrastando na grade; escolha o tipo, o nome, o projeto (para salas de projeto e de foco) e o piso no painel ao lado;
 - "Porta" abre ou fecha uma porta clicando na borda da sala; toda área precisa de ao menos uma porta para o corredor;

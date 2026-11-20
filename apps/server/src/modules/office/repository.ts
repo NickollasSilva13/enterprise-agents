@@ -52,6 +52,7 @@ export function readStoredLayout(db: Db): OfficeLayout | null {
       facing: item.facing,
       agentId: item.agentId,
       label: item.label,
+      color: item.color,
     }));
   return { ...meta.data, areas, items };
 }

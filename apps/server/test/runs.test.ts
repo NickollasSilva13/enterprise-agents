@@ -505,9 +505,14 @@ describe('logs', () => {
         conversationId,
         status: 'running',
         prompt: 'Preciso de ajuda com o pedido 42',
+        // Phase 29: the step it is on, out of the agent's limit (and since when, below).
+        steps: 1,
+        maxSteps: 20,
+        task: null,
       },
       lastError: null,
     });
+    expect(typeof office.agents[0]?.currentRun?.startedAt).toBe('string');
 
     hold.open();
     await s.finished(runId);

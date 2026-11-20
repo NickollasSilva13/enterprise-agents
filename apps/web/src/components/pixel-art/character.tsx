@@ -1,4 +1,17 @@
-import { type Appearance, defaultAppearance, type HairStyle, type Outfit } from '@ea/shared';
+import { type Appearance, defaultAppearance } from '@ea/shared';
+import { useMemo } from 'react';
+import {
+  type Activity,
+  type Direction,
+  FIGURE_HEIGHT,
+  type FigureSpec,
+  FIGURE_WIDTH,
+  figureMask,
+  HIPS,
+  type Holding,
+  type Pose,
+  type RobotTraits,
+} from './figure';
 import {
   EYES,
   GEAR,
@@ -13,476 +26,141 @@ import {
   SHOES,
   SKIN,
 } from './palette';
-import { layer, type Palette, PixelSprite, type Sprite } from './pixels';
-import { AgentHead, agentLook } from './robot';
+import { agentLook } from './robot';
+import type { PixelPath } from './pixels';
+import { colorPaths, type Materials, mix, ramp, shade } from './shade';
 
-// The agents as 16-bit pixel art characters (Phase 15), seen in 3/4 as the
-// isometric office is. Two views are drawn, facing down-left ("sw") and
-// up-left ("nw"); the other two directions are those mirrored. A character
-// is built from layers: head, hair, face, accessory, torso, pattern and legs,
-// each coloured by the options the user picked. Original art: no sprite of
-// any game is copied.
+// The agents as 32-bit pixel art characters (Phase 22), seen in 3/4 as the
+// isometric office is. The figure is built as a mask (figure.ts) and shaded
+// with three to four tones per material (shade.ts). Original art.
 
-export const CHARACTER_WIDTH = 20;
-/** Rows above the head, for tall hair (afro, bun, spikes). */
-const HEADROOM = 4;
-export const CHARACTER_HEIGHT = HEADROOM + 36;
+export type { Activity, Direction, Holding, Pose } from './figure';
+
+export const CHARACTER_WIDTH = FIGURE_WIDTH;
+export const CHARACTER_HEIGHT = FIGURE_HEIGHT;
 /** The rows down to the hips: what shows of a seated character. */
-export const SEATED_HEIGHT = HEADROOM + 26;
-/** Characters are drawn a little smaller than their pixels, to match the furniture. */
-export const CHARACTER_SCALE = 0.8;
-
-export type Direction = 'sw' | 'se' | 'nw' | 'ne';
-export type Pose = 'stand' | 'walk' | 'sit';
-
+export const SEATED_HEIGHT = HIPS;
 /**
- * A sprite of the full character height, with `rows` from `start` (0 is the
- * top of the head, negative goes up into the headroom). Short rows are
- * padded with transparency.
+ * Twice the pixels of the 16-bit characters at the same height on screen
+ * (D2): 64 rows at 0.5 are the 40 rows at 0.8 of before.
  */
-function place(start: number, rows: readonly string[]): string[] {
-  const sprite = Array.from({ length: CHARACTER_HEIGHT }, () => '.'.repeat(CHARACTER_WIDTH));
-  rows.forEach((row, index) => {
-    const at = start + index + HEADROOM;
-    if (at >= 0 && at < CHARACTER_HEIGHT) sprite[at] = row.padEnd(CHARACTER_WIDTH, '.');
-  });
-  return sprite;
-}
+export const CHARACTER_SCALE = 0.5;
 
-// ---------------------------------------------------------------------------
-// Head
-
-const HEAD = place(1, [
-  '......XXXXXXX',
-  '....XXSSSSSSSXX',
-  '...XSSSSSSSSSSSX',
-  '..XSSSSSSSSSSSSSX',
-  '..XSSSSSSSSSSSSSX',
-  '.XSbbSSSbbSSSSSssX',
-  '.XSSSSSSSSSSSSSssX',
-  '.XSeWSSSeWSSSXsSsX',
-  '.XSeeSSSeeSSSXsSsX',
-  '.XSSSSSSSSSSSSXssX',
-  '.XSSSsSSSSSSSSSssX',
-  '..XSSSSSSSSSSSSsX',
-  '..XSSMMMSSSSSSssX',
-  '...XSSSSSSSSSssX',
-  '....XXsSSSSsXX',
-  '......XXXXXX',
-]);
-
-/** The back of a head: hair all over, the ear and the nape showing. */
-const HEAD_BACK = place(1, [
-  '......XXXXXXX',
-  '....XXHHHHHHHXX',
-  '...XHHjjHHHHHHHX',
-  '..XHHjHHHHHHHHHHX',
-  '..XHHHHHHHHHHHHHX',
-  '.XHHHHHHHHHHHHHhhX',
-  '.XHHHHHHHHHHHHHhhX',
-  '.XHHHHHHHHHHHXsShX',
-  '.XHHHHHHHHHHHXsShX',
-  '.XhHHHHHHHHHHHXhhX',
-  '.XhhHHHHHHHHHHhhhX',
-  '..XhhHHHHHHHHhhhX',
-  '..XShhhhhhhhhhhSX',
-  '...XSSSSSSSSSSSX',
-  '....XXsSSSSsXX',
-  '......XXXXXX',
-]);
-
-/** A shaved head from behind: skin with a dark shadow of hair on top. */
-const HEAD_BACK_SHAVED = place(1, [
-  '......XXXXXXX',
-  '....XXhhhhhhhXX',
-  '...XhhhhhhhhhhhX',
-  '..XhhhhhhhhhhhhhX',
-  '..XhhhhhhhhhhhhhX',
-  '.XShhhhhhhhhhhhssX',
-  '.XSSSSSSSSSSSSSssX',
-  '.XSSSSSSSSSSSXsSsX',
-  '.XSSSSSSSSSSSXsSsX',
-  '.XSSSSSSSSSSSSXssX',
-  '.XSSSSSSSSSSSSSssX',
-  '..XSSSSSSSSSSSSsX',
-  '..XSSSSSSSSSSSssX',
-  '...XSSSSSSSSSssX',
-  '....XXsSSSSsXX',
-  '......XXXXXX',
-]);
-
-/** Top of the head shared by most styles. */
-const CAP_OF_HAIR = [
-  '......XXXXXXX',
-  '....XXHHHHHHHXX',
-  '...XHHjjHHHHHHHX',
-  '..XHHjHHHHHHHHHHX',
-  '..XHHHHHHHHHHHHHX',
-];
-
-interface HairSprites {
-  /** Over the face, seen from the front. */
-  readonly front: Sprite;
-  /** Over the back of the head. */
-  readonly back: Sprite | null;
-}
-
-const HAIR_STYLE: Record<HairStyle, HairSprites> = {
-  short: {
-    front: place(1, [...CAP_OF_HAIR, '.XHHhHhhHHhHHHHHhX', '............HHHhhX']),
-    back: null,
-  },
-  long: {
-    front: place(1, [
-      ...CAP_OF_HAIR,
-      '.XHHhHhhHHhHHHHHhX',
-      '.XH.........HHHhhX',
-      '.XH..........HHhhX',
-      '.XH..........HHhhX',
-      '.XH..........HHhhX',
-      '.XH..........HhhX',
-      '.XH..........HhhX',
-      '..X..........HhhX',
-      '............XHhhX',
-      '............XhhX',
-      '.............XX',
-    ]),
-    back: place(12, [
-      '..XhhHHHHHHHHhhhX',
-      '..XHHHHHHHHHHHhhX',
-      '...XHHHHHHHHHhhX',
-      '...XhHHHHHHHHhX',
-      '....XhhHHHHhhX',
-      '.....XXXXXXXX',
-    ]),
-  },
-  curly: {
-    front: place(-1, [
-      '.....X.XX.X.X',
-      '....XHXHHXHXHX',
-      '...XHHHHHHHHHXX',
-      '..XHjHHHHHHHHHHX',
-      '..XHHjHHHHHHHHHHX',
-      '.XHHHHHHHHHHHHHHHX',
-      '.XHHHHHHHHHHHHHHHX',
-      '.XHHhHHhHHhHHHHHhX',
-      '.XHh.........HHhhX',
-      '..Hh..........HhX',
-    ]),
-    back: place(-1, ['.....X.XX.X.X', '....XHXHHXHXHX', '...XHHHHHHHHHXX']),
-  },
-  bun: {
-    front: place(-3, [
-      '.......XXXX',
-      '......XHHjhX',
-      '......XHHHhX',
-      '.......XXXX',
-      ...CAP_OF_HAIR,
-      '.XHHhHhhHHhHHHHHhX',
-      '............HHHhhX',
-    ]),
-    back: place(-3, ['.......XXXX', '......XHHjhX', '......XHHHhX', '.......XXXX']),
-  },
-  spiky: {
-    front: place(-2, [
-      '.....X..X..X..X',
-      '....XHXXHXXHXXHX',
-      '....XHHHHHHHHHHX',
-      ...CAP_OF_HAIR,
-      '.XHHhHhhHHhHHHHHhX',
-      '............HHHhhX',
-    ]),
-    back: place(-2, ['.....X..X..X..X', '....XHXXHXXHXXHX', '....XHHHHHHHHHHX']),
-  },
-  shaved: {
-    front: place(1, ['......XXXXXXX', '....XXhhhhhhhXX', '...XhhhhhhhhhhhX', '..XhSSSSSSSSShhhX']),
-    back: null,
-  },
-  afro: {
-    front: place(-3, [
-      '.....XXXXXXXXX',
-      '...XXHHHHHHHHHXX',
-      '..XHHHjHHHHHHHHHX',
-      '.XHHjHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHhHhhHHhHHHHHHhhX',
-      'XHh.........HHHHhhX',
-      'XHh..........HHhhhX',
-      'XHh..........HHhhhX',
-      'XHh..........HHhhX',
-      '.Xh..........HhhhX',
-      '..X...........hhX',
-    ]),
-    back: place(-3, [
-      '.....XXXXXXXXX',
-      '...XXHHHHHHHHHXX',
-      '..XHHHjHHHHHHHHHX',
-      '.XHHjHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHHHX',
-      'XHHHHHHHHHHHHHHHhhX',
-      'XHHHHHHHHHHHHHHHhhX',
-      'XhHHHHHHHHHHHHHhhhX',
-      'XhhHHHHHHHHHHHhhhhX',
-      'XhhhHHHHHHHHHhhhhX',
-      '.XhhhhhhhhhhhhhhX',
-      '..XXXXXXXXXXXXXX',
-    ]),
-  },
-  ponytail: {
-    front: place(1, [
-      ...CAP_OF_HAIR,
-      '.XHHhHhhHHhHHHHHhXX',
-      '............HHHhXHX',
-      '................XHX',
-      '................XhX',
-      '................XhX',
-      '.................X',
-    ]),
-    back: place(9, ['.......XHHX', '.......XHhX', '.......XHhX', '.......XhhX', '........XX']),
-  },
-  wavy: {
-    front: place(1, [
-      ...CAP_OF_HAIR,
-      '.XHhHHhHHhHHHHHHhX',
-      '.XHh........HHHhhX',
-      '.XH..........HHhhX',
-      '.Xh..........HhhX',
-      '..h...........hX',
-    ]),
-    back: place(12, ['..XhHHhHHhHHhhhX', '...XhHhhHhhHhX', '....XXXXXXXXX']),
-  },
-};
-
-const FACIAL_HAIR: Record<Appearance['facialHair'], Sprite | null> = {
-  none: null,
-  stubble: place(11, ['...h.h.h.h.h', '....h.h...h.h', '.....h.h.h']),
-  mustache: place(12, ['....hHHHh']),
-  beard: place(11, [
-    '..XH.........HH',
-    '..XHHhSSSShHHHX',
-    '..XHHMMMHHHHHHX',
-    '...XHHHHHHHHHX',
-    '....XXHHHHHXX',
-  ]),
-};
-
-const ACCESSORY_FRONT: Record<Appearance['accessory'], Sprite | null> = {
-  none: null,
-  glasses: place(7, ['..GGGG.GGGG.GG', '..GL.G.GL.G', '..G..GGG..G', '..GGGG.GGGG']),
-  headset: place(1, [
-    '......GGGGGGG',
-    '....GG.......GG',
-    '...G...........G',
-    '',
-    '',
-    '',
-    '.............GGGG',
-    '.............GggG',
-    '.............GggG',
-    '..........GGGGGG',
-    '.......GGG',
-  ]),
-  cap: place(0, [
-    '......CCCCCCC',
-    '....CCCCCCCCCCC',
-    '...CCcCCCCCCCCCC',
-    '..CCCCCCCCCCCCCCC',
-    'cccccccCCCCCCCCCC',
-    '.cccccc',
-  ]),
-};
-
-const ACCESSORY_BACK: Record<Appearance['accessory'], Sprite | null> = {
-  none: null,
-  glasses: place(8, ['.............GG']),
-  headset: place(1, [
-    '......GGGGGGG',
-    '....GG.......GG',
-    '...G...........G',
-    '',
-    '',
-    '',
-    '.............GGGG',
-    '.............GggG',
-    '.............GggG',
-  ]),
-  cap: place(0, [
-    '......CCCCCCC',
-    '....CCCCCCCCCCC',
-    '...CCcCCCCCCCCCC',
-    '..CCCCCCCCCCCCCCC',
-    '..ccCCCCCCCCCCCc',
-  ]),
-};
-
-// ---------------------------------------------------------------------------
-// Body
-
-const TORSO: Record<Outfit, Sprite> = {
-  tshirt: place(16, [
-    '......XXXXXX',
-    '....XXOOSSOOXX',
-    '...XOOOOSOOOOoX',
-    '..XOOOOOOOOOOooX',
-    '..XOXOOOOOOOOooX',
-    '.XOOXOOOOOOOOooX',
-    '.XSSXOOOOOOOOooX',
-    '.XSSXOOOOOOOOooX',
-    '.XSsXOOOOOOOOooX',
-    '..XX.XooooooooX',
-    '.....XPPPPPPPqX',
-  ]),
-  hoodie: place(16, [
-    '....XXXXXXXXX',
-    '...XOOOOOOOOoX',
-    '...XOODOOODOoX',
-    '..XOOODOOODOooX',
-    '..XOXOOOOOOOooX',
-    '.XOOXOOOOOOOooX',
-    '.XOOXOOooooOooX',
-    '.XOOXOOOOOOOooX',
-    '.XSsXOOOOOOOooX',
-    '..XX.XooooooooX',
-    '.....XPPPPPPPqX',
-  ]),
-  shirt: place(16, [
-    '......XXXXXX',
-    '....XXDDSSDDXX',
-    '...XOODDSDDOOoX',
-    '..XOOOODDOOOOooX',
-    '..XOXOOODOOOOooX',
-    '.XOOXOOOOOOOOooX',
-    '.XOOXOOODOOOOooX',
-    '.XOOXOOOOOOOOooX',
-    '.XSsXOOODOOOOooX',
-    '..XX.XooooooooX',
-    '.....XPPPPPPPqX',
-  ]),
-};
-
-/** From behind every outfit is plain: no collar, no buttons, no strings. */
-const torsoBack = (outfit: Outfit): string[] =>
-  TORSO[outfit].map((row, index) => {
-    // The collar rows lose their skin and white details; the hands keep their skin.
-    const collar = index >= HEADROOM + 16 && index < HEADROOM + 19;
-    return collar ? row.replace(/[DS]/g, 'O') : row.replace(/D/g, 'O');
-  });
-
-const PATTERN: Record<Appearance['pattern'], Sprite | null> = {
-  plain: null,
-  stripes: place(19, ['.....QQQQQQQQ', '', '.....QQQQQQQQ', '', '.....QQQQQQQQ']),
-  badge: place(19, ['.........DDD', '.........DQD']),
-};
-
-const LEGS_STAND = place(26, [
-  '.....XPPPPPPPqX',
-  '.....XPPPXPPPqX',
-  '.....XPPPXPPqqX',
-  '.....XPPPXPPqqX',
-  '.....XPPPXPPqqX',
-  '.....XPPqXPqqqX',
-  '....XKKKKXKKKkX',
-  '....XkkkkXkkkkX',
-  '.....XXXXXXXXXX',
-]);
-
-/** Two steps of a walk: the near leg forward, then the far one. */
-const LEGS_STEP_A = place(26, [
-  '.....XPPPPPPPqX',
-  '.....XPPPXPPPqX',
-  '....XPPPX.XPPqX',
-  '....XPPPX.XPqqX',
-  '...XPPPX..XPqqX',
-  '...XPPqX..XPqqX',
-  '..XKKKKX.XKKKkX',
-  '..XkkkkX.XkkkkX',
-  '...XXXX...XXXX',
-]);
-
-const LEGS_STEP_B = place(26, [
-  '.....XPPPPPPPqX',
-  '.....XPPPXPPPqX',
-  '.....XPPPXXPPPqX',
-  '.....XPPPX.XPPqX',
-  '.....XPPPX..XPPqX',
-  '.....XPPqX..XPqqX',
-  '....XKKKKX.XKKKkX',
-  '....XkkkkX.XkkkkX',
-  '.....XXXX...XXXX',
-]);
-
-/** A raised hand, for an agent waiting for the user. */
-const RAISED_HAND = place(9, ['XSX', 'XSX', 'XOX', 'XOX', 'XOX', 'XOX', 'XOX']);
-
-/** Every sprite of the character, for the tests that check their shape. */
-export const ALL_SPRITES: readonly Sprite[] = [
-  HEAD,
-  HEAD_BACK,
-  HEAD_BACK_SHAVED,
-  ...Object.values(HAIR_STYLE).flatMap((style) =>
-    style.back ? [style.front, style.back] : [style.front],
-  ),
-  ...Object.values(FACIAL_HAIR).flatMap((sprite) => (sprite ? [sprite] : [])),
-  ...Object.values(ACCESSORY_FRONT).flatMap((sprite) => (sprite ? [sprite] : [])),
-  ...Object.values(ACCESSORY_BACK).flatMap((sprite) => (sprite ? [sprite] : [])),
-  ...Object.values(TORSO),
-  ...Object.values(PATTERN).flatMap((sprite) => (sprite ? [sprite] : [])),
-  LEGS_STAND,
-  LEGS_STEP_A,
-  LEGS_STEP_B,
-  RAISED_HAND,
-];
-
-function paletteOf(look: Appearance, robotBody: string | null): Palette {
-  const [skin, skinShadow] = SKIN[look.skin];
-  const [hair, hairShadow] = HAIR[look.hairColor];
-  const [outfit, outfitShadow] = robotBody ? [robotBody, robotBody] : OUTFIT[look.outfitColor];
-  const [pants, pantsShadow] = robotBody ? [GEAR, GEAR] : PANTS[look.pants];
-  const [shoe, shoeShadow] = SHOES[look.shoes];
-  const [iris] = EYES[look.eyes];
+/** The colours of each material of a look; a robot's body takes its own colour. */
+export function materialsOf(look: Appearance, robotBody: string | null): Materials {
+  const skin = SKIN[look.skin];
+  const hair = HAIR[look.hairColor];
+  const outfit = robotBody
+    ? ([robotBody, mix(robotBody, INK, 0.3)] as const)
+    : OUTFIT[look.outfitColor];
+  const gear = [GEAR, mix(GEAR, INK, 0.4)] as const;
+  const skinRamp = ramp(robotBody ? gear : skin);
+  const hairRamp = ramp(hair);
+  const outfitRamp = ramp(outfit);
+  const pantsRamp = ramp(robotBody ? gear : PANTS[look.pants]);
+  const shoeRamp = ramp(robotBody ? gear : SHOES[look.shoes]);
+  const gearRamp = ramp(gear);
+  const detailRamp = ramp([PAPER, '#c9c2e0']);
   return {
-    X: INK,
-    S: robotBody ? GEAR : skin,
-    s: robotBody ? GEAR : skinShadow,
-    e: iris,
-    W: '#ffffff',
-    b: hairShadow,
-    M: MOUTH,
-    H: hair,
-    h: hairShadow,
-    j: lighten(hair, 0.35),
-    O: outfit,
-    o: outfitShadow,
-    D: PAPER,
-    Q: look.pattern === 'badge' ? '#ff7b72' : lighten(outfit, 0.55),
-    P: pants,
-    q: pantsShadow,
-    K: shoe,
-    k: shoeShadow,
-    G: GEAR,
-    g: '#7a7194',
-    L: LENS,
-    C: outfit,
-    c: outfitShadow,
+    S: { id: 'skin', ramp: skinRamp },
+    s: { id: 'skin', ramp: skinRamp, tone: 'shadow' },
+    H: { id: 'hair', ramp: hairRamp },
+    h: { id: 'hair', ramp: hairRamp, tone: 'shadow' },
+    j: { id: 'hair', ramp: hairRamp, tone: 'light' },
+    b: { id: 'brow', flat: hairRamp.outline },
+    E: { id: 'lash', flat: mix(hair[1], INK, 0.6) },
+    e: { id: 'iris', flat: EYES[look.eyes][0] },
+    W: { id: 'spark', flat: '#ffffff' },
+    u: { id: 'blush', flat: mix(skin[0], '#ff6f91', 0.3) },
+    M: { id: 'mouth', flat: MOUTH },
+    O: { id: 'outfit', ramp: outfitRamp },
+    o: { id: 'outfit', ramp: outfitRamp, tone: 'shadow' },
+    A: { id: 'sleeve', ramp: outfitRamp },
+    C: { id: 'cap', ramp: outfitRamp },
+    c: { id: 'cap', ramp: outfitRamp, tone: 'shadow' },
+    D: { id: 'detail', ramp: detailRamp },
+    Q: { id: 'pattern', flat: lighten(outfit[0], 0.55) },
+    B: { id: 'badge', flat: '#ff7b72' },
+    P: { id: 'pants', ramp: pantsRamp },
+    K: { id: 'shoe', ramp: shoeRamp },
+    k: { id: 'shoe', ramp: shoeRamp, tone: 'shadow' },
+    G: { id: 'gear', ramp: gearRamp },
+    g: { id: 'gear-light', flat: '#7a7194' },
+    L: { id: 'lens', flat: LENS },
+    R: { id: 'robot', ramp: outfitRamp },
+    r: { id: 'robot', ramp: outfitRamp, tone: 'shadow' },
+    N: { id: 'screen', flat: '#151024' },
+    n: { id: 'glow', flat: robotBody ? lighten(robotBody, 0.45) : '#ffffff' },
+    Y: { id: 'paper', flat: PAPER },
+    y: { id: 'ink', flat: '#9c94b8' },
+    U: { id: 'cup', flat: '#f4f1ff' },
+    v: { id: 'steam', flat: '#d9d3ee' },
   };
 }
 
-/** The layers of a person's head for a view: base, hair, face, accessory. */
-function headOf(look: Appearance, back: boolean): string[] {
-  const style = HAIR_STYLE[look.hair];
-  if (back) {
-    const base = look.hair === 'shaved' ? HEAD_BACK_SHAVED : HEAD_BACK;
-    return layer(base, style.back, ACCESSORY_BACK[look.accessory]);
+/**
+ * Frames already drawn, by everything that changes them. A walker turning a
+ * corner comes back to views it has had; the scene re-reads the office every
+ * few seconds with new objects of the same looks. Kept to a bound so a long
+ * session does not grow it forever.
+ */
+const FRAMES = new Map<string, PixelPath[]>();
+const FRAMES_KEPT = 1500;
+
+function drawFrame(spec: FigureSpec, robotBody: string | null, x: number, y: number): PixelPath[] {
+  const key = JSON.stringify([spec, robotBody, x, y]);
+  const cached = FRAMES.get(key);
+  if (cached) return cached;
+  const paths = colorPaths(shade(figureMask(spec), materialsOf(spec.look, robotBody)), x, y);
+  if (FRAMES.size >= FRAMES_KEPT) {
+    const oldest = FRAMES.keys().next().value;
+    if (oldest !== undefined) FRAMES.delete(oldest);
   }
-  return layer(HEAD, style.front, FACIAL_HAIR[look.facialHair], ACCESSORY_FRONT[look.accessory]);
+  FRAMES.set(key, paths);
+  return paths;
+}
+
+/** How many frames each animation has (D6). */
+function framesOf(pose: Pose, activity: Activity, raisedHand: boolean): number {
+  if (pose === 'walk') return 4;
+  return activity || raisedHand ? 2 : 1;
+}
+
+/** The class that shows frame `index` of an animation in turn (theme.css). */
+function frameClass(
+  pose: Pose,
+  activity: Activity,
+  raisedHand: boolean,
+  index: number,
+  count: number,
+): string | undefined {
+  if (count === 1) return undefined;
+  const name =
+    pose === 'walk' ? 'walk' : raisedHand ? 'wave' : activity === 'typing' ? 'type' : 'talk';
+  // Only the first frame stays when motion is reduced.
+  return `pixel-${name}-${index + 1}${index > 0 ? ' pixel-alt' : ''}`;
+}
+
+function robotOf(look: Appearance, agentId: string): (RobotTraits & { body: string }) | null {
+  return look.kind === 'robot' ? agentLook(agentId) : null;
+}
+
+interface FigureLook {
+  readonly look: Appearance;
+  readonly robot: (RobotTraits & { body: string }) | null;
+}
+
+/**
+ * The look to draw, kept while its content is the same: the scene passes a
+ * new object on every read of the office, and drawing is costly.
+ */
+function useFigureLook(agentId: string, appearance: Appearance | null): FigureLook {
+  const key = JSON.stringify([agentId, appearance]);
+  return useMemo(() => {
+    const [id, chosen] = JSON.parse(key) as [string, Appearance | null];
+    const look = chosen ?? defaultAppearance(id);
+    return { look, robot: robotOf(look, id) };
+  }, [key]);
 }
 
 export interface CharacterProps {
@@ -491,17 +169,19 @@ export interface CharacterProps {
   readonly pose: Pose;
   readonly facing?: Direction;
   /** Something in the hand: the result of a delegation, or a coffee. */
-  readonly holding?: 'paper' | 'cup' | null;
-  /** Class of the head, for the movement of the agent's state. */
-  readonly headClass?: string;
-  /** Class of the body. */
+  readonly holding?: Holding;
+  /** Class of the whole figure, for the movement of the agent's state. */
   readonly bodyClass?: string;
+  /** Class of the head's movement; kept for the shake of a failure. */
+  readonly headClass?: string;
   readonly raisedHand?: boolean;
+  /** Typing at the desk, or talking in a meeting (D6). */
+  readonly activity?: Activity;
 }
 
 /**
- * A character drawn with its feet at (0, 0), or its hips when seated. The
- * walk alternates two leg frames with the `pixel-frame-*` classes (CSS only).
+ * A character drawn with its feet at (0, 0), or its hips when seated. Frames
+ * of an animation are stacked and shown in turn by CSS classes alone.
  */
 export function PixelCharacter({
   agentId,
@@ -509,93 +189,63 @@ export function PixelCharacter({
   pose,
   facing = 'sw',
   holding = null,
-  headClass,
   bodyClass,
+  headClass,
   raisedHand = false,
+  activity = null,
 }: CharacterProps) {
-  const look = appearance ?? defaultAppearance(agentId);
-  const robot = look.kind === 'robot' ? agentLook(agentId) : null;
-  const palette = paletteOf(look, robot?.body ?? null);
-  const back = facing === 'nw' || facing === 'ne';
-  const mirrored = facing === 'se' || facing === 'ne';
-  const torso = layer(
-    back ? torsoBack(look.outfit) : TORSO[look.outfit],
-    back || robot ? null : PATTERN[look.pattern],
-  );
-  const left = -CHARACTER_WIDTH / 2;
-  const top = pose === 'sit' ? -SEATED_HEIGHT : -CHARACTER_HEIGHT;
+  const figure = useFigureLook(agentId, appearance);
+  const count = framesOf(pose, activity, raisedHand);
+  const frames = useMemo(() => {
+    const { look, robot } = figure;
+    return Array.from({ length: count }, (_, frame) =>
+      drawFrame(
+        { look, robot, facing, pose, frame, holding, raisedHand, activity },
+        robot?.body ?? null,
+        -CHARACTER_WIDTH / 2,
+        pose === 'sit' ? -SEATED_HEIGHT : -CHARACTER_HEIGHT,
+      ),
+    );
+  }, [figure, facing, pose, holding, raisedHand, activity, count]);
+
   return (
-    <g transform={`scale(${mirrored ? -CHARACTER_SCALE : CHARACTER_SCALE} ${CHARACTER_SCALE})`}>
-      {pose !== 'sit' && <ellipse cx="0" cy="0" rx="8" ry="2.5" fill={INK} opacity="0.3" />}
+    <g transform={`scale(${CHARACTER_SCALE})`}>
+      {pose !== 'sit' && <ellipse cx="0" cy="0" rx="13" ry="4" fill={INK} opacity="0.3" />}
       <g className={bodyClass}>
-        {pose === 'stand' && <PixelSprite sprite={LEGS_STAND} palette={palette} x={left} y={top} />}
-        {pose === 'walk' && (
-          <>
-            <PixelSprite
-              sprite={LEGS_STEP_A}
-              palette={palette}
-              x={left}
-              y={top}
-              className="pixel-frame-a"
-            />
-            <PixelSprite
-              sprite={LEGS_STEP_B}
-              palette={palette}
-              x={left}
-              y={top}
-              className="pixel-frame-b"
-            />
-          </>
-        )}
-        <PixelSprite
-          sprite={pose === 'sit' ? torso.slice(0, SEATED_HEIGHT) : torso}
-          palette={palette}
-          x={left}
-          y={top}
-        />
-        {raisedHand && (
-          <PixelSprite
-            sprite={RAISED_HAND}
-            palette={palette}
-            x={left + 15}
-            y={top}
-            className="desk-wave"
-          />
-        )}
-        {holding === 'paper' && (
-          <g shapeRendering="crispEdges">
-            <rect x={left - 1} y={top + HEADROOM + 21} width="5" height="6" fill={PAPER} />
-            <rect x={left} y={top + HEADROOM + 22} width="3" height="1" fill={INK} opacity="0.5" />
-            <rect x={left} y={top + HEADROOM + 24} width="3" height="1" fill={INK} opacity="0.5" />
-          </g>
-        )}
-        {holding === 'cup' && (
-          <g shapeRendering="crispEdges">
-            <rect x={left} y={top + HEADROOM + 22} width="4" height="4" fill={PAPER} />
-            <rect x={left + 4} y={top + HEADROOM + 23} width="1" height="2" fill={PAPER} />
-            <path
-              d={`M${left + 1} ${top + HEADROOM + 20} v-2 M${left + 3} ${top + HEADROOM + 20} v-2`}
-              stroke={PAPER}
-              strokeWidth="0.7"
-              className="desk-steam"
-            />
-          </g>
-        )}
-      </g>
-      <g className={headClass}>
-        {robot ? (
-          <g transform={`translate(${left + 1} ${top + HEADROOM}) scale(0.45)`}>
-            <AgentHead look={robot} />
-          </g>
-        ) : (
-          <PixelSprite sprite={headOf(look, back)} palette={palette} x={left} y={top} />
-        )}
+        <g className={headClass}>
+          {frames.map((paths, index) => (
+            <g
+              key={index}
+              className={frameClass(pose, activity, raisedHand, index, count)}
+              shapeRendering="crispEdges"
+            >
+              {paths.map((path) => (
+                <path key={path.fill} d={path.d} fill={path.fill} />
+              ))}
+            </g>
+          ))}
+        </g>
       </g>
     </g>
   );
 }
 
-/** Just the head and shoulders, for avatars, in a 20 by 22 box. */
+export interface FrameRequest {
+  readonly pose: Pose;
+  readonly facing: Direction;
+  readonly holding: Holding;
+  readonly raisedHand: boolean;
+  readonly activity: Activity;
+}
+
+/** Rows of the bust: from above the tallest hair down to the shoulders. */
+const BUST_TOP = 3;
+const BUST_ROWS = 26;
+/** The columns of the head and shoulders: the figure is narrower than its box. */
+const BUST_LEFT = 4;
+const BUST_WIDTH = 24;
+
+/** Just the head and shoulders, for avatars. */
 export function PixelBust({
   agentId,
   appearance,
@@ -603,23 +253,64 @@ export function PixelBust({
   agentId: string;
   appearance: Appearance | null;
 }) {
-  const look = appearance ?? defaultAppearance(agentId);
-  const robot = look.kind === 'robot' ? agentLook(agentId) : null;
-  if (robot) {
-    return (
-      <g transform="translate(1 1) scale(0.45)">
-        <AgentHead look={robot} />
-      </g>
+  const figure = useFigureLook(agentId, appearance);
+  const paths = useMemo(() => {
+    const { look, robot } = figure;
+    return colorPaths(
+      shade(
+        figureMask({
+          look,
+          robot,
+          facing: 'sw',
+          pose: 'sit',
+          frame: 0,
+          holding: null,
+          raisedHand: false,
+          activity: null,
+        }).slice(BUST_TOP, BUST_TOP + BUST_ROWS),
+        materialsOf(look, robot?.body ?? null),
+      ),
     );
-  }
-  const palette = paletteOf(look, null);
-  // From the top of the tallest hair to the shoulders.
-  const sprite = layer(TORSO[look.outfit], PATTERN[look.pattern], headOf(look, false)).slice(
-    1,
-    1 + 22,
+  }, [figure]);
+  return (
+    <g shapeRendering="crispEdges">
+      {paths.map((path) => (
+        <path key={path.fill} d={path.d} fill={path.fill} />
+      ))}
+    </g>
   );
-  return <PixelSprite sprite={sprite} palette={palette} x={0} y={0} />;
 }
 
 /** The box of a bust, for the avatar's `viewBox`. */
-export const BUST_VIEWBOX = '0 0 20 22';
+export const BUST_VIEWBOX = `${BUST_LEFT} 0 ${BUST_WIDTH} ${BUST_ROWS}`;
+
+/** One frame of a character, still: for the reference page and the tests. */
+export function PixelStill({
+  agentId,
+  appearance,
+  facing = 'sw',
+  pose = 'stand',
+  frame = 0,
+  holding = null,
+  raisedHand = false,
+  activity = null,
+}: Omit<CharacterProps, 'bodyClass' | 'headClass' | 'pose'> & {
+  readonly pose?: Pose;
+  readonly frame?: number;
+}) {
+  const look = appearance ?? defaultAppearance(agentId);
+  const robot = robotOf(look, agentId);
+  const paths = colorPaths(
+    shade(
+      figureMask({ look, robot, facing, pose, frame, holding, raisedHand, activity }),
+      materialsOf(look, robot?.body ?? null),
+    ),
+  );
+  return (
+    <g shapeRendering="crispEdges">
+      {paths.map((path) => (
+        <path key={path.fill} d={path.d} fill={path.fill} />
+      ))}
+    </g>
+  );
+}

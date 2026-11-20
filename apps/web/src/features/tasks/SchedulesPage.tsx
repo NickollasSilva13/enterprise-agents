@@ -1,8 +1,8 @@
 import type { Schedule, ScheduleKind, ScheduleRule } from '@ea/shared';
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router';
-import { Button, IconButton } from '../../components/Button';
+import { Link, useSearchParams } from 'react-router';
+import { Button, buttonClass, IconButton } from '../../components/Button';
 import { SelectField, Switch, TextAreaField, TextField } from '../../components/Form';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
@@ -19,6 +19,9 @@ import {
   useSchedules,
   useUpdateSchedule,
 } from '../../lib/task-queries';
+import { BACK_LINK, LINK } from '../../components/TextLink';
+import { FormError, ToneText } from '../../components/Notice';
+import { Tip } from '../../components/Tip';
 
 // Scheduled tasks (Phase 19): a task created on an area's board at set
 // times, which then follows the area's flow. Times are this machine's.
@@ -66,10 +69,7 @@ function LastResult({ schedule }: { schedule: Schedule }) {
   }
   const when = formatDateTime(schedule.lastRunAt);
   const task = schedule.lastTaskId ? (
-    <Link
-      to={`/tarefas/${encodeURIComponent(schedule.lastTaskId)}`}
-      className="text-info underline underline-offset-4"
-    >
+    <Link to={`/tarefas/${encodeURIComponent(schedule.lastTaskId)}`} className={LINK}>
       {schedule.lastTaskTitle ?? 'tarefa'}
     </Link>
   ) : null;
@@ -88,7 +88,9 @@ function LastResult({ schedule }: { schedule: Schedule }) {
       );
     case 'failed':
       return (
-        <p className="text-fail">Em {when}, não conseguiu criar a tarefa: a área está sem fluxo.</p>
+        <ToneText tone="fail" className="block">
+          Em {when}, não conseguiu criar a tarefa: a área está sem fluxo.
+        </ToneText>
       );
   }
 }
@@ -303,20 +305,14 @@ function ScheduleDialog({
             required
           />
         )}
-        {ruleError && (
-          <p role="alert" className="text-sm text-fail">
-            {ruleError}
-          </p>
-        )}
+        {ruleError && <FormError>{ruleError}</FormError>}
         <p className="text-sm text-dim">
           O horário é o desta máquina. Se a plataforma estiver desligada na hora marcada, a tarefa é
           criada uma vez quando ela voltar. Enquanto a tarefa anterior deste agendamento estiver
           aberta, nenhuma nova é criada.
         </p>
         {mutation.error && !ruleError && !errors.title && !errors.areaId && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(mutation.error)}
-          </p>
+          <FormError>{errorMessage(mutation.error)}</FormError>
         )}
       </form>
     </Modal>
@@ -397,11 +393,7 @@ function ScheduleItem({
           Criar agora
         </Button>
       </div>
-      {error && (
-        <p role="alert" className="text-fail">
-          {errorMessage(error)}
-        </p>
-      )}
+      {error && <FormError>{errorMessage(error)}</FormError>}
       {editing && (
         <ScheduleDialog schedule={schedule} areas={areas} onClose={() => setEditing(false)} />
       )}
@@ -430,16 +422,27 @@ function ScheduleItem({
 export function SchedulesPage() {
   const schedules = useSchedules();
   const projects = useProjects();
-  const [creating, setCreating] = useState(false);
+  // "Agendar tarefa" in the office's quick actions opens the form here (Phase 29, D6).
+  const [params, setParams] = useSearchParams();
+  const [creating, setCreating] = useState(params.get('novo') === '1');
+  const stopCreating = () => {
+    setCreating(false);
+    if (params.has('novo'))
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete('novo');
+          return next;
+        },
+        { replace: true },
+      );
+  };
   const areas = projects.data ?? [];
   const error = schedules.error ?? projects.error;
 
   return (
     <>
-      <Link
-        to="/tarefas"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-info underline underline-offset-4"
-      >
+      <Link to="/tarefas" className={BACK_LINK}>
         <ArrowLeft className="size-4" aria-hidden />
         Tarefas
       </Link>
@@ -453,6 +456,10 @@ export function SchedulesPage() {
           </Button>
         }
       />
+      <Tip id="schedules-no-repeat" className="mb-4">
+        Um agendamento não cria uma tarefa nova enquanto a anterior dele estiver aberta: o quadro
+        não enche de repetidas.
+      </Tip>
       {(schedules.isPending || projects.isPending) && (
         <LoadingState label="Carregando os agendamentos…" />
       )}
@@ -466,7 +473,20 @@ export function SchedulesPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState title="Nenhum agendamento ainda.">
+            <EmptyState
+              title="Nenhum agendamento ainda."
+              action={
+                areas.length === 0 ? (
+                  <Link to="/tarefas" className={buttonClass('primary')}>
+                    Criar uma área
+                  </Link>
+                ) : (
+                  <Button variant="primary" onClick={() => setCreating(true)}>
+                    Criar o primeiro agendamento
+                  </Button>
+                )
+              }
+            >
               {areas.length === 0
                 ? 'Crie uma área antes: uma tarefa agendada entra no quadro de uma área.'
                 : 'Use “Novo agendamento” para criar uma tarefa toda semana, todo mês ou numa data.'}
@@ -474,8 +494,9 @@ export function SchedulesPage() {
           )}
         </Panel>
       )}
-      {creating && (
-        <ScheduleDialog schedule={null} areas={areas} onClose={() => setCreating(false)} />
+      {/* The form picks the first area when it opens: it waits for the areas. */}
+      {creating && areas.length > 0 && (
+        <ScheduleDialog schedule={null} areas={areas} onClose={stopCreating} />
       )}
     </>
   );

@@ -1,16 +1,17 @@
 import { ACTIVE_RUN_STATUSES, type RunStatus, type RunStep, type RunSummary } from '@ea/shared';
 import { formatCount, formatDuration } from './format';
+import type { Tone } from './tone';
 
 /** One label and one colour per run status, everywhere in the UI. */
-export const RUN_STATUS: Record<RunStatus, { label: string; tone: string }> = {
-  queued: { label: 'Na fila', tone: 'text-dim' },
-  running: { label: 'Em andamento', tone: 'text-ok' },
-  waiting_approval: { label: 'Aguardando aprovação', tone: 'text-wait' },
-  completed: { label: 'Concluída', tone: 'text-chalk' },
-  failed: { label: 'Falhou', tone: 'text-fail' },
-  cancelled: { label: 'Interrompida por você', tone: 'text-dim' },
-  timed_out: { label: 'Tempo esgotado', tone: 'text-fail' },
-  interrupted: { label: 'Interrompida', tone: 'text-dim' },
+export const RUN_STATUS: Record<RunStatus, { label: string; tone: Tone }> = {
+  queued: { label: 'Na fila', tone: 'idle' },
+  running: { label: 'Em andamento', tone: 'info' },
+  waiting_approval: { label: 'Aguardando aprovação', tone: 'wait' },
+  completed: { label: 'Concluída', tone: 'ok' },
+  failed: { label: 'Falhou', tone: 'fail' },
+  cancelled: { label: 'Interrompida por você', tone: 'idle' },
+  timed_out: { label: 'Tempo esgotado', tone: 'fail' },
+  interrupted: { label: 'Interrompida', tone: 'idle' },
 };
 
 export const isActiveRun = (status: RunStatus) => ACTIVE_RUN_STATUSES.includes(status);
