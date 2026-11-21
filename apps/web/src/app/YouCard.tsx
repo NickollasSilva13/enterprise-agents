@@ -17,7 +17,7 @@ export function YouCard({ onNavigate }: { onNavigate?: () => void }) {
     <Link
       to="/configuracoes#voce"
       onClick={onNavigate}
-      className="flex items-center gap-3 rounded-xl border border-line bg-sheet-raised/60 p-2 hover:bg-sheet-raised"
+      className="flex items-center gap-3 rounded-lg border border-line p-2 transition-colors hover:border-line-strong hover:bg-sheet-raised"
     >
       {data?.appearance ? (
         <AgentAvatar agentId={PROFILE_CHARACTER_ID} appearance={data.appearance} size={36} />

@@ -1,11 +1,11 @@
 import type { TemplateImportResult, WorkflowTemplateSummary } from '@ea/shared';
-import { ArrowLeft, Download, Pencil, Trash2, Upload } from 'lucide-react';
+import { Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, useRef, useState } from 'react';
-import { Link } from 'react-router';
 import { Button, IconButton } from '../../components/Button';
 import { TextAreaField, TextField } from '../../components/Form';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
+import { TasksTabs } from './TasksTabs';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
@@ -20,7 +20,6 @@ import {
   useWorkflowTemplates,
 } from '../../lib/task-queries';
 import { TemplateDetails } from './TemplateDetails';
-import { BACK_LINK } from '../../components/TextLink';
 import { FormError } from '../../components/Notice';
 
 // The catalogue of workflow templates (Phase 18): the ready-made ones and the
@@ -279,10 +278,7 @@ export function TemplatesPage() {
   const own = templates.data?.filter((template) => template.origin === 'user') ?? [];
   return (
     <>
-      <Link to="/tarefas" className={BACK_LINK}>
-        <ArrowLeft className="size-4" aria-hidden />
-        Tarefas
-      </Link>
+      <TasksTabs />
       <PageHeader
         title="Modelos de fluxo"
         description="Fluxos prontos para criar uma área com etapas, agentes e boas práticas. Um modelo leva etapas, passagens, papéis e instruções; nunca chaves, endereços, modelos de IA ou permissões liberadas."

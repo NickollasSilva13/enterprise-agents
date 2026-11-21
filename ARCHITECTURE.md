@@ -46,7 +46,7 @@ flowchart TB
 | Linguagem | TypeScript estrito |
 | Monorepo | npm workspaces |
 | Backend | Node 22, Fastify, Zod |
-| Banco | SQLite (`better-sqlite3`), Drizzle ORM e migrações |
+| Banco | SQLite (`better-sqlite3`, fixado em 12.6.2 porque traz o binário pronto e dispensa compilador), Drizzle ORM e migrações |
 | Tempo real | Server-Sent Events |
 | Frontend | React 19, Vite, Tailwind CSS 4, TanStack Query, React Router 7, lucide-react (ícones), Bricolage Grotesque (fonte embutida) |
 | Segredos | `@napi-rs/keyring` (Credential Manager / Keychain / Secret Service) |

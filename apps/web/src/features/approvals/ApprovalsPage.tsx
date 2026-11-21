@@ -152,7 +152,7 @@ export function ApprovalsPage() {
         <div className="space-y-6">
           <section aria-label="Aprovações pendentes">
             {pending.data.length === 0 ? (
-              <div className="rounded-lg border border-line bg-sheet">
+              <div className="rounded-xl border border-line bg-sheet">
                 <EmptyState
                   title="Nada esperando por você."
                   action={

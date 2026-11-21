@@ -37,20 +37,29 @@ export function Modal({ title, children, footer, onClose }: ModalProps) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center p-4">
-      <div className="absolute inset-0 bg-ink/75" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-30 grid grid-cols-1 items-end justify-items-center sm:place-items-center sm:p-4">
+      <div
+        className="absolute inset-0 animate-fade bg-ink/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      {/* On a phone the dialog rises from the bottom, within reach of the thumb. */}
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative max-h-full w-full max-w-md overflow-y-auto rounded-lg border border-line-strong bg-sheet p-5"
+        className="relative flex max-h-[92dvh] w-full max-w-md animate-pop flex-col overflow-hidden rounded-t-2xl border border-line bg-sheet shadow-pop sm:max-h-[85dvh] sm:rounded-2xl"
       >
-        <h2 id={titleId} className="text-lg font-bold">
-          {title}
-        </h2>
-        <div className="mt-3">{children}</div>
-        <div className="mt-6 flex flex-wrap justify-end gap-3">{footer}</div>
+        <div className="overflow-y-auto px-5 pt-5 pb-5">
+          <h2 id={titleId} className="text-lg font-semibold tracking-tight">
+            {title}
+          </h2>
+          <div className="mt-3">{children}</div>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line px-5 py-4">
+          {footer}
+        </div>
       </div>
     </div>
   );

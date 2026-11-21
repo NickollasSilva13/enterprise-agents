@@ -38,6 +38,12 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 30 | Indicadores reais | Concluída em 2026-11-19 |
 | 31 | Telas internas no mesmo padrão | Concluída em 2026-11-20 |
 | 32 | Primeiros passos e polimento | Concluída em 2026-11-20 |
+| 33 | Ambientes externos: arquitetura e parque 3D | Concluída em 2026-11-20 (aguarda a aprovação visual do usuário) |
+| 34 | A cidade como ambiente | Concluída em 2026-11-21 |
+| 35 | Bairro residencial e condomínio moderno | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
+| 36 | Ilha tropical e jardim tecnológico | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
+| 37 | Validação final | Concluída em 2026-11-21 |
+| 38 | Redesenho da interface | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 
 ## Fases concluídas
 
@@ -1371,17 +1377,224 @@ continuam 2D.
 - O tempo de uma pessoa de verdade, com um modelo real, da instalação à primeira tarefa (o E2E mede 19 ações e 15,6 s com o provedor simulado).
 - Leitor de tela real (NVDA ou Narrador) no roteiro e na Ajuda; a auditoria é automática e o teclado foi conferido só no primeiro passo.
 
+## Ajustes pedidos depois da Fase 32 (2026-11-20)
+
+Dois pedidos do usuário com a aplicação aberta, antes da Fase 33.
+
+- **Retratos 3D fora da cena** (revê o D9 da Fase 27; alternativa escolhida pelo usuário entre "foto do 3D", "cena 3D por retrato" e "redesenhar em 2D"). `AgentAvatar` mostra uma foto do busto do mesmo personagem voxel do Escritório. Um único renderizador WebGL, fora da página, desenha cada visual uma vez (`features/office/three/portrait.ts`); a foto fica guardada como endereço `data:` PNG, que a CSP já aceitava em `img-src`. three.js carrega sob demanda, fora do pacote principal. A prévia da aparência, na edição do agente, mostra o mesmo personagem de corpo inteiro e muda a cada escolha. Sem WebGL (e no jsdom dos testes), continua o desenho 2D. Os dois usam `usePortrait` (`components/use-portrait.ts`). A geometria do personagem saiu de `VoxelCharacter.tsx` para `three/voxel-meshes.ts`, usada pela cena e pelos retratos.
+- **Zoom pela roda do mouse no Escritório**, como no Escritório SVG. A roda aproxima em volta do ponteiro, arrastar com o mouse move a vista, e rolar de volta para no escritório inteiro (`features/office/stage-zoom.ts`). Continua sem botões de zoom e sem minimapa (D6 da Fase 24). No celular o dedo sobre a cena rola a página.
+
+## Fase 33 — Ambientes externos: arquitetura e parque 3D (concluída)
+
+Pedido do usuário: ambientes externos em 3D, escolhidos por uma configuração central, sem mudar nada do escritório aprovado; primeiro um parque completo como padrão, depois a arquitetura pronta para cidade, bairro residencial, ilha tropical, condomínio moderno e jardim tecnológico. Sem controle novo na interface por enquanto. Decisões D1 a D10 aprovadas em 2026-11-20 ("Aprovo todas"). A validação final, que seria a Fase 33, passou a ser a 37 (D1).
+
+### O que foi feito
+
+- **Registro de ambientes** (`features/office/three/environments/`): `types.ts` (o que um ambiente traz: céu, névoa e a cena), `registry.ts` (o único lugar que liga cada `surroundings` ao seu ambiente), `catalog.ts` (o que já tem 3D e o que está planejado, sem three.js, para o editor), `Environment.tsx` (céu, névoa e cena do ambiente escolhido) e `clearance.ts` (as regras que todo ambiente cumpre em volta do escritório).
+- **O escritório não muda** (D2): piso, paredes, salas, móveis, personagens, câmera e interface não foram tocados. Os degraus, o brilho sob o piso e o painel da marca, que são do escritório, saíram do `Street` da cidade para `Approach`, desenhado em todo ambiente. Nada de um ambiente fica na plataforma, a menos de 1,2 ladrilho dela ou nos degraus, e nada esconde um ponto do piso ou de alguém em pé nele (teste em todos os layouts padrão, de dia e de noite); um E2E compara o miolo do escritório desenhado na cidade e no parque.
+- **Luz** (D3): a luz do sol e a ambiente são as mesmas em todo ambiente. Cada ambiente traz céu (com nuvens de dia no parque), cor e distância da névoa e chão. A luz dos postes do parque é desenhada no gramado (manchas aditivas), e não é luz de verdade: assim nada do parque ilumina o escritório, e o número de luzes da cena não muda.
+- **Parque** (D5), em `environments/park/`: plano puro (`plan.ts`, com sorteio fixo pelo tamanho do layout) e peças puras (`build.ts`), desenhados por `ParkEnvironment.tsx`. Gramado com relevo suave e outeiros, plano junto da plataforma; praça de pedra com fonte ao pé dos degraus; caminhos de lajes que saem da praça (passeio pela frente e pelo lado do prédio, volta pelo lago, caminho dos fundos e do coreto); lago de dois lobos com água que reflete e ondula (parada com "reduzir movimento"), margem de areia e pedras, ponte de madeira em arco no estreito, deque com poste, juncos, vitórias-régias e patos; árvores de quatro espécies (carvalho, pinheiro, bétula e jacarandá, roxo como a marca) em bosques, arbustos (alguns floridos), canteiros de flores, florzinhas no gramado; bancos voltados para os caminhos, mesas de piquenique, coreto octogonal com telhado roxo e postes que acendem à noite, com vaga-lumes. Tudo em volume (nada de imagem plana).
+- **Desempenho** (D6): peças repetidas fundidas por material, com a sombra assada nas cores dos vértices (pé mais escuro que o topo, folhagem mais clara em cima). O parque tem 4 chamadas de desenho para as peças, mais gramado, gramado distante, água e luz dos postes; cerca de 112 mil triângulos nas peças (as lajes são caixas simples) e 38 mil no gramado. Plano e peças em 65 ms no navegador, a fusão em cerca de 200 ms, uma vez por layout e por mudança de dia ou noite. A medida de quadros com 30 agentes ficou em 59,9 por segundo, como na cidade.
+- **Padrão e lista do editor** (D7): escritório novo começa no parque; o layout gravado guarda o seu. Aplicar um layout padrão no editor mantém o entorno escolhido. Nomes: "Cidade", "Bairro residencial" e "Parque"; o bairro aparece como "Bairro residencial (em 3D: planejado para a Fase 35)" e, até lá, é desenhado em 3D como a cidade.
+- **Sem WebGL** (D8): o desenho 2D de cidade, casa e parque continua como estava.
+
+### Decisões tomadas durante a implementação
+
+- A luz dos postes é pintada no chão em vez de luzes pontuais: luz pontual entra no cálculo de todo material, inclusive o do escritório, e mudaria o escritório e o custo de cada quadro.
+- O ponto de vista da câmera (ortográfica, de cima) não mostra o horizonte: o que fica longe atrás do escritório sai pelo alto da imagem. O "até o horizonte" do D5 virou bosques densos nas bordas de cima, que a névoa apaga; as colinas distantes não foram feitas, porque não apareceriam.
+- O plano usa três enquadramentos de referência (1000×700, 1400×700 e 700×900) para pôr detalhe só onde algum deles mostra.
+- As capturas de dia e de noite do `scenery.spec.ts` passaram a ser feitas com "reduzir movimento", para a água ficar parada entre duas fotos.
+
+### Não validado
+
+- A aprovação visual do parque pelo usuário (D9).
+- O primeiro desenho do parque no painel do aplicativo levou de 4 a 10 s algumas vezes; não reproduzido nos E2E (o painel pode estar em segundo plano). Uma rodada do E2E teve `chat.spec.ts` lento no celular (página desenhada por software); depois de aliviar as lajes, passou.
+
+## Fase 34 — A cidade como ambiente (concluída)
+
+A cidade da Fase 25 entra na arquitetura de ambientes da Fase 33 (D1), sem mudar o visual. Sem decisão nova: a fase segue o D1 aprovado.
+
+### O que foi feito
+
+- `three/city.ts` foi dividido. O que é do escritório em qualquer ambiente (altura do chão, degraus, painel da marca e o sorteio fixo `seeded`) foi para `three/approach.ts`. As torres e as árvores da rua foram para `environments/city/plan.ts`.
+- As torres, as fachadas, a rua e as árvores saíram de `Surroundings.tsx` para `environments/city/CityEnvironment.tsx`, com o céu da cidade (`CITY_SKY`). `Surroundings.tsx` ficou só com o céu de cada ambiente e o `Approach`. O céu não tem mais paleta padrão: cada ambiente diz a sua.
+- Testes: `approach.test.ts` (degraus e marca) e `environments/city/plan.test.ts` (torres, árvores e, novo, nada da cidade esconde o escritório em nenhum layout padrão, de dia e de noite, e nenhuma árvore fica sobre os degraus).
+- Capturas novas da cidade de dia e de noite (`cidade-dia.png`, `cidade-noite.png`), feitas antes da mudança e comparadas depois.
+
+### Defeito corrigido
+
+- Em todos os layouts padrão, a copa de uma árvore da rua cobria o pé dos degraus da entrada (desde a Fase 25). As árvores sobre os degraus agora são tiradas depois do sorteio, então as outras não mudam de lugar. Teste novo em `environments/city/plan.test.ts`. A comparação com a captura de antes ficou dentro da tolerância de 1%; as capturas foram gravadas de novo com a correção e conferidas.
+
+### Ajustes no parque da Fase 33
+
+- **Água sem quadros próprios.** A ondulação pedia um quadro novo 12 vezes por segundo, o tempo todo: a cena inteira, com sombras e efeitos, era desenhada de novo só pela água. Nas rodadas E2E isso deixou lentas as páginas que desenham o Escritório (a caminhada passou de 30 s e o cartão do agente demorou a mudar). Agora a água ondula nos quadros que a cena já desenha (gente andando, digitando, falando) e fica parada quando o escritório está parado. Isso muda o D5 da Fase 33, que pedia ondulação sempre.
+- **Conferência de área livre mais barata.** `hidesOffice` pula os pontos que o volume não pode esconder (a linha de visão só vai para +x e +y). O teste do parque caiu de 2,5 s para 0,95 s, e o plano do parque fica mais rápido. Antes disso, rodando ao lado dele, o teste do editor estourava os 5 s.
+
+### Decisões tomadas durante a implementação
+
+- Algumas copas das árvores da cidade chegam a menos de 1,2 ladrilho da plataforma, a folga que o parque respeita. Ficaram onde estavam, para a cidade não mudar: ficam na altura do piso ou abaixo e não escondem nada (teste).
+
+### Não validado
+
+- Nada além das capturas: a cidade não foi vista à mão nesta fase.
+- A caminhada de `office.spec.ts` (perto do limite de 30 s), `chat.spec.ts` e `tools.spec.ts` falharam numa rodada E2E feita ao mesmo tempo que um `npm run check`; sozinha, a suíte passou duas vezes depois do ajuste da água.
+
+## Fase 35 — Bairro residencial e condomínio moderno (concluída)
+
+Os dois ambientes de rua em 3D (D1 da Fase 33), na mesma arquitetura do parque e da cidade, sem nada mudar no escritório.
+
+### O que foi feito
+
+- **Bairro residencial** (`environments/neighborhood/`, entorno `house`):
+  - O escritório fica no seu lote, com cerca branca e portão na frente dos degraus.
+  - Duas ruas se cruzam na quina da frente, com calçadas elevadas, meio-fio, faixa central tracejada e faixas de pedestre.
+  - Do outro lado das ruas há casas de um ou dois andares, com telhado de duas ou quatro águas, chaminé, porta com luz, garagem, entrada de carro, caixa de correio e árvore no jardim. Atrás e ao lado do escritório ficam os quintais dos vizinhos.
+  - Árvores na calçada, postes e carros estacionados.
+  - À noite, as janelas acendem uma a uma, como na cidade, e os postes iluminam as calçadas.
+- **Condomínio moderno** (`environments/condo/`, entorno novo `condo`):
+  - O escritório faz o papel de clube, com terraço de pedra ao pé.
+  - Na frente, a piscina, com deque de madeira, borda, espreguiçadeiras, guarda-sóis e luz sob a água à noite.
+  - Ruas internas de pavers claros, com balizadores que acendem.
+  - Casas modernas: térreo branco, caixa superior em madeira ou painel escuro, lajes e paredes de vidro, entrada de carro, carro, ciprestes e canteiros de capim.
+  - Ciprestes em volta do clube, a portaria com cancela e o muro branco nos fundos.
+- **Peças comuns**:
+  - `kit.ts`: árvores (agora seis espécies, com cipreste e bola podada), bancos, postes e mesas, tirados do parque.
+  - `town.ts`: casas, carros, cercas, sebes, faixas do chão, balizadores, espreguiçadeiras, guarda-sóis, capim, topiaria; e o planejador `townPlanner`, que só aceita uma coisa que respeita a área livre, não esconde o escritório e aparece em algum enquadramento.
+  - `scenery.tsx`: as peças fundidas, a água, a luz no chão e o gramado.
+  - `pieces.ts` ganhou o telhado de duas águas (`gable`).
+- **Contrato** (D7 da Fase 33): `condo` entrou em `SURROUNDINGS` ("Condomínio moderno"). O bairro deixou de ser "planejado" na lista do editor.
+- **Sem WebGL** (D8 da Fase 33): o condomínio é desenhado em 2D como o bairro, com o seu próprio nome em `data-surroundings`.
+
+### Defeitos encontrados e corrigidos durante a fase
+
+- **`volumeOf` largo demais:** para peça girada, usava um círculo; um trilho comprido de cerca "invadia" a plataforma e a cerca do lote era recusada. Agora usa a caixa exata do retângulo girado, mais o que a peça inclina e o inchaço dos tufos. As capturas do parque não mudaram.
+- **Cena inteira em branco:** faixas do chão com largura zero (comparação `=== 0` com `sin(π)`, que não dá exatamente zero) deixavam a cena inteira sem desenho. Corrigido o cálculo; `strip` e `mergedPieces` agora recusam peça sem tamanho. O teste confere que toda peça tem números finitos.
+- **Janelas apagadas à noite:** `windowLit` recebia sementes grandes em vez de uma fração entre 0 e 1, e nenhuma janela acendia. As casas modernas ganharam também vidro nos fundos e nas laterais, porque a câmera vê o fundo das casas.
+
+- **Sombra só de perto.** Cada ambiente é uma malha por material, que nunca sai do quadro; inteira, ela entrava no passe de sombras a cada quadro. Agora só as peças em pé dentro da caixa que o sol sombreia projetam sombra (`PieceMeshes` recebe o layout); as de longe só recebem. Com isso, a suíte E2E passou inteira.
+
+### Não validado
+
+- A aprovação visual dos dois ambientes pelo usuário.
+- A caminhada de `office.spec.ts` continua perto dos 30 s (estouro intermitente registrado desde a Fase 12, seção 8 do `TESTING.md`).
+
+## Fase 36 — Ilha tropical e jardim tecnológico (concluída)
+
+Os dois últimos ambientes do pedido da Fase 33 (D1), na mesma arquitetura, sem nada mudar no escritório.
+
+### O que foi feito
+
+- **Ilha tropical** (`environments/island/`, entorno `island`):
+  - O escritório fica numa ilha de areia de contorno irregular.
+  - A praia desce para uma plataforma de areia sob água clara e depois para o mar fundo. A cor da água muda com a profundidade porque o fundo aparece através dela.
+  - Coqueiros (espécie nova no kit: tronco curvo em anéis, folhas caídas, cocos) ao longo da praia e no interior, arbustos com flores.
+  - Um deque de madeira vai dos degraus até o píer, com dois bangalôs sobre a água e um barco atracado.
+  - Bar de praia com teto de palha, espreguiçadeiras e guarda-sóis, pedras na beira.
+  - Tochas que acendem à noite no deque, no píer e pela praia.
+- **Jardim tecnológico** (`environments/garden/`, entorno `techGarden`):
+  - Gramado com faixas de corte.
+  - Caminhos de ardósia em anel e em grade, com linhas de luz nas bordas: claras de dia, ciano à noite.
+  - Eixo dos degraus até um espelho d'água, entre pilares com faixa roxa.
+  - Árvores de luz: tronco de aço em três galhos, com esferas acesas à noite.
+  - Canteiros elevados e paredes verdes, cúpulas de estufa, coberturas solares sobre carros carregando, turbinas eólicas pequenas, balizadores e bancos.
+- **Contrato** (D7 da Fase 33): `island` ("Ilha tropical") e `techGarden` ("Jardim tecnológico") entraram em `SURROUNDINGS`. Agora os seis entornos do pedido existem em 3D.
+- **Sem WebGL** (D8 da Fase 33): os dois são desenhados em 2D como o parque, cada um com o seu nome em `data-surroundings`.
+
+### Decisões tomadas durante a implementação
+
+- No jardim, o que muda com a hora (as faixas do gramado à noite, os pilares e as árvores de luz) é montado de novo a cada hora a partir de valores sorteados uma vez só. Um primeiro rascunho sorteava dentro da montagem e mudaria a cada hora; foi corrigido antes de testar.
+
+### Não validado
+
+- A aprovação visual dos dois ambientes pelo usuário.
+
+## Fase 37 — Validação final (concluída)
+
+O que faltava validar no projeto, com decisões D1 a D8 aprovadas em 2026-11-21 ("Aprovo todas"). O resultado de cada item está em "Pendências ao final do projeto", logo abaixo.
+
+### O que foi feito
+
+- **Instalação a partir do repositório (D2):** clone novo do ramo numa pasta temporária, `npm ci` e `npm start` com porta e dados próprios. O `npm ci` falhou: o `better-sqlite3` 13 não traz binário pronto e tentou compilar, e esta máquina não tem o Visual Studio Build Tools. Na mesma cópia, a 12.6.2 baixou o binário, passou nos 638 testes do servidor e subiu.
+  - Alternativas apresentadas: fixar na 12.6.2, manter a 13 e exigir o compilador, ou trocar pelo `node:sqlite`. O usuário escolheu fixar.
+  - `better-sqlite3` fixado em 12.6.2 (versão exata). Teste novo `apps/server/test/install.test.ts`: falha se o pacote instalado não baixar o binário pronto ou se a versão deixar de ser exata.
+  - Instalação limpa repetida: `npm ci` em 15 s, 640 testes do servidor e a aplicação no ar em 13 s.
+- **Primeiro uso com o Ollama (D3):** numa instalação nova e vazia, o usuário conectou o Ollama, habilitou o `llama3.2:3b`, criou uma área a partir de modelo pronto e a primeira tarefa em 62 s (meta: menos de 5 minutos), medidos pelo registro de pedidos do servidor. A tarefa rodou com o agente "Produto (Dev)" em 11,7 s, com várias chamadas de ferramenta.
+- **Claude Code (D4):** numa instalação descartável, 8 execuções com Haiku e 8 com Sonnet, cada uma pedindo para escrever um arquivo. Todas concluíram e criaram o arquivo com o conteúdo pedido; nenhum pedido mal formatado. Uma execução do Haiku pediu a mesma escrita duas vezes. Tempo médio: 10,6 s (Haiku) e 9,0 s (Sonnet). Nenhum processo do harness ficou para trás.
+- **Avast (D5):** o usuário preferiu não pôr a exceção; a hipótese segue sem teste.
+- **Conferências do usuário (D6):** `Ctrl+C` no terminal (lido por mim), Narrador, movimento dos agentes, arrastar no quadro e os seis ambientes, sem problema relatado.
+- **`npm audit` (D8):** igual ao registrado antes.
+
+### Não validado
+
+- Máquina limpa de verdade, macOS e Linux.
+- OpenAI, Anthropic e Codex com o serviço real.
+- A causa das falhas de tempo intermitentes do E2E.
+
+## Ajuste pedido depois da Fase 37 (2026-11-21)
+
+O usuário notou cerca de 1 s até o Escritório aparecer ao entrar na plataforma.
+
+- **Medição**, com marcações temporárias de tempo e um perfil de CPU, no Chromium dos testes (placa de vídeo ligada) e com o parque e os dados do usuário: cerca de 1,25 s até o primeiro quadro pintado. Os maiores custos:
+  - ~300 ms de espera antes de criar o WebGL, porque o React segurava a troca do `Suspense` do código carregado sob demanda;
+  - ~350 ms montando o gramado do parque, a maior parte na distância de cada ponto a cada trecho de caminho;
+  - ~140 ms fundindo as peças.
+- **Ajustes, sem mudar o visual:**
+  - o código 3D começa a baixar quando a página do Escritório monta, e é usado direto se já chegou (`loadCanvas` em `OfficePage.tsx`);
+  - no gramado, cada caminho e cada árvore marcam só os pontos perto deles;
+  - cada peça é posta no lugar com uma só matriz.
+- **Resultado:** cerca de 0,53 s até o primeiro quadro pintado (três rodadas: 533, 517 e 551 ms). Gramado ~50 ms, peças ~105 ms. O que sobra é montar o resto do escritório e o primeiro desenho, que compila os shaders (~100 ms).
+
+## Fase 38 — Redesenho da interface (concluída)
+
+Pedido do usuário depois da Fase 37: uma revisão completa de interface e experiência, com implementação, não só recomendações. Nenhuma regra de negócio, rota ou contrato da API mudou.
+
+### Diagnóstico
+
+Feito no navegador, em 1440 px e em 375 px, com os dados do usuário:
+
+- violeta em tudo (fundo, painéis, item atual do menu como bloco brilhante): a cor de destaque não destacava;
+- menu com dez itens soltos, sem agrupamento;
+- Tarefas com quatro botões no cabeçalho para as telas irmãs (empilhados no celular) e um link "← Tarefas" em cada uma;
+- Configurações: o seletor "Usar um personagem" e "Salvar perfil" na mesma linha, por serem os dois `inline-flex`;
+- Relatórios: dois quadros de números seguidos sem título e uma área violeta vazia no fim da grade (`gap-px` sobre fundo colorido);
+- rolagem horizontal no celular em Agentes e em Relatórios;
+- dica do Escritório dizendo "à direita", que no celular fica embaixo.
+
+### O que foi feito
+
+- **Paleta (`theme.css`):** base grafite fria com fundo índigo leve (`ink #101119`, `sheet #171923`, `sheet-raised #1f2230`); o violeta (`accent #6a50f5`) ficou para onde você está, a ação principal e o foco. Os nomes dos tokens não mudaram. Contraste AA conferido antes de aplicar e pelo `theme.test.ts`.
+- **Tipografia:** Instrument Sans no texto (`@fontsource-variable/instrument-sans`, empacotada, sem recurso externo); Bricolage Grotesque nos títulos (`--font-display`).
+- **Profundidade e movimento:** `--shadow-lift` (superfícies) e `--shadow-pop` (o que flutua), `animate-pop`, `animate-fade`, `animate-slide-in`; todos desligados com "reduzir movimento".
+- **Componentes:** botões, campos (foco na borda, erro com ícone), painéis, modal (no celular sobe de baixo; rodapé fixo), tabela, aviso temporário (ícone), tela vazia (ícone), dica, cartões e quadros de números no mesmo raio e na mesma sombra. `Panel` com `min-w-0`, o que acabou com a rolagem horizontal das grades.
+- **Navegação:** menu em grupos (`NAV_GROUPS`: Trabalho, Equipe, Sistema); item atual com barra e ícone violeta. Componente novo `SectionTabs` e as abas de Tarefas (`TasksTabs`: Quadro, Pedidos entre áreas, Agendamentos, Modelos de fluxo) no lugar dos botões e do link de volta.
+- **Telas:** Configurações, Relatórios (título visível em cada quadro de números), Escritório (botão de aprovações no padrão dos outros, texto da dica) e o cabeçalho das páginas, que agora quebra as ações em vez de vazar.
+
+### Defeitos encontrados e corrigidos durante a fase
+
+- O cabeçalho novo não deixava as ações quebrarem linha (Agentes vazava 35 px no celular).
+- A marca virou link no menu e passou a receber o primeiro Tab, antes de "Escritório" (pego pelo E2E); voltou a ser texto.
+
+### Não validado
+
+- A aprovação visual do usuário.
+- Tema claro: não existe.
+- O menu diz "Automações" e a tela, "Agendamentos"; mantido, porque os testes dependem dos dois nomes.
+
 ## Pendências ao final do projeto
 
-- OpenAI e Anthropic nunca foram validados com o serviço real (não há chave); só contra servidores simulados.
-- O provedor de Codex (Fases 12 e 13) nunca foi validado: o Codex não está instalado. Falta conferir o formato real da saída dele e se o sandbox o impede de ler arquivos por conta própria. O Claude Code foi validado com um único modelo (Haiku) e poucas execuções: com que frequência um modelo erra o formato dos pedidos de ferramenta não foi medido.
-- Critério de aceite 1 (`SPEC.md`, seção 8), instalar em uma máquina limpa, não foi verificado: tudo foi feito nesta máquina.
-- Encerramento por `Ctrl+C` em terminal interativo nunca foi verificado à mão.
-- O movimento do Escritório não foi visto por uma pessoa.
-- O E2E falha de vez em quando sem causa identificada (`TESTING.md`, seção 8).
-- `npm audit` completo: 11 avisos moderados em ferramentas de desenvolvimento, aceitos (`SECURITY.md`, seção 10).
-- macOS e Linux não foram testados.
-- Limitações de produto aceitas: `SPEC.md`, seção 9.
+Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.
+
+- **Instalar numa máquina limpa (critério de aceite 1 de `SPEC.md`, seção 8):** validado de forma parcial, com um clone novo do repositório numa pasta temporária, nesta máquina. Achou um defeito: o `better-sqlite3` 13 não traz binário pronto, e `npm ci` falhava sem compilador C++. Fixado na 12.6.2 (decisão do usuário), `npm ci` passou em 15 s e a aplicação subiu. Uma máquina limpa de verdade continua não verificada.
+- **Primeiro uso com modelo real:** validado. O usuário fez os quatro primeiros passos com o Ollama (`llama3.2:3b`) em 62 s, e a primeira tarefa rodou em 11,7 s.
+- **Claude Code:** validado com Haiku e Sonnet, 8 execuções cada, todas com o pedido de ferramenta no formato certo (uma do Haiku repetiu o pedido). Opus não foi medido.
+- **OpenAI e Anthropic com o serviço real:** não validados. Não há chave; o usuário não cadastrou nenhuma.
+- **Codex:** não validado. Não está instalado.
+- **`Ctrl+C` em terminal interativo:** validado. O servidor registrou o encerramento por `SIGINT`, fechou as conexões e liberou a porta, sem pergunta do PowerShell.
+- **Movimento do Escritório, Narrador, arrastar no quadro e os seis ambientes:** conferidos pelo usuário, sem problema relatado.
+- **Falhas de tempo intermitentes do E2E** (`TESTING.md`, seção 8): continuam abertas. A hipótese do filtro de rede do Avast não foi testada, porque o usuário preferiu não pôr a exceção.
+- **`npm audit`:** 11 avisos moderados só em ferramentas de desenvolvimento, aceitos (`SECURITY.md`, seção 10); nenhum nas dependências de produção.
+- **macOS e Linux:** não testados (não há macOS; o WSL não tem distribuição instalada).
+- **Limitações de produto aceitas:** `SPEC.md`, seção 9.
 
 ## Funcionalidades entregues
 

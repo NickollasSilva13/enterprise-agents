@@ -12,7 +12,7 @@ interface QuickActionProps {
   compact?: boolean;
 }
 
-const FRAME = 'surface-glass flex items-center gap-3 rounded-2xl text-left transition-colors';
+const FRAME = 'surface-glass flex items-center gap-3 rounded-xl text-left transition-colors';
 
 /**
  * A shortcut to the next thing to do (Phase 20). Off, it still shows, with
@@ -31,7 +31,7 @@ export function QuickAction({
   const body = (
     <>
       <span
-        className={`grid shrink-0 place-items-center bg-accent text-white ${
+        className={`grid shrink-0 place-items-center bg-accent/20 text-glow ${
           compact ? 'size-7 rounded-lg' : 'size-10 rounded-xl'
         }`}
       >

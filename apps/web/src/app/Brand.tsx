@@ -10,11 +10,11 @@ export function Brand() {
           height="24"
           rx="3"
           fill="none"
-          stroke="#f1edff"
+          stroke="#eceef6"
           strokeWidth="2"
         />
-        <path d="M14 2 V11 M14 17 V26 M2 14 H8 M20 14 H26" stroke="#f1edff" strokeWidth="2" />
-        <rect x="16.5" y="4.5" width="7" height="7" rx="1" fill="#8467ff" />
+        <path d="M14 2 V11 M14 17 V26 M2 14 H8 M20 14 H26" stroke="#eceef6" strokeWidth="2" />
+        <rect x="16.5" y="4.5" width="7" height="7" rx="1" fill="#7c66ff" />
       </svg>
       Enterprise Agents
     </span>

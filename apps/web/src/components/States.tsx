@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert, Inbox, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { errorMessage } from '../lib/errors';
 import { Button } from './Button';
@@ -19,12 +19,20 @@ interface EmptyStateProps {
   title: string;
   children?: ReactNode;
   action?: ReactNode;
+  /** What will be here, drawn small above the title. */
+  icon?: LucideIcon;
 }
 
 /** Nothing to show yet: says what will appear here and how to get it. */
-export function EmptyState({ title, children, action }: EmptyStateProps) {
+export function EmptyState({ title, children, action, icon: Icon = Inbox }: EmptyStateProps) {
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 py-8 sm:px-6">
+      <span
+        aria-hidden
+        className="mb-3 grid size-10 place-items-center rounded-xl border border-line bg-sheet-raised text-dim"
+      >
+        <Icon className="size-5" />
+      </span>
       <p className="font-semibold">{title}</p>
       {children && <div className="mt-1 max-w-prose text-sm text-dim">{children}</div>}
       {action && <div className="mt-4">{action}</div>}

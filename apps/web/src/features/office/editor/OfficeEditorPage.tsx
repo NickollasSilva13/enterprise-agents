@@ -73,6 +73,7 @@ import { floorPoints, unproject } from '../art/iso';
 import { useDaylight } from '../daylight';
 import { Around, AroundFront, Floor, Perimeter, Signs } from '../OfficeScene';
 import { RoomSigns } from '../three/OfficeOverlay';
+import { environmentLabel } from '../three/environments/catalog';
 import { hasWebGL, useElementSize } from '../three/support';
 import { officeView, type OfficeView } from '../three/view';
 import { useViewport } from '../viewport';
@@ -379,7 +380,11 @@ function Editor({ office }: { office: Office }) {
     }));
     const homeless = counts.get(null) ?? 0;
     if (homeless > 0) rooms.push({ projectId: null, agents: homeless });
-    dispatch({ type: 'replace', layout: buildPresetLayout(preset, rooms) });
+    // A preset rearranges the rooms; the surroundings chosen stay.
+    dispatch({
+      type: 'replace',
+      layout: { ...buildPresetLayout(preset, rooms), surroundings: layout.surroundings },
+    });
   };
 
   const issueAreas = new Set(
@@ -735,7 +740,7 @@ function Editor({ office }: { office: Office }) {
             >
               {SURROUNDINGS.map((each) => (
                 <option key={each} value={each}>
-                  {SURROUNDINGS_INFO[each].label}
+                  {environmentLabel(each)}
                 </option>
               ))}
             </SelectField>

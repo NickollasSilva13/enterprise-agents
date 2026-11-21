@@ -1,11 +1,12 @@
 import type { Schedule, ScheduleKind, ScheduleRule } from '@ea/shared';
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, buttonClass, IconButton } from '../../components/Button';
 import { SelectField, Switch, TextAreaField, TextField } from '../../components/Form';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
+import { TasksTabs } from './TasksTabs';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
@@ -19,7 +20,7 @@ import {
   useSchedules,
   useUpdateSchedule,
 } from '../../lib/task-queries';
-import { BACK_LINK, LINK } from '../../components/TextLink';
+import { LINK } from '../../components/TextLink';
 import { FormError, ToneText } from '../../components/Notice';
 import { Tip } from '../../components/Tip';
 
@@ -442,10 +443,7 @@ export function SchedulesPage() {
 
   return (
     <>
-      <Link to="/tarefas" className={BACK_LINK}>
-        <ArrowLeft className="size-4" aria-hidden />
-        Tarefas
-      </Link>
+      <TasksTabs />
       <PageHeader
         title="Agendamentos"
         description="Tarefas criadas sozinhas no quadro de uma área, uma vez ou em horários que se repetem. Cada tarefa segue o fluxo da área, como qualquer outra."

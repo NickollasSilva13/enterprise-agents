@@ -1,12 +1,5 @@
 import type { Board, TaskSummary, WorkflowStage } from '@ea/shared';
-import {
-  ArrowLeftRight,
-  CalendarClock,
-  LayoutTemplate,
-  MoveRight,
-  Plus,
-  Workflow,
-} from 'lucide-react';
+import { MoveRight, Plus, Workflow } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Button, buttonClass } from '../../components/Button';
@@ -23,6 +16,7 @@ import { NewAreaDialog } from './NewAreaDialog';
 import { NewTaskDialog } from './NewTaskDialog';
 import { PriorityBadge, STAGE_KIND_LABEL, TaskStatus } from './TaskBadges';
 import { Tip } from '../../components/Tip';
+import { TasksTabs } from './TasksTabs';
 
 /** A move the user started from the board, waiting for the confirmation. */
 interface PendingMove {
@@ -54,7 +48,7 @@ function TaskCard({ task, moves, dragged, onDragStart, onDragEnd, onMove }: Task
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className={`rounded-xl border border-line bg-ink transition-colors hover:border-line-strong ${
+      className={`rounded-lg border border-line bg-sheet-raised shadow-lift transition-colors hover:border-line-strong ${
         movable ? 'cursor-grab active:cursor-grabbing' : ''
       } ${dragged ? 'opacity-50' : ''}`}
     >
@@ -173,7 +167,7 @@ function BoardView({ board }: { board: Board }) {
 
   if (stages.length === 0) {
     return (
-      <div className="rounded-lg border border-line bg-sheet">
+      <div className="rounded-xl border border-line bg-sheet">
         <EmptyState
           title="Esta área ainda não tem fluxo."
           action={
@@ -263,28 +257,15 @@ export function TasksPage() {
 
   return (
     <>
+      <TasksTabs />
       <PageHeader
         title="Tarefas"
         description="O quadro de cada área. Quando uma tarefa chega à etapa de um agente, ele trabalha nela e a passa adiante pelas regras do fluxo."
         actions={
-          <div className="flex flex-wrap gap-3">
-            <Link to="/tarefas/pedidos" className={buttonClass()}>
-              <ArrowLeftRight className="size-4.5" aria-hidden />
-              Pedidos entre áreas
-            </Link>
-            <Link to="/tarefas/agendamentos" className={buttonClass()}>
-              <CalendarClock className="size-4.5" aria-hidden />
-              Agendamentos
-            </Link>
-            <Link to="/tarefas/modelos" className={buttonClass()}>
-              <LayoutTemplate className="size-4.5" aria-hidden />
-              Modelos de fluxo
-            </Link>
-            <Button onClick={() => setCreatingArea(true)}>
-              <Plus className="size-4.5" aria-hidden />
-              Nova área a partir de modelo
-            </Button>
-          </div>
+          <Button onClick={() => setCreatingArea(true)}>
+            <Plus className="size-4.5" aria-hidden />
+            Nova área a partir de modelo
+          </Button>
         }
       />
 
@@ -293,7 +274,7 @@ export function TasksPage() {
         <ErrorState title="Não foi possível carregar as áreas." error={projects.error} />
       )}
       {projects.data?.length === 0 && (
-        <div className="rounded-lg border border-line bg-sheet">
+        <div className="rounded-xl border border-line bg-sheet">
           <EmptyState
             title="Nenhuma área ainda."
             action={

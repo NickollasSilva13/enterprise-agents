@@ -26,6 +26,7 @@ export interface Size {
  */
 export function useElementSize(): {
   ref: (element: HTMLElement | null) => void;
+  element: HTMLElement | null;
   size: Size | null;
 } {
   const [element, setElement] = useState<HTMLElement | null>(null);
@@ -46,5 +47,5 @@ export function useElementSize(): {
     observer.observe(element);
     return () => observer.disconnect();
   }, [element]);
-  return { ref: setElement, size };
+  return { ref: setElement, element, size };
 }

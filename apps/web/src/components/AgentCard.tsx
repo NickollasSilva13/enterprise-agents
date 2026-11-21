@@ -53,7 +53,7 @@ export function AgentCard({
   return (
     <article
       data-agent-card={agentId}
-      className={`relative flex flex-wrap gap-3 rounded-2xl border bg-sheet p-3 transition-colors focus-within:ring-2 focus-within:ring-glow hover:bg-sheet-raised ${
+      className={`relative flex flex-wrap gap-3 rounded-xl border bg-sheet p-3 transition-colors focus-within:ring-2 focus-within:ring-glow hover:bg-sheet-raised ${
         selected ? 'border-glow shadow-[0_0_14px_-4px_var(--color-glow)]' : 'border-line'
       }`}
     >
@@ -67,7 +67,7 @@ export function AgentCard({
             <Link
               to={to}
               aria-current={selected ? 'true' : undefined}
-              className="outline-none after:absolute after:inset-0 after:rounded-2xl"
+              className="outline-none after:absolute after:inset-0 after:rounded-xl"
             >
               {name}
             </Link>
@@ -100,7 +100,7 @@ export function AgentCard({
 /** The place of a card while the team loads. */
 export function AgentCardSkeleton() {
   return (
-    <div aria-hidden className="flex gap-3 rounded-2xl border border-line bg-sheet p-3">
+    <div aria-hidden className="flex gap-3 rounded-xl border border-line bg-sheet p-3">
       <div className="size-12 shrink-0 animate-pulse rounded-xl bg-sheet-raised" />
       <div className="flex-1 space-y-2 py-1">
         <div className="h-4 w-1/2 animate-pulse rounded bg-sheet-raised" />
