@@ -32,6 +32,11 @@ Carregado quando a tarefa toca a interface. As regras gerais estão em `CLAUDE.m
 - Dentro da lista "Mensagens" só vão texto e marcação: nada de `img` (o E2E confere que a saída do modelo não vira imagem), por isso a foto do agente fica no cabeçalho e na lista de conversas, não ao lado dos balões.
 - Cada item da lista "Mensagens" é, nesta ordem: o dia (uma vez por dia), os balões (com o horário) e a nota da execução.
 
+## Provedores (depois da Fase 38)
+
+- Os serviços de "Adicionar provedor" são predefinições da interface (`features/models/presets.ts`): a maioria é `openai_compatible` com o endereço do serviço. O que se grava é o tipo e o endereço; o serviço de um provedor gravado vem de `presetOf` (host do endereço). Serviço novo compatível entra lá e em `presets.test.ts`, com o logotipo em `components/ProviderLogo.tsx` (SVG na página, nunca imagem de fora).
+- O formulário tem as abas "API" e "Harness" (`group` da predefinição); cada serviço é um rádio que cobre o cartão inteiro (invisível, não `sr-only`, para o Playwright conseguir marcar).
+
 ## Moldura (Fase 21)
 
 - Menu em `app/navigation.ts` (em grupos desde a Fase 38, `NAV_GROUPS`; `NAV_ITEMS` é a lista plana derivada): o item atual vem de `isCurrent` (com `except` para que Tarefas não acenda em `/tarefas/agendamentos`, que é Automações); contadores só onde algo espera o usuário (`counter`). A ajuda é a área planejada `HELP_AREA` (Fase 27), no rodapé do menu, fora do `nav` "Principal".

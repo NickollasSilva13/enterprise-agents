@@ -115,14 +115,12 @@ test('an API key is stored but never shown or returned', async ({ page }, testIn
 
   await page.goto(`${CRUD_URL}/modelos`);
   const dialog = await openAddDialog(page);
-  await dialog.getByRole('combobox', { name: 'Tipo' }).selectOption({ label: 'Anthropic' });
+  await dialog.getByRole('radio', { name: 'Anthropic' }).check();
   await expect(dialog.getByText(/fica fora deste computador/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Adicionar provedor' }).click();
   await expect(dialog.getByText('Anthropic exige uma chave de API.')).toBeVisible();
 
-  await dialog
-    .getByRole('combobox', { name: 'Tipo' })
-    .selectOption({ label: 'Compatível com OpenAI' });
+  await dialog.getByRole('radio', { name: 'Outro compatível' }).check();
   await dialog.getByRole('textbox', { name: 'Nome' }).fill(providerName);
   await dialog.getByRole('textbox', { name: 'Endereço' }).fill(`${FAKE_PROVIDER_URL}/v1`);
   const keyField = dialog.getByLabel('Chave de API');

@@ -271,9 +271,7 @@ describe('adding a provider', () => {
   it('fills in the usual address of each kind and warns about external ones', async () => {
     renderApp('/modelos', api([]));
     const dialog = await open();
-    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
-      target: { value: 'anthropic' },
-    });
+    fireEvent.click(dialog.getByRole('radio', { name: 'Anthropic' }));
     expect(dialog.getByRole('textbox', { name: 'Endereço' })).toHaveProperty(
       'value',
       'https://api.anthropic.com',
@@ -291,9 +289,7 @@ describe('adding a provider', () => {
   it('requires the key where the provider requires one, and sends nothing without it', async () => {
     const { writes } = renderApp('/modelos', api([]));
     const dialog = await open();
-    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
-      target: { value: 'anthropic' },
-    });
+    fireEvent.click(dialog.getByRole('radio', { name: 'Anthropic' }));
     fireEvent.click(dialog.getByRole('button', { name: 'Adicionar provedor' }));
     expect(await dialog.findByText('Anthropic exige uma chave de API.')).toBeTruthy();
     expect(writes()).toEqual([]);
@@ -306,9 +302,7 @@ describe('adding a provider', () => {
       'POST /api/providers/p2/models/sync': { models: [], added: 0, removed: 0 },
     });
     const dialog = await open();
-    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
-      target: { value: 'openai_compatible' },
-    });
+    fireEvent.click(dialog.getByRole('radio', { name: 'OpenAI' }));
     fireEvent.change(dialog.getByLabelText('Chave de API'), {
       target: { value: '  sk-typed-key-123456  ' },
     });
@@ -337,6 +331,56 @@ describe('adding a provider', () => {
     ).toBeTruthy();
     expect(writes()).toEqual([]);
   });
+
+  it('offers each API service with its mark, and its address and key', async () => {
+    const { writes } = renderApp('/modelos', api([]));
+    const dialog = await open();
+    const services = dialog
+      .getAllByRole('radio')
+      .map((radio) => radio.closest('label')?.textContent);
+    expect(services).toEqual([
+      'Ollama',
+      'OpenAI',
+      'Anthropic',
+      'Google',
+      'DeepSeek',
+      'Groq',
+      'Mistral',
+      'OpenRouter',
+      'Outro compatível',
+    ]);
+    for (const radio of dialog.getAllByRole('radio')) {
+      expect(radio.closest('label')?.querySelector('svg')).not.toBeNull();
+    }
+
+    fireEvent.click(dialog.getByRole('radio', { name: 'Google' }));
+    expect(dialog.getByRole('textbox', { name: 'Nome' })).toHaveProperty('value', 'Google');
+    expect(dialog.getByRole('textbox', { name: 'Endereço' })).toHaveProperty(
+      'value',
+      'https://generativelanguage.googleapis.com/v1beta/openai',
+    );
+    fireEvent.click(dialog.getByRole('button', { name: 'Adicionar provedor' }));
+    expect(await dialog.findByText('Google exige uma chave de API.')).toBeTruthy();
+    expect(writes()).toEqual([]);
+  });
+
+  it('keeps the harnesses in a tab of their own, reached by the arrow keys too', async () => {
+    renderApp('/modelos', api([]));
+    const dialog = await open();
+    const apiTab = dialog.getByRole('tab', { name: 'API' });
+    expect(apiTab.getAttribute('aria-selected')).toBe('true');
+    expect(dialog.queryByRole('radio', { name: 'Claude Code' })).toBeNull();
+
+    fireEvent.keyDown(apiTab, { key: 'ArrowRight' });
+    const harnessTab = dialog.getByRole('tab', { name: 'Harness' });
+    expect(harnessTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(harnessTab);
+    expect(
+      dialog.getAllByRole('radio').map((radio) => radio.closest('label')?.textContent),
+    ).toEqual(['Claude Code', 'Codex']);
+    expect(dialog.getByRole('radio', { name: 'Claude Code' })).toHaveProperty('checked', true);
+    expect(dialog.queryByRole('radio', { name: 'OpenAI' })).toBeNull();
+  });
 });
 
 describe('editing a provider', () => {
@@ -351,7 +395,7 @@ describe('editing a provider', () => {
       'PATCH /api/providers/p2': { ...openai, name: 'OpenAI pessoal' },
     });
     const dialog = await open('OpenAI');
-    expect(dialog.queryByRole('combobox', { name: 'Tipo' })).toBeNull();
+    expect(dialog.queryByRole('tablist', { name: 'Forma de conexão' })).toBeNull();
     expect(dialog.getByLabelText('Chave de API')).toHaveProperty('value', '');
     expect(dialog.getByText('Deixe vazio para manter a chave atual (…cdef).')).toBeTruthy();
 
@@ -467,9 +511,8 @@ describe('harness providers (Fase 12)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Adicionar provedor' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Adicionar provedor' }));
 
-    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
-      target: { value: 'claude_code' },
-    });
+    fireEvent.click(dialog.getByRole('tab', { name: 'Harness' }));
+    fireEvent.click(dialog.getByRole('radio', { name: 'Claude Code' }));
     expect(dialog.getByRole('textbox', { name: 'Nome' })).toHaveProperty('value', 'Claude Code');
     expect(dialog.getByRole('textbox', { name: 'Comando' })).toHaveProperty('value', 'claude');
     expect(dialog.queryByRole('textbox', { name: 'Endereço' })).toBeNull();
@@ -491,9 +534,8 @@ describe('harness providers (Fase 12)', () => {
     const { writes } = renderApp('/modelos', { '/api/providers': { providers: [] } });
     fireEvent.click(await screen.findByRole('button', { name: 'Adicionar provedor' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Adicionar provedor' }));
-    fireEvent.change(dialog.getByRole('combobox', { name: 'Tipo' }), {
-      target: { value: 'codex' },
-    });
+    fireEvent.click(dialog.getByRole('tab', { name: 'Harness' }));
+    fireEvent.click(dialog.getByRole('radio', { name: 'Codex' }));
     fireEvent.change(dialog.getByRole('textbox', { name: 'Comando' }), {
       target: { value: 'codex --dangerously-bypass-approvals' },
     });

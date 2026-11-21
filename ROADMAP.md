@@ -1607,6 +1607,16 @@ Pedido do usuário: a tela de conversa com um agente "como uma conversa no Whats
 
 - O MSAA do ajuste anterior também ligava quando o 3D é desenhado pelo processador (sem placa de vídeo, como nos testes). Ali ele pesava tanto que o roteiro de conversa do E2E, que abre o Escritório numa segunda aba, falhava em duas de três rodadas com os dois aparelhos juntos. Agora a multiamostragem só liga com placa de vídeo (`isSoftwareRenderer` em `three/support.ts`, pelo nome que o navegador dá ao renderizador). As capturas do recorte e do jardim voltaram às de antes do MSAA.
 
+## Provedores com logotipo e harness em aba própria (2026-11-21)
+
+Pedido do usuário: em "Adicionar provedor", conexão por API com OpenAI, Anthropic, Google, DeepSeek, Groq, Mistral e OpenRouter, cada um com o ícone ao lado, e os harness (Claude Code e Codex) numa aba separada.
+
+- **Sem tipo novo no servidor:** Google, DeepSeek, Groq, Mistral e OpenRouter falam o protocolo da OpenAI, então são o tipo `openai_compatible` com o endereço do serviço já preenchido (predefinições em `apps/web/src/features/models/presets.ts`). Nada muda no banco, na API nem nos adaptadores; um endereço digitado à mão continua valendo ("Outro compatível"). O serviço de um provedor gravado é reconhecido pelo host do endereço (`presetOf`).
+- **Formulário:** a lista "Tipo" virou duas abas, "API" e "Harness" (padrão de abas, com as setas do teclado), e cada serviço é um cartão com o logotipo. Na aba API, os serviços pagos exigem a chave antes de enviar.
+- **Página Modelos:** cada cartão de provedor mostra o logotipo e o nome do serviço, e a lista se divide em "Provedores de API" e "Harness".
+- **Logotipos:** desenhados em SVG dentro da página (a CSP não permite imagem de fora nem o atributo `style`), em `components/ProviderLogo.tsx`; os traços vêm do LobeHub Icons (licença MIT), e cada marca pertence à sua empresa e só identifica o serviço. Os de uma cor seguem a cor do texto.
+- Não validado com o serviço real: não há chave de nenhum dos novos serviços nesta máquina. Os endereços são os documentados por cada um para o protocolo da OpenAI.
+
 ## Pendências ao final do projeto
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.

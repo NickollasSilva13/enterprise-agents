@@ -23,7 +23,8 @@ import {
   useUpdateModel,
 } from '../../lib/provider-queries';
 import { ExternalNotice } from './ExternalNotice';
-import { ProviderDialog } from './ProviderDialog';
+import { LogoTile, ProviderDialog } from './ProviderDialog';
+import { presetOf } from './presets';
 import { useAddressFlag } from '../../lib/address-flag';
 import { FormError } from '../../components/Notice';
 import { StatusPill } from '../../components/StatusPill';
@@ -152,6 +153,7 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
   const sync = useSyncModels();
   const notify = useToast();
   const info = PROVIDER_KIND_INFO[provider.kind];
+  const preset = presetOf(provider);
   const headingId = `provider-${provider.id}`;
 
   const refreshModels = () =>
@@ -173,12 +175,13 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
   return (
     <section aria-labelledby={headingId} className="rounded-xl border border-line bg-sheet">
       <header className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-line px-4 py-3">
-        <div className="min-w-0 flex-1 basis-64">
-          <h2 id={headingId} className="truncate text-lg font-semibold">
+        <LogoTile preset={preset.id} size="lg" />
+        <div className="min-w-0 flex-1 basis-48">
+          <h3 id={headingId} className="truncate text-lg font-semibold">
             {provider.name}
-          </h2>
+          </h3>
           <p className="flex flex-wrap items-center gap-2 text-sm text-dim">
-            {info.label}
+            {preset.id === 'compatible' ? info.label : preset.label}
             <StatusPill tone={provider.isExternal ? 'wait' : 'ok'}>
               {provider.isExternal ? 'externo' : 'neste computador'}
             </StatusPill>
@@ -236,12 +239,12 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
       )}
 
       <div className="border-t border-line">
-        <h3 className="px-4 pt-3 text-sm font-semibold">
+        <h4 className="px-4 pt-3 text-sm font-semibold">
           Modelos
           <span className="ml-2 font-normal text-dim">
             {provider.enabledModelCount} de {provider.modelCount} habilitados
           </span>
-        </h3>
+        </h4>
         <ModelList provider={provider} />
       </div>
     </section>
@@ -273,6 +276,20 @@ function DeleteProviderDialog({ provider, onClose }: { provider: Provider; onClo
     </ConfirmDialog>
   );
 }
+
+/** Harnesses are listed apart: they run on this computer, by subscription. */
+const PROVIDER_SECTIONS = [
+  {
+    id: 'api',
+    title: 'Provedores de API',
+    description: 'Respondem por um endereço, com chave de API ou neste computador.',
+  },
+  {
+    id: 'harness',
+    title: 'Harness',
+    description: 'Programas instalados neste computador que usam a sua assinatura.',
+  },
+] as const;
 
 export function ModelsPage() {
   const { data: providers, error, isPending, refetch } = useProviders();
@@ -321,15 +338,32 @@ export function ModelsPage() {
       )}
 
       {providers && providers.length > 0 && (
-        <div className="space-y-6">
-          {providers.map((provider) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              onEdit={setEditing}
-              onDelete={setDeleting}
-            />
-          ))}
+        <div className="space-y-8">
+          {PROVIDER_SECTIONS.map((section) => {
+            const members = providers.filter(
+              (provider) => (provider.command === null ? 'api' : 'harness') === section.id,
+            );
+            if (members.length === 0) return null;
+            return (
+              <section key={section.id} aria-labelledby={`providers-${section.id}`}>
+                <h2 id={`providers-${section.id}`} className="text-base font-semibold">
+                  {section.title}
+                  <span className="ml-2 font-normal text-dim">{members.length}</span>
+                </h2>
+                <p className="mb-3 text-sm text-dim">{section.description}</p>
+                <div className="space-y-6">
+                  {members.map((provider) => (
+                    <ProviderCard
+                      key={provider.id}
+                      provider={provider}
+                      onEdit={setEditing}
+                      onDelete={setDeleting}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
