@@ -19,7 +19,28 @@ import { type BoxColors, floorPoints, IsoBox, points, project, tones } from './i
 // as in the proposal, and everything follows the clock (`light`, 0 at night
 // and 1 by day, from daylight.ts).
 
-type Layout = Pick<OfficeLayout, 'width' | 'height' | 'surroundings' | 'items' | 'areas'>;
+type SceneLayout = Pick<OfficeLayout, 'width' | 'height' | 'surroundings' | 'items' | 'areas'>;
+
+/**
+ * The surroundings drawn in 2D (Phase 15). One added later for the 3D scene
+ * is drawn here as the nearest of these, for browsers without WebGL (Phase
+ * 35, D8 of Phase 33): the modern condominium as the residential street; the
+ * tropical island and the technological garden (Phase 36) as the park.
+ */
+type Drawn = 'building' | 'house' | 'park';
+const DRAWN: Record<Surroundings, Drawn> = {
+  building: 'building',
+  house: 'house',
+  park: 'park',
+  condo: 'house',
+  island: 'park',
+  techGarden: 'park',
+};
+type Layout = Omit<SceneLayout, 'surroundings'> & { readonly surroundings: Drawn };
+const drawnOf = (layout: SceneLayout): Layout => ({
+  ...layout,
+  surroundings: DRAWN[layout.surroundings],
+});
 
 /** A small seeded random source, so the same layout always gets the same trees. */
 function seeded(seed: string): () => number {
@@ -44,9 +65,9 @@ const CLOUD: Sprite = [
 ];
 
 /** How far around the office each kind of surroundings goes, in tiles. */
-const MARGIN: Record<Surroundings, number> = { building: 0, house: 6, park: 8 };
+const MARGIN: Record<Drawn, number> = { building: 0, house: 6, park: 8 };
 
-const DAY_SKY: Record<Surroundings, { top: string; bottom: string }> = {
+const DAY_SKY: Record<Drawn, { top: string; bottom: string }> = {
   building: { top: '#7fb6ef', bottom: '#dcecff' },
   house: { top: '#7fb8f0', bottom: '#d6ebff' },
   park: { top: '#86c5e8', bottom: '#e3f4ff' },
@@ -705,11 +726,12 @@ function Greenery({ layout, front, light }: { layout: Layout; front: boolean; li
 // ---------------------------------------------------------------------------
 // Layers
 
-export function SurroundingsBack({ layout, light }: { layout: Layout; light: number }) {
+export function SurroundingsBack({ layout: scene, light }: { layout: SceneLayout; light: number }) {
+  const layout = drawnOf(scene);
   const { width, height, surroundings } = layout;
   const entrance = entranceOf(layout);
   return (
-    <g data-surroundings={surroundings} data-light={light.toFixed(2)} aria-hidden>
+    <g data-surroundings={scene.surroundings} data-light={light.toFixed(2)} aria-hidden>
       <Sky layout={layout} light={light} />
       {surroundings === 'building' && (
         <>
@@ -757,7 +779,8 @@ const MULLION: BoxColors = tones('#eeeaf8');
 const HOUSE_WALL: BoxColors = { top: '#a8473b', left: '#f1e4cf', right: '#dccbb0' };
 
 /** The outer walls behind the office, along its back edges. */
-export function PerimeterBack({ layout, light }: { layout: Layout; light: number }) {
+export function PerimeterBack({ layout: scene, light }: { layout: SceneLayout; light: number }) {
+  const layout = drawnOf(scene);
   const { width, height, surroundings } = layout;
   const wall = (key: string, x: number, y: number, w: number, d: number) => {
     if (surroundings === 'house') {
@@ -815,7 +838,8 @@ export function PerimeterBack({ layout, light }: { layout: Layout; light: number
 }
 
 /** The low outer walls or rails in front of the office. */
-export function PerimeterFront({ layout }: { layout: Layout }) {
+export function PerimeterFront({ layout: scene }: { layout: SceneLayout }) {
+  const layout = drawnOf(scene);
   const { width, height, surroundings } = layout;
   const entrance = entranceOf(layout);
   const colors = surroundings === 'house' ? HOUSE_WALL : MULLION;
@@ -830,7 +854,14 @@ export function PerimeterFront({ layout }: { layout: Layout }) {
   return <g aria-hidden>{rails}</g>;
 }
 
-export function SurroundingsFront({ layout, light }: { layout: Layout; light: number }) {
+export function SurroundingsFront({
+  layout: scene,
+  light,
+}: {
+  layout: SceneLayout;
+  light: number;
+}) {
+  const layout = drawnOf(scene);
   if (layout.surroundings === 'building')
     return (
       <g aria-hidden>

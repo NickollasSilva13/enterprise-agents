@@ -10,8 +10,9 @@ import type { OfficeSceneState } from '../OfficeScene';
 import { Blocks } from './Blocks';
 import { Effects, Reflections } from './Effects';
 import { type Block, chairBlocks, itemBlocks, wallPieces } from './model';
-import { City, horizonAt, Sky, Street } from './Surroundings';
-import { cameraDirection, HEIGHTS, type OfficeView } from './view';
+import { Environment } from './environments/Environment';
+import { Approach } from './Surroundings';
+import { HEIGHTS, type OfficeView } from './view';
 import { isLively, motionOf, VoxelCharacter } from './VoxelCharacter';
 
 // The office in 3D (Phase 24, D1): React Three Fiber over three.js. This file
@@ -262,32 +263,6 @@ export function Lights({ layout, light }: { layout: OfficeLayout; light: number 
   );
 }
 
-/** Things far behind the office fade into the horizon, as in the proposal; the office never does. */
-export function Fog({
-  view,
-  layout,
-  light,
-}: {
-  view: OfficeView;
-  layout: OfficeLayout;
-  light: number;
-}) {
-  const scene = useThree((state) => state.scene);
-  const [dx, dy, dz] = cameraDirection();
-  const [tx, ty, tz] = view.target;
-  // Distance from the camera (100 tiles out from the target) to the farthest corner of the office.
-  const depth = (x: number, z: number) => 100 - ((x - tx) * dx + (0 - ty) * dy + (z - tz) * dz);
-  const near = Math.max(depth(0, 0), depth(layout.width, 0), depth(0, layout.height)) + 4;
-  const color = horizonAt(light);
-  useLayoutEffect(() => {
-    scene.fog = new THREE.Fog(color, near, near + 30);
-    return () => {
-      scene.fog = null;
-    };
-  }, [scene, color, near]);
-  return null;
-}
-
 export default function OfficeCanvas({
   layout,
   agents,
@@ -323,12 +298,10 @@ export default function OfficeCanvas({
       aria-hidden
     >
       <CameraRig view={view} />
-      <Sky light={light} />
-      <Fog view={view} layout={layout} light={light} />
+      <Environment layout={layout} view={view} light={light} reduced={reduced} />
       <Reflections strength={0.22 + light * 0.08} />
       <Lights layout={layout} light={light} />
-      <City layout={layout} light={light} />
-      <Street layout={layout} light={light} />
+      <Approach layout={layout} light={light} />
       <Floors layout={layout} />
       <Furniture layout={layout} screens={stableScreens} />
       {agents.map((agent) => {

@@ -21,6 +21,7 @@ import { Button } from '../../components/Button';
 import { SelectField } from '../../components/Form';
 import { PixelCharacter } from '../../components/pixel-art/character';
 import { EYES, HAIR, OUTFIT, PANTS, SHOES, SKIN } from '../../components/pixel-art/palette';
+import { usePortrait } from '../../components/use-portrait';
 
 // How the agent looks in the office and in its avatar (Phase 14). Colours are
 // picked from swatches drawn in SVG (fill attribute, never inline style).
@@ -73,6 +74,19 @@ function Swatches<T extends string>({
 }
 
 function Preview({ agentId, appearance }: { agentId: string; appearance: Appearance }) {
+  // The robot is drawn from the id, as in the office: its look is not stored.
+  const picture = usePortrait(agentId, appearance.kind === 'robot' ? null : appearance, 'full');
+  // The whole voxel figure of the office; until it is drawn, or without WebGL, the 2D one.
+  if (picture)
+    return (
+      <img
+        src={picture}
+        alt=""
+        aria-hidden
+        draggable={false}
+        className="h-44 w-36 shrink-0 rounded-lg bg-sheet-raised"
+      />
+    );
   return (
     <svg
       viewBox="-12 -34 24 36"

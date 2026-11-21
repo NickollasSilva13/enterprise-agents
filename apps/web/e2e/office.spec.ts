@@ -392,7 +392,9 @@ test('the layout is edited, saved, seen in the office and set back to automatic'
   // Rename the lounge, put the office in a house, and save.
   await areas.getByRole('button', { name: /^Descompressão/ }).click();
   await page.getByRole('textbox', { name: 'Nome' }).fill('Cantinho do jogo');
-  await page.getByRole('combobox', { name: 'Entorno' }).selectOption({ label: 'Casa' });
+  await page
+    .getByRole('combobox', { name: 'Entorno' })
+    .selectOption({ label: 'Bairro residencial' });
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByText('Escritório salvo.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Layout salvo' })).toBeVisible();
@@ -414,6 +416,7 @@ test('the layout is edited, saved, seen in the office and set back to automatic'
   await page.goto(`${EMPTY_URL}/escritorio`);
   await expect(page.locator('[data-office-scene]')).toContainText('Descompressão');
   await expect(page.locator('[data-office-scene]')).not.toContainText('Cantinho do jogo');
-  await expect(page.locator('[data-office-scene] [data-surroundings="building"]')).toHaveCount(1);
+  // The automatic layout starts in the park (Phase 33).
+  await expect(page.locator('[data-office-scene] [data-surroundings="park"]')).toHaveCount(1);
   expect(problems).toEqual([]);
 });

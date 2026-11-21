@@ -268,5 +268,6 @@ export function buildPresetLayout(
       });
     }
   }
-  return { width: finalWidth, height, surroundings: 'building', areas, items };
+  // New offices start in the park (Phase 33, D7); a saved layout keeps its own.
+  return { width: finalWidth, height, surroundings: 'park', areas, items };
 }

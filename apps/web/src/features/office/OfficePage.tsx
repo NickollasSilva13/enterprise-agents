@@ -28,7 +28,8 @@ import {
 import { placesOf } from './scene';
 import { OfficeOverlay } from './three/OfficeOverlay';
 import { hasWebGL, useElementSize } from './three/support';
-import { officeView } from './three/view';
+import { officeView, zoomedView } from './three/view';
+import { useStageZoom } from './stage-zoom';
 import { TONES } from '../../lib/tone';
 import { FirstSteps, useFirstStepsOpen } from '../guide/FirstSteps';
 import { Tip } from '../../components/Tip';
@@ -243,10 +244,19 @@ export function OfficePage() {
   const firstSteps = useFirstStepsOpen();
   const bounds = useMemo(() => (layout ? sceneBounds(layout) : null), [layout]);
   const size = stage.size;
-  const view = useMemo(
-    () => (layout && size ? officeView(layout, size.width, size.height) : null),
-    [layout, size],
-  );
+  // The wheel zooms and the mouse drags the view; no buttons, as decided in Phase 24 (D6).
+  const { frame } = useStageZoom(stage.element);
+  const view = useMemo(() => {
+    if (!layout || !size) return null;
+    const whole = officeView(layout, size.width, size.height);
+    if (frame.size >= 1) return whole;
+    return zoomedView(whole, {
+      x: frame.x * size.width,
+      y: frame.y * size.height,
+      width: frame.size * size.width,
+      height: frame.size * size.height,
+    });
+  }, [layout, size, frame]);
 
   const delegations = delegationsOf(agents);
   const balloons = new Map<string, BalloonInfo>();
@@ -359,7 +369,12 @@ export function OfficePage() {
               ) : (
                 <OfficeDrawing
                   className="absolute inset-0 size-full select-none"
-                  viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
+                  viewBox={[
+                    bounds.x + frame.x * bounds.width,
+                    bounds.y + frame.y * bounds.height,
+                    frame.size * bounds.width,
+                    frame.size * bounds.height,
+                  ].join(' ')}
                   layout={layout}
                   projects={data.projects}
                   agents={agents}
