@@ -1,8 +1,10 @@
-import type { OfficeArea, OfficeItem } from '@ea/shared';
+import { buildPresetLayout, OFFICE_PRESETS } from '@ea/shared';
 import { describe, expect, it } from 'vitest';
-import { GROUND, logoBlocks, stepBlocks, towersOf, treeBlocks, treesOf } from './city';
+import { GROUND, stepBlocks } from '../../approach';
+import { hidesOffice, sightPoints } from '../clearance';
+import { towersOf, treeBlocks, treesOf } from './plan';
 
-const layout = { width: 18, height: 12 };
+const layout = { width: 18, height: 12, items: [] };
 
 describe('towersOf', () => {
   it('always builds the same city for the same office', () => {
@@ -52,27 +54,48 @@ describe('the street around the building', () => {
     const night = treeBlocks(tree, 1).map((block) => block.color);
     expect(night).not.toEqual(day);
   });
+});
 
-  it('runs the steps from the entrance down to the street', () => {
-    const items = [{ kind: 'entrance', x: 5, y: 11 } as OfficeItem];
-    const steps = stepBlocks({ height: 12, items });
-    expect(steps.length).toBeGreaterThan(1);
-    for (const step of steps) expect(step.z).toBe(GROUND);
-    // Each step is lower than the one before, going away from the floor.
-    for (let index = 1; index < steps.length; index += 1) {
-      expect(steps[index]?.h).toBeLessThan(steps[index - 1]?.h ?? 0);
-      expect(steps[index]?.y).toBeGreaterThan(steps[index - 1]?.y ?? 0);
-    }
-    expect(stepBlocks({ height: 12, items: [] })).toEqual([]);
-  });
-
-  it('hangs the mark on the back wall of the reception, lit', () => {
-    const reception = { kind: 'reception', x: 6, y: 0, width: 4 } as OfficeArea;
-    const blocks = logoBlocks({ areas: [reception], width: 18 });
-    expect(blocks.some((block) => block.glow)).toBe(true);
-    for (const block of blocks) {
-      expect(block.x).toBeGreaterThanOrEqual(6);
-      expect(block.x + block.w).toBeLessThanOrEqual(10);
+describe('the city as an environment (Phase 34)', () => {
+  it('hides nothing of the office, in every preset, by day and by night', () => {
+    for (const preset of OFFICE_PRESETS) {
+      const office = buildPresetLayout(preset, [{ projectId: 'a', agents: 4 }]);
+      const points = sightPoints(office);
+      const volumes = [
+        ...towersOf(office).map((tower) => ({
+          x0: tower.x,
+          x1: tower.x + tower.w,
+          y0: tower.y,
+          y1: tower.y + tower.d,
+          z0: GROUND,
+          z1: GROUND + tower.h + 1.2,
+        })),
+        ...[0, 1].flatMap((dusk) =>
+          treesOf(office).flatMap((tree) =>
+            treeBlocks(tree, dusk).map((block) => ({
+              x0: block.x,
+              x1: block.x + block.w,
+              y0: block.y,
+              y1: block.y + block.d,
+              z0: block.z,
+              z1: block.z + block.h,
+            })),
+          ),
+        ),
+      ];
+      expect(volumes.filter((volume) => hidesOffice(office, volume, points))).toEqual([]);
+      // Its trees keep their place of Phase 25 (some crowns nearer the platform
+      // than the park's free ground, low enough to hide nothing), but none on the steps.
+      for (const step of stepBlocks(office))
+        for (const tree of treesOf(office)) {
+          const r = tree.size * 0.5 + 0.1;
+          const apart =
+            tree.x + r <= step.x ||
+            tree.x - r >= step.x + step.w ||
+            tree.y + r <= step.y ||
+            tree.y - r >= step.y + step.d;
+          expect(apart).toBe(true);
+        }
     }
   });
 });

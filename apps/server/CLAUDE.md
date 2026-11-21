@@ -32,7 +32,7 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - O adaptador da Anthropic usa o SDK oficial e sempre passa a chave explicitamente: sem chave o SDK usaria credenciais da própria máquina.
 - Novo provedor: novo adaptador de `ModelProvider` com os testes de contrato compartilhados.
 - Provedores de harness (`claude-code.ts`, `codex.ts`) rodam o programa por `providers/command.ts` (sem shell, ambiente por lista de permissão). As ferramentas da plataforma chegam a eles só pelo protocolo de texto de `harness.ts` (`ToolCallReader`); o laço continua no `RunManager`. Não tire o `--safe-mode`: sem ele o Claude Code carrega servidores MCP, `CLAUDE.md` e a auto-memória do usuário.
-- Não há conta de harness conectada nesta máquina: os testes de harness usam um `CommandRunner` simulado (`harness-tools.test.ts` passa pelo `RunManager` real); `command.test.ts` cria processos de verdade com o próprio Node.
+- Os testes automáticos de harness não usam a conta real (que existe nesta máquina desde a Fase 13 e foi medida à mão na 37): usam um `CommandRunner` simulado (`harness-tools.test.ts` passa pelo `RunManager` real); `command.test.ts` cria processos de verdade com o próprio Node.
 
 ## Runtime
 
@@ -77,6 +77,10 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 ## Exportar e importar agentes
 
 `modules/agents/transfer.ts`. O arquivo nomeia projeto, modelo e provedor (nunca ids, endereço ou chave) e a importação nunca grava `allow`: tudo entra como `ask`. Campo novo de agente precisa entrar em `exportedAgentSchema` e nos dois sentidos de `transfer.ts`. O acesso à pasta da área é exportado, mas a importação sempre grava `none`, com aviso.
+
+## Instalação (Fase 37)
+
+O `better-sqlite3` fica na versão exata 12.6.2: da 13 em diante ele não traz binário pronto e `npm ci` exige compilador C++. `test/install.test.ts` falha se isso mudar. Não atualize o pacote sem conferir que a nova versão baixa o binário (`scripts.install` com `prebuild-install`).
 
 ## Testes
 

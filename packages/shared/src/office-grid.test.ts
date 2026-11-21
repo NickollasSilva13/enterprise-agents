@@ -350,14 +350,15 @@ describe('Phase 15 contract', () => {
     expect(answer.agents[0]?.appearance).toMatchObject({ eyes: 'brown', pattern: 'plain' });
   });
 
-  it('puts the office in a building unless told otherwise', () => {
+  it('starts new offices in the park and reads a layout without surroundings as a building', () => {
+    // New offices start in the park (Phase 33, D7); one saved before Phase 15 was in a building.
     const layout = buildPresetLayout('compact', []);
-    expect(layout.surroundings).toBe('building');
+    expect(layout.surroundings).toBe('park');
     const without: Record<string, unknown> = { ...layoutInputOf(layout) };
     delete without.surroundings;
     expect(officeLayoutInputSchema.parse(without).surroundings).toBe('building');
-    expect(officeLayoutInputSchema.parse({ ...without, surroundings: 'park' }).surroundings).toBe(
-      'park',
+    expect(officeLayoutInputSchema.parse({ ...without, surroundings: 'house' }).surroundings).toBe(
+      'house',
     );
     expect(officeLayoutInputSchema.safeParse({ ...without, surroundings: 'moon' }).success).toBe(
       false,

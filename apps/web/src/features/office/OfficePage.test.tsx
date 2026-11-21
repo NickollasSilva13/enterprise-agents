@@ -260,8 +260,8 @@ describe('OfficePage', () => {
     expect(scene?.textContent).toContain('Atendimento');
     expect(scene?.textContent).toContain('Copa');
     expect(scene?.textContent).toContain('Boas ideias!');
-    // Around it, by default, a building: its facade and the city behind (Phase 15).
-    expect(scene?.querySelector('[data-surroundings="building"]')).not.toBeNull();
+    // Around it, by default, the park (Phase 33; before, a building).
+    expect(scene?.querySelector('[data-surroundings="park"]')).not.toBeNull();
     // Nothing uses an inline style, an outside resource or <text> (CSP, readable text).
     expect(document.querySelector('main [style]')).toBeNull();
     expect(document.querySelector('main image, main use, main [href^="http"]')).toBeNull();
@@ -300,8 +300,10 @@ describe('OfficePage', () => {
     );
   });
 
-  it('draws the surroundings the layout says: a house, a park', async () => {
-    for (const surroundings of ['house', 'park'] as const) {
+  it('draws the surroundings the layout says: a house, a park, a condominium', async () => {
+    // Without WebGL the condominium (Phase 35) is drawn as the residential street, and the island
+    // and the technological garden (Phase 36) as the park, each under its own name.
+    for (const surroundings of ['house', 'park', 'condo', 'island', 'techGarden'] as const) {
       const data = officeWith([occupant({ id: 'a1', name: 'Ana' })]);
       const view = render({ ...data, layout: { ...data.layout, surroundings } });
       await screen.findByRole('region', { name: /^Agentes no escritório/ });

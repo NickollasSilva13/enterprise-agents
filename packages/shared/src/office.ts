@@ -88,15 +88,33 @@ export const FLOOR_LABELS: Record<Floor, string> = {
 };
 
 /** What is around the office (Phase 15): it is drawn, and nobody walks there. */
-export const SURROUNDINGS = ['building', 'house', 'park'] as const;
+export const SURROUNDINGS = ['building', 'house', 'park', 'condo', 'island', 'techGarden'] as const;
 export type Surroundings = (typeof SURROUNDINGS)[number];
 export const SURROUNDINGS_INFO: Record<Surroundings, { label: string; hint: string }> = {
   building: {
-    label: 'Andar de prédio',
-    hint: 'Fachada de vidro, os andares de baixo e a cidade ao fundo.',
+    label: 'Cidade',
+    hint: 'O escritório num andar alto, com as torres da cidade ao fundo.',
   },
-  house: { label: 'Casa', hint: 'Quintal com cerca, árvores, calçada e rua.' },
-  park: { label: 'Parque', hint: 'Gramado, caminhos, árvores, lago e bancos.' },
+  house: {
+    label: 'Bairro residencial',
+    hint: 'Ruas com calçadas, casas com quintal e cerca, árvores e carros na rua.',
+  },
+  condo: {
+    label: 'Condomínio moderno',
+    hint: 'Casas modernas em volta de uma piscina, com portaria, muro e jardins desenhados.',
+  },
+  park: {
+    label: 'Parque',
+    hint: 'Gramado com relevo, caminhos de pedra, lago com deque, coreto, árvores e canteiros.',
+  },
+  island: {
+    label: 'Ilha tropical',
+    hint: 'Praia de areia, mar azul-turquesa, coqueiros, píer com bangalôs e tochas à noite.',
+  },
+  techGarden: {
+    label: 'Jardim tecnológico',
+    hint: 'Jardim geométrico com caminhos acesos, painéis solares, estufa em cúpula e esculturas de luz.',
+  },
 };
 
 export const SIDES = ['n', 'e', 's', 'w'] as const;
