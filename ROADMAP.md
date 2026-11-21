@@ -42,7 +42,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 34 | A cidade como ambiente | Concluída em 2026-11-21 |
 | 35 | Bairro residencial e condomínio moderno | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 | 36 | Ilha tropical e jardim tecnológico | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
-| 37 | Validação final | Planejada |
+| 37 | Validação final | Concluída em 2026-11-21 |
 
 ## Fases concluídas
 
@@ -1507,17 +1507,43 @@ Os dois últimos ambientes do pedido da Fase 33 (D1), na mesma arquitetura, sem 
 
 - A aprovação visual dos dois ambientes pelo usuário.
 
+## Fase 37 — Validação final (concluída)
+
+O que faltava validar no projeto, com decisões D1 a D8 aprovadas em 2026-11-21 ("Aprovo todas"). O resultado de cada item está em "Pendências ao final do projeto", logo abaixo.
+
+### O que foi feito
+
+- **Instalação a partir do repositório (D2):** clone novo do ramo numa pasta temporária, `npm ci` e `npm start` com porta e dados próprios. O `npm ci` falhou: o `better-sqlite3` 13 não traz binário pronto e tentou compilar, e esta máquina não tem o Visual Studio Build Tools. Na mesma cópia, a 12.6.2 baixou o binário, passou nos 638 testes do servidor e subiu.
+  - Alternativas apresentadas: fixar na 12.6.2, manter a 13 e exigir o compilador, ou trocar pelo `node:sqlite`. O usuário escolheu fixar.
+  - `better-sqlite3` fixado em 12.6.2 (versão exata). Teste novo `apps/server/test/install.test.ts`: falha se o pacote instalado não baixar o binário pronto ou se a versão deixar de ser exata.
+  - Instalação limpa repetida: `npm ci` em 15 s, 640 testes do servidor e a aplicação no ar em 13 s.
+- **Primeiro uso com o Ollama (D3):** numa instalação nova e vazia, o usuário conectou o Ollama, habilitou o `llama3.2:3b`, criou uma área a partir de modelo pronto e a primeira tarefa em 62 s (meta: menos de 5 minutos), medidos pelo registro de pedidos do servidor. A tarefa rodou com o agente "Produto (Dev)" em 11,7 s, com várias chamadas de ferramenta.
+- **Claude Code (D4):** numa instalação descartável, 8 execuções com Haiku e 8 com Sonnet, cada uma pedindo para escrever um arquivo. Todas concluíram e criaram o arquivo com o conteúdo pedido; nenhum pedido mal formatado. Uma execução do Haiku pediu a mesma escrita duas vezes. Tempo médio: 10,6 s (Haiku) e 9,0 s (Sonnet). Nenhum processo do harness ficou para trás.
+- **Avast (D5):** o usuário preferiu não pôr a exceção; a hipótese segue sem teste.
+- **Conferências do usuário (D6):** `Ctrl+C` no terminal (lido por mim), Narrador, movimento dos agentes, arrastar no quadro e os seis ambientes, sem problema relatado.
+- **`npm audit` (D8):** igual ao registrado antes.
+
+### Não validado
+
+- Máquina limpa de verdade, macOS e Linux.
+- OpenAI, Anthropic e Codex com o serviço real.
+- A causa das falhas de tempo intermitentes do E2E.
+
 ## Pendências ao final do projeto
 
-- OpenAI e Anthropic nunca foram validados com o serviço real (não há chave); só contra servidores simulados.
-- O provedor de Codex (Fases 12 e 13) nunca foi validado: o Codex não está instalado. Falta conferir o formato real da saída dele e se o sandbox o impede de ler arquivos por conta própria. O Claude Code foi validado com um único modelo (Haiku) e poucas execuções: com que frequência um modelo erra o formato dos pedidos de ferramenta não foi medido.
-- Critério de aceite 1 (`SPEC.md`, seção 8), instalar em uma máquina limpa, não foi verificado: tudo foi feito nesta máquina.
-- Encerramento por `Ctrl+C` em terminal interativo nunca foi verificado à mão.
-- O movimento do Escritório não foi visto por uma pessoa.
-- O E2E falha de vez em quando sem causa identificada (`TESTING.md`, seção 8).
-- `npm audit` completo: 11 avisos moderados em ferramentas de desenvolvimento, aceitos (`SECURITY.md`, seção 10).
-- macOS e Linux não foram testados.
-- Limitações de produto aceitas: `SPEC.md`, seção 9.
+Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.
+
+- **Instalar numa máquina limpa (critério de aceite 1 de `SPEC.md`, seção 8):** validado de forma parcial, com um clone novo do repositório numa pasta temporária, nesta máquina. Achou um defeito: o `better-sqlite3` 13 não traz binário pronto, e `npm ci` falhava sem compilador C++. Fixado na 12.6.2 (decisão do usuário), `npm ci` passou em 15 s e a aplicação subiu. Uma máquina limpa de verdade continua não verificada.
+- **Primeiro uso com modelo real:** validado. O usuário fez os quatro primeiros passos com o Ollama (`llama3.2:3b`) em 62 s, e a primeira tarefa rodou em 11,7 s.
+- **Claude Code:** validado com Haiku e Sonnet, 8 execuções cada, todas com o pedido de ferramenta no formato certo (uma do Haiku repetiu o pedido). Opus não foi medido.
+- **OpenAI e Anthropic com o serviço real:** não validados. Não há chave; o usuário não cadastrou nenhuma.
+- **Codex:** não validado. Não está instalado.
+- **`Ctrl+C` em terminal interativo:** validado. O servidor registrou o encerramento por `SIGINT`, fechou as conexões e liberou a porta, sem pergunta do PowerShell.
+- **Movimento do Escritório, Narrador, arrastar no quadro e os seis ambientes:** conferidos pelo usuário, sem problema relatado.
+- **Falhas de tempo intermitentes do E2E** (`TESTING.md`, seção 8): continuam abertas. A hipótese do filtro de rede do Avast não foi testada, porque o usuário preferiu não pôr a exceção.
+- **`npm audit`:** 11 avisos moderados só em ferramentas de desenvolvimento, aceitos (`SECURITY.md`, seção 10); nenhum nas dependências de produção.
+- **macOS e Linux:** não testados (não há macOS; o WSL não tem distribuição instalada).
+- **Limitações de produto aceitas:** `SPEC.md`, seção 9.
 
 ## Funcionalidades entregues
 

@@ -184,6 +184,7 @@ Dependências: executar `npm audit` antes de cada fechamento de fase e avaliar o
 | 34 | Nenhum controle novo nem alterado. Só reorganização do desenho da cidade e uma árvore a menos sobre os degraus; nenhuma rota, dado ou entrada nova. |
 | 35 | Nenhum controle novo nem alterado. `SURROUNDINGS` ganhou `condo`, continua uma lista fechada no esquema estrito (valor desconhecido → 400) e é gravada pelo mesmo `PUT /api/office/layout`. Os ambientes novos são desenhados só a partir do tamanho do layout e da entrada, sem texto de usuário nem de modelo e sem recurso externo (C-05). |
 | 36 | Nenhum controle novo nem alterado. `SURROUNDINGS` ganhou `island` e `techGarden`, na mesma lista fechada do esquema estrito (valor desconhecido → 400), gravada pelo mesmo `PUT /api/office/layout`. Os ambientes novos são desenhados só a partir do tamanho do layout e da entrada, sem texto de usuário nem de modelo e sem recurso externo (C-05). |
+| 37 | Nenhum controle novo nem alterado. C-24 revisto: `npm audit` igual ao registrado (11 avisos moderados só em ferramentas de desenvolvimento, nenhum em produção). O `better-sqlite3` passou a ser fixado na versão exata 12.6.2, que baixa o binário pronto do próprio projeto no GitHub em vez de compilar (teste `test/install.test.ts`). Nenhuma chave foi usada na validação: o Claude Code usa a conta do próprio programa, e o Ollama não tem chave. |
 
 Além dos controles numerados, a Fase 3 garante que erros inesperados são devolvidos como mensagem genérica, sem stack trace nem texto do erro original (base para C-10).
 
