@@ -1529,6 +1529,20 @@ O que faltava validar no projeto, com decisões D1 a D8 aprovadas em 2026-11-21 
 - OpenAI, Anthropic e Codex com o serviço real.
 - A causa das falhas de tempo intermitentes do E2E.
 
+## Ajuste pedido depois da Fase 37 (2026-11-21)
+
+O usuário notou cerca de 1 s até o Escritório aparecer ao entrar na plataforma.
+
+- **Medição**, com marcações temporárias de tempo e um perfil de CPU, no Chromium dos testes (placa de vídeo ligada) e com o parque e os dados do usuário: cerca de 1,25 s até o primeiro quadro pintado. Os maiores custos:
+  - ~300 ms de espera antes de criar o WebGL, porque o React segurava a troca do `Suspense` do código carregado sob demanda;
+  - ~350 ms montando o gramado do parque, a maior parte na distância de cada ponto a cada trecho de caminho;
+  - ~140 ms fundindo as peças.
+- **Ajustes, sem mudar o visual:**
+  - o código 3D começa a baixar quando a página do Escritório monta, e é usado direto se já chegou (`loadCanvas` em `OfficePage.tsx`);
+  - no gramado, cada caminho e cada árvore marcam só os pontos perto deles;
+  - cada peça é posta no lugar com uma só matriz.
+- **Resultado:** cerca de 0,53 s até o primeiro quadro pintado (três rodadas: 533, 517 e 551 ms). Gramado ~50 ms, peças ~105 ms. O que sobra é montar o resto do escritório e o primeiro desenho, que compila os shaders (~100 ms).
+
 ## Pendências ao final do projeto
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.

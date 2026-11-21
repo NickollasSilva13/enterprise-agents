@@ -42,6 +42,7 @@ O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/o
 - A coluna do Escritório (`OfficePanel.tsx`) usa `AgentCard` dentro de cada `li` com `data-agent`/`data-place`/`data-seated`; a ordem é `byUrgency` (`features/office/activity.ts`). O texto de cada cartão começa pelo estado lido do avatar (`sr-only`): nos testes, procure "NomeEstado" sem âncora no começo.
 - Clique na cena chama `pick` (seleciona), nunca abre a conversa; o anel do agente aceso é `lit` (`pointed ?? selected`), em 3D no `VoxelCharacter` e `data-lit` na camada SVG.
 - Atividade recente: `useActivity()` (`/api/activity`, chave `['activity']`, também atualizada pelo fluxo de eventos) e `activityOf` transforma cada entrada em frase; `ActivityFeed` desenha.
+- Abertura do Escritório: o código 3D começa a baixar quando a página monta (`loadCanvas` em `OfficePage.tsx`) e, se já chegou, é usado sem `lazy`, que faria o React segurar a troca do `Suspense` por ~300 ms. Conta cara por ponto de terreno vira marcação a partir de cada objeto (`terrainGeometry` do parque).
 - Zoom do Escritório: `useStageZoom` (`features/office/stage-zoom.ts`) guarda o quadro mostrado em frações do desenho; a roda aproxima, o mouse arrasta, e o mesmo quadro move a câmera 3D (`zoomedView`) e o `viewBox` do SVG. Sem botões (D6 da Fase 24).
 - `/tarefas?nova=1` e `/tarefas/agendamentos?novo=1` abrem os formulários (ações rápidas); o parâmetro sai do endereço quando o formulário fecha.
 

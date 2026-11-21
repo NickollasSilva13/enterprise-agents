@@ -1,6 +1,6 @@
 import type { Approval, OfficeAgent } from '@ea/shared';
 import { Bell, CalendarPlus, ListPlus, PencilRuler, UserPlus } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { type ComponentType, lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { ActivityFeed } from '../../components/ActivityFeed';
 import { ApprovalCard } from '../../components/ApprovalCard';
@@ -27,6 +27,7 @@ import {
 } from './OfficeScene';
 import { placesOf } from './scene';
 import { OfficeOverlay } from './three/OfficeOverlay';
+import type { OfficeCanvasProps } from './three/OfficeCanvas';
 import { hasWebGL, useElementSize } from './three/support';
 import { officeView, zoomedView } from './three/view';
 import { useStageZoom } from './stage-zoom';
@@ -34,8 +35,23 @@ import { TONES } from '../../lib/tone';
 import { FirstSteps, useFirstStepsOpen } from '../guide/FirstSteps';
 import { Tip } from '../../components/Tip';
 
-/** The 3D scene and three.js are loaded only when the office opens (Phase 24, D1). */
-const OfficeCanvas = lazy(() => import('./three/OfficeCanvas'));
+/**
+ * The 3D scene and three.js are loaded only when the office opens (Phase 24,
+ * D1). The download starts as soon as the page mounts, beside the request for
+ * the office, so the scene is usually ready when the data arrives and is
+ * drawn at once; through `lazy` the reveal would wait for React's Suspense
+ * throttle (about 300 ms).
+ */
+let loadedCanvas: ComponentType<OfficeCanvasProps> | null = null;
+let canvasLoading: Promise<{ default: ComponentType<OfficeCanvasProps> }> | null = null;
+function loadCanvas(): Promise<{ default: ComponentType<OfficeCanvasProps> }> {
+  canvasLoading ??= import('./three/OfficeCanvas').then((module) => {
+    loadedCanvas = module.default;
+    return module;
+  });
+  return canvasLoading;
+}
+const LazyOfficeCanvas = lazy(loadCanvas);
 
 /** Who is working for whom right now (RF-09). */
 interface Delegations {
@@ -237,7 +253,12 @@ export function OfficePage() {
       : null;
   const scene = useOfficeScene(geometry, places);
 
-  const [webgl] = useState(hasWebGL);
+  const [webgl] = useState(() => {
+    const supported = hasWebGL();
+    if (supported) void loadCanvas();
+    return supported;
+  });
+  const OfficeCanvas = loadedCanvas ?? LazyOfficeCanvas;
   const stage = useElementSize();
   const light = useDaylight();
   const reduced = useReducedMotion();
