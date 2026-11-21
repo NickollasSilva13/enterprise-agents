@@ -1580,6 +1580,18 @@ Feito no navegador, em 1440 px e em 375 px, com os dados do usuário:
 - Tema claro: não existe.
 - O menu diz "Automações" e a tela, "Agendamentos"; mantido, porque os testes dependem dos dois nomes.
 
+## Ajuste pedido depois da Fase 38 (2026-11-21)
+
+O usuário notou o Escritório e os agentes serrilhados.
+
+- **Causa:** a cena é desenhada pelos efeitos (`three/Effects.tsx`: oclusão de ambiente e brilho) numa textura do `EffectComposer`, não direto na tela; o `antialias` do canvas só vale para a tela, então nenhuma borda era suavizada. Numa tela com escala 100% (proporção de pixel 1), o serrilhado aparece em toda aresta.
+- **Correção:** a textura da cena passou a ter multiamostragem (MSAA, `MSAA_SAMPLES = 4`), suavizada antes dos efeitos a lerem. Vale para o Escritório e para o editor, que usam os mesmos efeitos. Nenhuma dependência nova.
+- **Conferido** no Chromium com a placa de vídeo, com os dados do usuário, desligando e ligando as amostras: escada, borda do piso, fonte, postes e personagens sem degraus. Desempenho com 30 agentes: 58 quadros/s no desktop e 60 no celular (limite 20).
+
+### Não validado
+
+- A oclusão de ambiente é calculada numa textura própria, sem multiamostragem: a linha clara no alto da borda do piso ainda mostra degraus leves.
+
 ## Pendências ao final do projeto
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.

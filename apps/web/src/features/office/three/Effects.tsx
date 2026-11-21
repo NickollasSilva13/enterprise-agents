@@ -35,6 +35,9 @@ export function Reflections({ strength }: { strength: number }) {
   return null;
 }
 
+/** Samples per pixel of the scene's render target (WebGL 2 caps it to what the card allows). */
+export const MSAA_SAMPLES = 4;
+
 /**
  * Draws the scene through the effects instead of directly: a render, ambient
  * occlusion, bloom and the output (tone mapping and colour space). Taking the
@@ -46,7 +49,15 @@ export function Effects({ bloom }: { bloom: number }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const { composer, glowPass } = useMemo(() => {
-    const result = new EffectComposer(gl);
+    // The scene is drawn into the composer's own target, not the screen, so
+    // the canvas `antialias` never reaches it and every edge came out jagged.
+    // A multisampled target smooths them (MSAA, resolved before the effects
+    // read it); the type is the half float the composer uses by default.
+    const target = new THREE.WebGLRenderTarget(size.width, size.height, {
+      type: THREE.HalfFloatType,
+      samples: MSAA_SAMPLES,
+    });
+    const result = new EffectComposer(gl, target);
     result.addPass(new RenderPass(scene, camera));
     const occlusion = new GTAOPass(scene, camera, size.width, size.height);
     occlusion.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.2, thickness: 1, scale: 1 });
