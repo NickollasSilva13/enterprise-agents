@@ -151,14 +151,14 @@ test('an agent answers in a chat, can be interrupted, and leaves a trail', async
   // The history survives a reload and can be reopened (RF-32).
   await navigateTo(page, 'Agentes');
   await page.getByRole('link', { name: `Conversar com ${agentName}` }).click();
-  // On narrow screens the conversation list is folded away.
-  // It opens by itself once the list arrives, so a blind click could close it.
-  const folded = page.getByText(/^Conversas \(\d+\)$/);
+  // Below 1280 px the list and the chat take turns (Phase 38): the list is
+  // reached by "Ver as conversas" in the chat's bar; wide, it is beside the chat.
+  const showList = page.getByRole('button', { name: 'Ver as conversas' });
   const first = page.getByRole('link', { name: /Bom dia/ }).first();
   await expect(async () => {
-    // Bounded: on a wide screen there is nothing to unfold, and the link may
-    // simply not be drawn yet; an unbounded click would wait for ever.
-    if (!(await first.isVisible())) await folded.click({ timeout: 1000 });
+    // Bounded: on a wide screen the button is hidden, and the link may simply
+    // not be drawn yet; an unbounded click would wait for ever.
+    if (!(await first.isVisible())) await showList.click({ timeout: 1000 });
     await expect(first).toBeVisible({ timeout: 1000 });
   }).toPass();
   await first.click();

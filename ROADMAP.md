@@ -1592,6 +1592,21 @@ O usuário notou o Escritório e os agentes serrilhados.
 
 - A oclusão de ambiente é calculada numa textura própria, sem multiamostragem: a linha clara no alto da borda do piso ainda mostra degraus leves.
 
+## Conversa no formato de app de mensagens (2026-11-21)
+
+Pedido do usuário: a tela de conversa com um agente "como uma conversa no WhatsApp", com nome e foto do agente. Feito com as cores e a marca da plataforma, sem imitar a identidade visual de outro produto.
+
+- **Uma janela da altura da tela:** lista de conversas à esquerda e a conversa à direita a partir de 1280 px; abaixo disso, a lista e a conversa se alternam (o botão "Ver as conversas" no cabeçalho volta à lista). No celular a janela vai de borda a borda sob a barra do topo.
+- **Lista:** foto redonda do agente, título da conversa, horário (hoje) ou data, nome do agente e número de mensagens; excluir aparece ao passar o mouse quando a lista está ao lado; "Nova conversa" no topo da lista. Enquanto carrega, diz que está carregando, em vez de parecer vazia.
+- **Cabeçalho da conversa:** foto redonda, nome (o título da página), estado e modelo; voltar e configurar.
+- **Mensagens:** as suas à direita na cor de destaque, as do agente à esquerda numa superfície elevada, cada uma com o horário; o dia ("Hoje", "Ontem" ou a data) uma vez acima das mensagens daquele dia; a resposta em andamento com três pontos que se revezam.
+- **Escrever:** campo arredondado que cresce com o texto e botão redondo de enviar (ou de interromper).
+- Funções novas em `lib/format.ts`: `formatClock`, `formatDay`, `formatWhen`. `AgentAvatar` ganhou `round`.
+
+### Defeito encontrado e corrigido
+
+- O MSAA do ajuste anterior também ligava quando o 3D é desenhado pelo processador (sem placa de vídeo, como nos testes). Ali ele pesava tanto que o roteiro de conversa do E2E, que abre o Escritório numa segunda aba, falhava em duas de três rodadas com os dois aparelhos juntos. Agora a multiamostragem só liga com placa de vídeo (`isSoftwareRenderer` em `three/support.ts`, pelo nome que o navegador dá ao renderizador). As capturas do recorte e do jardim voltaram às de antes do MSAA.
+
 ## Pendências ao final do projeto
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.

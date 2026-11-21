@@ -15,6 +15,23 @@ export function hasWebGL(): boolean {
   }
 }
 
+/**
+ * Whether the GPU name a browser reports is a software renderer: the processor
+ * drawing what a graphics card would (no card, or acceleration turned off, as
+ * in headless test browsers). Costly extras such as multisampling are left off
+ * there, where they would slow the whole page down.
+ */
+export function isSoftwareRenderer(name: string): boolean {
+  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+}
+
+/** The GPU name of a WebGL context, unmasked where the browser allows it. */
+export function rendererName(gl: WebGLRenderingContext | WebGL2RenderingContext): string {
+  const debug = gl.getExtension('WEBGL_debug_renderer_info');
+  const name: unknown = gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+  return typeof name === 'string' ? name : '';
+}
+
 export interface Size {
   readonly width: number;
   readonly height: number;

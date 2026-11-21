@@ -75,7 +75,8 @@ describe('ChatPage', () => {
     expect(await screen.findByRole('heading', { name: 'Triagem', level: 1 })).toBeTruthy();
     expect(screen.getByText('Nova conversa com Triagem')).toBeTruthy();
     expect(screen.getByText('Classificar pedidos')).toBeTruthy();
-    expect(screen.getAllByText('Nenhuma conversa ainda.').length).toBeGreaterThan(0);
+    // The list says it is loading until the answer comes, instead of looking empty.
+    expect((await screen.findAllByText('Nenhuma conversa ainda.')).length).toBeGreaterThan(0);
 
     const send = screen.getByRole('button', { name: 'Enviar' });
     expect(send).toHaveProperty('disabled', true);
@@ -95,10 +96,12 @@ describe('ChatPage', () => {
     const list = await transcript();
 
     const items = list.getAllByRole('listitem').map((item) => item.textContent);
-    expect(items[0]).toBe('Você:Bom dia');
-    expect(items[1]).toBe('Agente:Bom dia! Como posso ajudar?');
-    expect(items[2]).toContain('3 s');
-    expect(items[2]).toContain('120 tokens');
+    // The day once above its messages, then each message with its time (Phase 38).
+    expect(items[0]).toMatch(/^(Hoje|Ontem|\d{2}\/\d{2}\/\d{4})$/);
+    expect(items[1]).toMatch(/^Você:Bom dia\d{2}:\d{2}$/);
+    expect(items[2]).toMatch(/^Agente:Bom dia! Como posso ajudar\?\d{2}:\d{2}$/);
+    expect(items[3]).toContain('3 s');
+    expect(items[3]).toContain('120 tokens');
     expect(list.getByRole('link', { name: 'Ver passos' }).getAttribute('href')).toBe('/logs/r1');
 
     const conversations = within(screen.getAllByRole('list', { name: 'Conversas' })[0]!);

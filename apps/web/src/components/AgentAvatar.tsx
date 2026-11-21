@@ -9,6 +9,8 @@ interface AgentAvatarProps {
   /** Rendered size in pixels. */
   size?: number;
   dimmed?: boolean;
+  /** A round photo, as in a chat; square by default. */
+  round?: boolean;
 }
 
 export function AgentAvatar({
@@ -16,8 +18,10 @@ export function AgentAvatar({
   appearance = null,
   size = 40,
   dimmed = false,
+  round = false,
 }: AgentAvatarProps) {
   const picture = usePortrait(agentId, appearance);
+  const shape = round ? 'rounded-full' : 'rounded-md';
   // The same look in 3D, as in the office (the voxel figure); until it is drawn, or without WebGL, the 2D bust.
   if (picture)
     return (
@@ -28,7 +32,7 @@ export function AgentAvatar({
         width={size}
         height={size}
         draggable={false}
-        className={`shrink-0 rounded-md bg-sheet-raised ${dimmed ? 'opacity-45' : ''}`}
+        className={`shrink-0 ${shape} bg-sheet-raised ${dimmed ? 'opacity-45' : ''}`}
       />
     );
   return (
@@ -37,7 +41,7 @@ export function AgentAvatar({
       width={size}
       height={size}
       aria-hidden
-      className="shrink-0 rounded-md bg-sheet-raised"
+      className={`shrink-0 ${shape} bg-sheet-raised`}
       opacity={dimmed ? 0.45 : 1}
     >
       <PixelBust agentId={agentId} appearance={appearance} />

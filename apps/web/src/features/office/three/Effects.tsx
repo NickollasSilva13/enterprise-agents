@@ -7,6 +7,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { isSoftwareRenderer, rendererName } from './support';
 
 // The finish of the 3D office (Phase 25), all from three.js itself, with no
 // new dependency: a soft room reflected by glass and polished floors, ambient
@@ -52,10 +53,13 @@ export function Effects({ bloom }: { bloom: number }) {
     // The scene is drawn into the composer's own target, not the screen, so
     // the canvas `antialias` never reaches it and every edge came out jagged.
     // A multisampled target smooths them (MSAA, resolved before the effects
-    // read it); the type is the half float the composer uses by default.
+    // read it); the type is the half float the composer uses by default. Drawn
+    // by the processor (no graphics card), the samples cost so much that the
+    // rest of the page lags, so there the edges stay as they were.
+    const software = isSoftwareRenderer(rendererName(gl.getContext()));
     const target = new THREE.WebGLRenderTarget(size.width, size.height, {
       type: THREE.HalfFloatType,
-      samples: MSAA_SAMPLES,
+      samples: software ? 0 : MSAA_SAMPLES,
     });
     const result = new EffectComposer(gl, target);
     result.addPass(new RenderPass(scene, camera));
