@@ -22,6 +22,7 @@ const SECTIONS = [
   'Personagens',
   'Opções de aparência',
   'Botões',
+  'Abas de seção',
 ];
 
 test('the reference shows every piece without overflowing', async ({ page }) => {

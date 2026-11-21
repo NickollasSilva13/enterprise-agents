@@ -26,4 +26,6 @@ Carregado quando a tarefa toca os testes de ponta a ponta.
 - Nos servidores de teste o guia começa sem nada pulado: o cartão "Primeiros passos" e as dicas aparecem. Roteiro que precisa das ações rápidas do Escritório pula o roteiro antes (`PUT /api/guide`), como em `office.spec.ts`.
 - `scenery.spec.ts` tem a captura da página do Escritório em 1536×864 (`escritorio-1536x864.png`), a que se compara com a proposta ao fim de cada fase visual.
 - `scenery.spec.ts` fixa o relógio com `page.clock.install` (12h e 22h) para as capturas do Escritório de dia e de noite, no servidor vazio.
+- Para atualizar capturas, rode o Playwright direto em `apps/web` (`npx playwright test <arquivos> --update-snapshots`, depois de `npm run build:e2e -w @ea/web`): `npm run test:e2e -- --update-snapshots` na raiz entrega a opção à compilação, não ao Playwright.
+- `escritorio-recorte.png` nunca se atualiza com `--update-snapshots`: cada ambiente regravaria a imagem e ficaria a do último. Apague o arquivo e rode o teste duas vezes (a primeira grava pelo primeiro ambiente e falha de propósito; a segunda compara os seis).
 - `reference.spec.ts` compara cada seção de `/referencia` com as capturas em `reference.spec.ts-snapshots/` (só desktop, nome com `win32`). Depois de uma mudança visual intencional, gere de novo com `--update-snapshots` e olhe as imagens antes do commit.

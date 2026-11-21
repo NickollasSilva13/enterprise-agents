@@ -9,7 +9,16 @@ import {
   PATTERNS,
   SKIN_TONES,
 } from '@ea/shared';
-import { CalendarPlus, ListPlus, Pencil, TriangleAlert, UserPlus } from 'lucide-react';
+import {
+  Bot,
+  CalendarPlus,
+  ListPlus,
+  ListTodo,
+  Palette,
+  Pencil,
+  TriangleAlert,
+  UserPlus,
+} from 'lucide-react';
 import { type ReactNode, useId } from 'react';
 import { ActivityFeed, type Activity } from '../../components/ActivityFeed';
 import { AgentCard, AgentCardSkeleton } from '../../components/AgentCard';
@@ -27,6 +36,7 @@ import { FormError, Notice, ToneText } from '../../components/Notice';
 import { PageHeader } from '../../components/PageHeader';
 import { QuickAction } from '../../components/QuickAction';
 import { RunStatusPill } from '../../components/RunStatusPill';
+import { SectionTabs } from '../../components/SectionTabs';
 import { StatusPill } from '../../components/StatusPill';
 import { TextLink } from '../../components/TextLink';
 import { AGENT_STATE_ORDER } from '../../lib/agent-state';
@@ -552,6 +562,18 @@ export function ReferencePage() {
             Desligado
           </Button>
         </div>
+      </Section>
+
+      {/* The current tab is this page; the others lead to real screens. */}
+      <Section title="Abas de seção">
+        <SectionTabs
+          label="Exemplo de abas"
+          tabs={[
+            { to: '/referencia', label: 'Sistema visual', icon: Palette },
+            { to: '/tarefas', label: 'Tarefas', icon: ListTodo },
+            { to: '/agentes', label: 'Agentes', icon: Bot },
+          ]}
+        />
       </Section>
     </div>
   );

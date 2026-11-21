@@ -24,25 +24,57 @@ export interface NavItem {
   readonly except?: readonly string[];
 }
 
-export const NAV_ITEMS: readonly NavItem[] = [
-  { to: '/escritorio', label: 'Escritório', icon: Building2 },
-  // The dashboard of before, now that the office is the home (Phase 29, D1).
-  { to: '/relatorios', label: 'Relatórios', icon: LayoutDashboard },
-  { to: '/agentes', label: 'Agentes', icon: Bot },
+export interface NavGroup {
+  /** Shown above the items; none for the first group, which is the home. */
+  readonly label?: string;
+  readonly items: readonly NavItem[];
+}
+
+/**
+ * The menu in groups (Phase 38): ten flat entries read as a wall, so they are
+ * grouped by what the user is doing — following the work, the team that does
+ * it, and how the platform runs.
+ */
+export const NAV_GROUPS: readonly NavGroup[] = [
   {
-    to: '/tarefas',
-    label: 'Tarefas',
-    icon: ListTodo,
-    counter: 'tasks',
-    except: ['/tarefas/agendamentos'],
+    items: [
+      { to: '/escritorio', label: 'Escritório', icon: Building2 },
+      // The dashboard of before, now that the office is the home (Phase 29, D1).
+      { to: '/relatorios', label: 'Relatórios', icon: LayoutDashboard },
+    ],
   },
-  { to: '/tarefas/agendamentos', label: 'Automações', icon: CalendarClock },
-  { to: '/aprovacoes', label: 'Aprovações', icon: Hand, counter: 'approvals' },
-  { to: '/modelos', label: 'Modelos de IA', icon: Cpu },
-  { to: '/ferramentas', label: 'Ferramentas', icon: Wrench },
-  { to: '/logs', label: 'Logs', icon: ScrollText },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
+  {
+    label: 'Trabalho',
+    items: [
+      {
+        to: '/tarefas',
+        label: 'Tarefas',
+        icon: ListTodo,
+        counter: 'tasks',
+        except: ['/tarefas/agendamentos'],
+      },
+      { to: '/tarefas/agendamentos', label: 'Automações', icon: CalendarClock },
+      { to: '/aprovacoes', label: 'Aprovações', icon: Hand, counter: 'approvals' },
+    ],
+  },
+  {
+    label: 'Equipe',
+    items: [
+      { to: '/agentes', label: 'Agentes', icon: Bot },
+      { to: '/modelos', label: 'Modelos de IA', icon: Cpu },
+      { to: '/ferramentas', label: 'Ferramentas', icon: Wrench },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { to: '/logs', label: 'Logs', icon: ScrollText },
+      { to: '/configuracoes', label: 'Configurações', icon: Settings },
+    ],
+  },
 ];
+
+export const NAV_ITEMS: readonly NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
 /** Whether `item` is the menu entry of the page at `pathname`. */
 export function isCurrent(item: NavItem, pathname: string): boolean {

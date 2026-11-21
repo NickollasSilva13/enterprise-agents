@@ -171,7 +171,7 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
     });
 
   return (
-    <section aria-labelledby={headingId} className="rounded-lg border border-line bg-sheet">
+    <section aria-labelledby={headingId} className="rounded-xl border border-line bg-sheet">
       <header className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1 basis-64">
           <h2 id={headingId} className="truncate text-lg font-semibold">
@@ -305,7 +305,7 @@ export function ModelsPage() {
       )}
 
       {providers?.length === 0 && (
-        <div className="rounded-lg border border-line bg-sheet">
+        <div className="rounded-xl border border-line bg-sheet">
           <EmptyState
             title="Nenhum provedor conectado."
             action={

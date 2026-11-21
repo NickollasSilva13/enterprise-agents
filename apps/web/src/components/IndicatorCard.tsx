@@ -34,7 +34,7 @@ interface IndicatorCardProps {
 export function IndicatorCard({ label, explain, status }: IndicatorCardProps) {
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className="surface-glass flex flex-col rounded-2xl p-4">
+    <section aria-labelledby={titleId} className="surface-glass flex flex-col rounded-xl p-4">
       <header className="flex items-start justify-between gap-3">
         <h3 id={titleId} className="text-sm font-medium text-dim">
           {label}
@@ -44,7 +44,7 @@ export function IndicatorCard({ label, explain, status }: IndicatorCardProps) {
             <CircleHelp className="size-4" aria-hidden />
             <span className="sr-only">Como é calculado: {label}</span>
           </summary>
-          <p className="surface-glass absolute right-0 z-10 mt-1 w-60 rounded-xl p-3 text-sm">
+          <p className="surface-glass absolute right-0 z-10 mt-1 w-60 animate-pop rounded-xl p-3 text-sm shadow-pop">
             {explain}
           </p>
         </details>
@@ -94,7 +94,7 @@ function IndicatorBody({ label, status }: { label: string; status: IndicatorStat
     case 'ready':
       return (
         <div className="mt-3 flex flex-1 flex-col">
-          <p className="text-3xl font-bold leading-tight">{status.value}</p>
+          <p className="text-3xl font-semibold leading-tight tracking-tight">{status.value}</p>
           {status.delta && (
             <p className={`mt-0.5 text-sm font-medium ${TONES[status.delta.tone].text}`}>
               {status.delta.text}

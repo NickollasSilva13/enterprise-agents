@@ -1,11 +1,12 @@
 import type { AreaLink, RequestSummary } from '@ea/shared';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { Button, IconButton } from '../../components/Button';
 import { SelectField, Switch } from '../../components/Form';
 import { ConfirmDialog } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
+import { TasksTabs } from './TasksTabs';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
@@ -20,7 +21,7 @@ import {
   useRequests,
   useUpdateAreaLink,
 } from '../../lib/task-queries';
-import { BACK_LINK, LINK } from '../../components/TextLink';
+import { LINK } from '../../components/TextLink';
 import { FormError } from '../../components/Notice';
 
 // Requests between areas (Phase 17): what is open now, and the rules saying
@@ -246,10 +247,7 @@ function Rules() {
 export function RequestsPage() {
   return (
     <>
-      <Link to="/tarefas" className={BACK_LINK}>
-        <ArrowLeft className="size-4" aria-hidden />
-        Tarefas
-      </Link>
+      <TasksTabs />
       <PageHeader
         title="Pedidos entre áreas"
         description="Uma área pede trabalho a outra: o pedido vira uma tarefa no quadro dela, e a tarefa que pediu espera a entrega. Os arquivos vão e voltam como cópias."

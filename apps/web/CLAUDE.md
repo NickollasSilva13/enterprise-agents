@@ -17,9 +17,18 @@ Carregado quando a tarefa toca a interface. As regras gerais estão em `CLAUDE.m
 - Peças: `StatusPill`, `Sparkline`, `IndicatorCard`, `AgentCard`, `Avatar`, `ActivityFeed`, `QuickAction` (em `src/components/`). Um número na tela sempre vem com "Como é calculado" e um estado sem dados que diz o porquê.
 - A página `/referencia` mostra tudo com valores de exemplo e só existe com `import.meta.env.DEV` ou no modo `e2e` (`npm run build:e2e`); `npm run build` não a gera. Peça nova entra nela e em `e2e/reference.spec.ts`.
 
+## Redesenho (Fase 38)
+
+- Paleta grafite com fundo índigo leve; o violeta (`accent`) só marca onde você está, a ação principal e o foco. Os nomes dos tokens são os de antes.
+- Fontes: `--font-sans` (Instrument Sans) no texto, `--font-display` (Bricolage Grotesque) no `h1`. Sombras só por `shadow-lift` (superfícies) e `shadow-pop` (o que flutua: modal, menu, aviso temporário); entradas por `animate-pop`, `animate-fade` e `animate-slide-in`.
+- Raios: campo e botão `rounded-lg`, painel e cartão `rounded-xl`, modal `rounded-2xl`.
+- Telas irmãs de uma seção ganham `SectionTabs` (`components/SectionTabs.tsx`) no topo, não botões no cabeçalho nem link de volta; Tarefas usa `TasksTabs`.
+- Um elemento `inline-flex` (como `Switch` ou `Button`) dentro de `space-y-*` não recebe a margem: ponha-o num `div` próprio, ou ele divide a linha com o vizinho.
+- `PageHeader` deixa as ações quebrarem linha; numa grade, um filho que pode ser mais largo que a coluna (tabela) precisa de `min-w-0` (o `Panel` já tem).
+
 ## Moldura (Fase 21)
 
-- Menu em `app/navigation.ts`: o item atual vem de `isCurrent` (com `except` para que Tarefas não acenda em `/tarefas/agendamentos`, que é Automações); contadores só onde algo espera o usuário (`counter`). A ajuda é a área planejada `HELP_AREA` (Fase 27), no rodapé do menu, fora do `nav` "Principal".
+- Menu em `app/navigation.ts` (em grupos desde a Fase 38, `NAV_GROUPS`; `NAV_ITEMS` é a lista plana derivada): o item atual vem de `isCurrent` (com `except` para que Tarefas não acenda em `/tarefas/agendamentos`, que é Automações); contadores só onde algo espera o usuário (`counter`). A ajuda é a área planejada `HELP_AREA` (Fase 27), no rodapé do menu, fora do `nav` "Principal".
 - O que espera o usuário vem de `useAttention()` (`lib/frame-queries.ts`), que junta aprovações pendentes, `/api/tasks/waiting` e pedidos `pending`; sino e contadores leem dali. `renderApp()` já responde essas listas e o perfil vazios.
 - Busca: `app/SearchDialog.tsx`; as telas são procuradas na interface com `searchRank` de `@ea/shared`, o resto em `/api/search`. Tela nova que deva ser achada entra em `SCREENS`.
 - No celular o resumo do topo mostra só "precisam de você"; os outros números ficam `sr-only` (os E2E os leem).

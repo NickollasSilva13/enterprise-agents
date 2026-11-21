@@ -1,4 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
+import { CircleAlert, CircleCheck } from 'lucide-react';
+import { TONES } from '../lib/tone';
 
 type Tone = 'ok' | 'fail';
 
@@ -38,10 +40,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {messages.map((message) => (
           <p
             key={message.id}
-            className={`rounded-md border bg-sheet-raised px-4 py-2 text-sm shadow-lg ${
-              message.tone === 'ok' ? 'border-ok' : 'border-fail'
+            className={`flex animate-pop items-center gap-2 rounded-xl border bg-sheet-raised py-2.5 pr-4 pl-3 text-sm font-medium shadow-pop ${
+              message.tone === 'ok' ? 'border-ok/60' : 'border-fail/60'
             }`}
           >
+            {message.tone === 'ok' ? (
+              <CircleCheck className={`size-4.5 shrink-0 ${TONES.ok.ink}`} aria-hidden />
+            ) : (
+              <CircleAlert className={`size-4.5 shrink-0 ${TONES.fail.ink}`} aria-hidden />
+            )}
             {message.text}
           </p>
         ))}

@@ -52,7 +52,7 @@ export function ProfilePanel() {
     <section
       id="voce"
       aria-labelledby={titleId}
-      className="mb-6 max-w-3xl scroll-mt-20 rounded-lg border border-line bg-sheet"
+      className="mb-6 max-w-3xl scroll-mt-20 rounded-xl border border-line bg-sheet"
     >
       <header className="border-b border-line px-4 py-3">
         <h2 id={titleId} className="text-base font-semibold">
@@ -81,13 +81,16 @@ export function ProfilePanel() {
             error={error}
             autoComplete="nickname"
           />
-          <Switch
-            label="Usar um personagem"
-            checked={appearance !== null}
-            onChange={(on) => setAppearance(on ? defaultAppearance(PROFILE_CHARACTER_ID) : null)}
-          >
-            Usar um personagem
-          </Switch>
+          {/* Both controls are inline: each gets its own row, or they share a line. */}
+          <div>
+            <Switch
+              label="Usar um personagem"
+              checked={appearance !== null}
+              onChange={(on) => setAppearance(on ? defaultAppearance(PROFILE_CHARACTER_ID) : null)}
+            >
+              Usar um personagem
+            </Switch>
+          </div>
           {appearance && (
             <AppearanceFields
               agentId={PROFILE_CHARACTER_ID}
@@ -96,9 +99,11 @@ export function ProfilePanel() {
               onChange={(look) => setAppearance(look ?? defaultAppearance(PROFILE_CHARACTER_ID))}
             />
           )}
-          <Button type="submit" variant="primary" disabled={save.isPending}>
-            Salvar perfil
-          </Button>
+          <div className="flex justify-end border-t border-line pt-4">
+            <Button type="submit" variant="primary" disabled={save.isPending}>
+              Salvar perfil
+            </Button>
+          </div>
         </form>
       )}
     </section>

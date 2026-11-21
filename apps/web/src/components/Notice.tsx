@@ -34,7 +34,7 @@ export function Notice({ tone, children, role, icon, className = '' }: NoticePro
   return (
     <div
       role={role}
-      className={`flex gap-2.5 rounded-md border p-3 text-sm ${classes.edge} ${classes.tint} ${className}`}
+      className={`flex gap-2.5 rounded-lg border p-3 text-sm ${classes.edge} ${classes.tint} ${className}`}
     >
       {icon && <span className={`mt-0.5 shrink-0 ${classes.ink}`}>{icon}</span>}
       <div className="min-w-0">{children}</div>

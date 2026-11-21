@@ -25,14 +25,14 @@ export function Tip({
     <aside
       aria-label="Dica"
       data-tip={id}
-      className={`flex flex-wrap items-start gap-x-3 gap-y-2 rounded-xl border p-3 text-sm ${TONES.info.edge} ${TONES.info.tint} ${className}`}
+      className={`flex flex-wrap items-start gap-x-3 gap-y-2 rounded-xl border border-line bg-sheet p-3 text-sm ${className}`}
     >
       <Lightbulb className={`mt-0.5 size-4.5 shrink-0 ${TONES.info.ink}`} aria-hidden />
-      <p className="min-w-0 flex-1 basis-60">{children}</p>
+      <p className="min-w-0 flex-1 basis-60 text-dim">{children}</p>
       <button
         type="button"
         onClick={() => dismissTip(id)}
-        className="rounded-md px-2 py-0.5 font-semibold text-chalk hover:bg-sheet-raised"
+        className="-my-1 min-h-8 rounded-md px-2.5 font-semibold text-chalk hover:bg-sheet-raised"
       >
         Entendi
       </button>

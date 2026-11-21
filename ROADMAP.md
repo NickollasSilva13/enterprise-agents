@@ -43,6 +43,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 35 | Bairro residencial e condomínio moderno | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 | 36 | Ilha tropical e jardim tecnológico | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 | 37 | Validação final | Concluída em 2026-11-21 |
+| 38 | Redesenho da interface | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 
 ## Fases concluídas
 
@@ -1542,6 +1543,42 @@ O usuário notou cerca de 1 s até o Escritório aparecer ao entrar na plataform
   - no gramado, cada caminho e cada árvore marcam só os pontos perto deles;
   - cada peça é posta no lugar com uma só matriz.
 - **Resultado:** cerca de 0,53 s até o primeiro quadro pintado (três rodadas: 533, 517 e 551 ms). Gramado ~50 ms, peças ~105 ms. O que sobra é montar o resto do escritório e o primeiro desenho, que compila os shaders (~100 ms).
+
+## Fase 38 — Redesenho da interface (concluída)
+
+Pedido do usuário depois da Fase 37: uma revisão completa de interface e experiência, com implementação, não só recomendações. Nenhuma regra de negócio, rota ou contrato da API mudou.
+
+### Diagnóstico
+
+Feito no navegador, em 1440 px e em 375 px, com os dados do usuário:
+
+- violeta em tudo (fundo, painéis, item atual do menu como bloco brilhante): a cor de destaque não destacava;
+- menu com dez itens soltos, sem agrupamento;
+- Tarefas com quatro botões no cabeçalho para as telas irmãs (empilhados no celular) e um link "← Tarefas" em cada uma;
+- Configurações: o seletor "Usar um personagem" e "Salvar perfil" na mesma linha, por serem os dois `inline-flex`;
+- Relatórios: dois quadros de números seguidos sem título e uma área violeta vazia no fim da grade (`gap-px` sobre fundo colorido);
+- rolagem horizontal no celular em Agentes e em Relatórios;
+- dica do Escritório dizendo "à direita", que no celular fica embaixo.
+
+### O que foi feito
+
+- **Paleta (`theme.css`):** base grafite fria com fundo índigo leve (`ink #101119`, `sheet #171923`, `sheet-raised #1f2230`); o violeta (`accent #6a50f5`) ficou para onde você está, a ação principal e o foco. Os nomes dos tokens não mudaram. Contraste AA conferido antes de aplicar e pelo `theme.test.ts`.
+- **Tipografia:** Instrument Sans no texto (`@fontsource-variable/instrument-sans`, empacotada, sem recurso externo); Bricolage Grotesque nos títulos (`--font-display`).
+- **Profundidade e movimento:** `--shadow-lift` (superfícies) e `--shadow-pop` (o que flutua), `animate-pop`, `animate-fade`, `animate-slide-in`; todos desligados com "reduzir movimento".
+- **Componentes:** botões, campos (foco na borda, erro com ícone), painéis, modal (no celular sobe de baixo; rodapé fixo), tabela, aviso temporário (ícone), tela vazia (ícone), dica, cartões e quadros de números no mesmo raio e na mesma sombra. `Panel` com `min-w-0`, o que acabou com a rolagem horizontal das grades.
+- **Navegação:** menu em grupos (`NAV_GROUPS`: Trabalho, Equipe, Sistema); item atual com barra e ícone violeta. Componente novo `SectionTabs` e as abas de Tarefas (`TasksTabs`: Quadro, Pedidos entre áreas, Agendamentos, Modelos de fluxo) no lugar dos botões e do link de volta.
+- **Telas:** Configurações, Relatórios (título visível em cada quadro de números), Escritório (botão de aprovações no padrão dos outros, texto da dica) e o cabeçalho das páginas, que agora quebra as ações em vez de vazar.
+
+### Defeitos encontrados e corrigidos durante a fase
+
+- O cabeçalho novo não deixava as ações quebrarem linha (Agentes vazava 35 px no celular).
+- A marca virou link no menu e passou a receber o primeiro Tab, antes de "Escritório" (pego pelo E2E); voltou a ser texto.
+
+### Não validado
+
+- A aprovação visual do usuário.
+- Tema claro: não existe.
+- O menu diz "Automações" e a tela, "Agendamentos"; mantido, porque os testes dependem dos dois nomes.
 
 ## Pendências ao final do projeto
 

@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react';
 import {
   type InputHTMLAttributes,
   type ReactNode,
@@ -6,8 +7,12 @@ import {
   useId,
 } from 'react';
 
+/*
+ * A field sits sunk into the panel (ink), with an edge that brightens on
+ * hover and turns violet on focus, so where the typing goes is never in doubt.
+ */
 const CONTROL =
-  'w-full rounded-md border bg-ink px-3 py-2 text-chalk placeholder:text-dim disabled:cursor-not-allowed disabled:opacity-60';
+  'min-h-10 w-full rounded-lg border bg-ink px-3 py-2 text-sm text-chalk transition-[border-color,box-shadow] duration-150 placeholder:text-dim hover:border-chalk/40 focus:border-glow focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_35%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
 
 const border = (invalid: boolean) => (invalid ? 'border-fail' : 'border-line-strong');
 
@@ -27,17 +32,18 @@ interface FieldShellProps extends FieldProps {
 function FieldShell({ id, label, hint, error, children }: FieldShellProps) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-semibold">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
         {label}
       </label>
       {children}
       {error ? (
-        <p id={`${id}-note`} className="mt-1 text-sm text-fail">
+        <p id={`${id}-note`} className="mt-1.5 flex items-start gap-1.5 text-sm text-fail">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           {error}
         </p>
       ) : (
         hint && (
-          <p id={`${id}-note`} className="mt-1 text-sm text-dim">
+          <p id={`${id}-note`} className="mt-1.5 text-sm text-dim">
             {hint}
           </p>
         )

@@ -14,10 +14,10 @@ export function Panel({ title, aside, children, className = '' }: PanelProps) {
   return (
     <section
       aria-labelledby={titleId}
-      className={`rounded-lg border border-line bg-sheet ${className}`}
+      className={`min-w-0 rounded-xl border border-line bg-sheet shadow-lift ${className}`}
     >
-      <header className="flex items-baseline justify-between gap-4 border-b border-line px-4 py-3">
-        <h2 id={titleId} className="text-base font-semibold">
+      <header className="flex min-h-12 items-center justify-between gap-4 border-b border-line px-4 py-2.5">
+        <h2 id={titleId} className="text-base font-semibold tracking-tight">
           {title}
         </h2>
         {aside && <span className="text-sm text-dim">{aside}</span>}

@@ -400,7 +400,7 @@ function Chat({ agent, conversationId }: { agent: Agent; conversationId: string 
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside className="rounded-lg border border-line bg-sheet p-2 lg:self-start">
+        <aside className="rounded-xl border border-line bg-sheet p-2 lg:self-start">
           <details open={list.length > 0 || undefined} className="group lg:hidden">
             <summary className="cursor-pointer px-2 py-1.5 text-sm font-semibold">
               Conversas ({list.length})
@@ -534,7 +534,7 @@ export function ChatPage() {
         />
       )}
       {agents && !agent && (
-        <div className="rounded-lg border border-line bg-sheet p-5">
+        <div className="rounded-xl border border-line bg-sheet p-5">
           <p className="font-semibold">Agente não encontrado.</p>
           <p className="mt-1 text-sm text-dim">
             Ele pode ter sido excluído. As execuções antigas continuam nos{' '}

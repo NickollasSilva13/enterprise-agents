@@ -316,7 +316,7 @@ export function OfficePage() {
             </Link>
             <Link
               to="/aprovacoes"
-              className="relative grid size-11 place-items-center rounded-full border border-line-strong text-chalk hover:bg-sheet-raised"
+              className="relative grid size-10 place-items-center rounded-lg border border-line bg-sheet-raised text-chalk shadow-lift transition-colors hover:border-line-strong hover:bg-line"
               aria-label={`Aprovações pendentes: ${pending}`}
               title="Aprovações pendentes"
             >
@@ -335,8 +335,8 @@ export function OfficePage() {
       />
 
       <Tip id="office-pick" className="mb-3">
-        Clique num agente na cena para destacar o cartão dele à direita; passar o mouse num cartão
-        acende o agente na cena.
+        Clique num agente na cena para destacar o cartão dele na lista do time; passar o mouse num
+        cartão acende o agente na cena.
       </Tip>
 
       {isPending && <LoadingState label="Carregando o escritório…" />}
@@ -429,8 +429,10 @@ export function OfficePage() {
                     aria-selected={tab === each.id}
                     aria-controls={`office-panel-${each.id}`}
                     onClick={() => setTab(each.id)}
-                    className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold ${
-                      tab === each.id ? 'bg-accent text-white' : 'text-chalk hover:bg-sheet-raised'
+                    className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors ${
+                      tab === each.id
+                        ? 'bg-sheet-raised text-chalk shadow-lift'
+                        : 'text-dim hover:text-chalk'
                     }`}
                   >
                     {each.label}

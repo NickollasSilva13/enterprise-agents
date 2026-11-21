@@ -24,7 +24,7 @@ import { FormError } from '../../components/Notice';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <fieldset className="rounded-lg border border-line bg-sheet p-4">
+    <fieldset className="rounded-xl border border-line bg-sheet p-4">
       <legend className="px-1 text-base font-semibold">{title}</legend>
       <div className="space-y-4">{children}</div>
     </fieldset>
@@ -328,7 +328,7 @@ export function AgentFormPage() {
             models={models.data}
           />
           {agent.data && (
-            <section className="max-w-3xl rounded-lg border border-line bg-sheet p-4">
+            <section className="max-w-3xl rounded-xl border border-line bg-sheet p-4">
               <h2 className="text-base font-semibold">Histórico de atividades</h2>
               <p className="mt-1 text-sm text-dim">
                 As conversas ficam no chat do agente; cada execução, com seus passos, fica nos logs.
