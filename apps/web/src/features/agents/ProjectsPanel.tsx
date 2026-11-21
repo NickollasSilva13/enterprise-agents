@@ -15,6 +15,7 @@ import {
   useProjects,
   useUpdateProject,
 } from '../../lib/queries';
+import { FormError } from '../../components/Notice';
 
 function NewProjectForm() {
   const [name, setName] = useState('');
@@ -111,9 +112,7 @@ function EditProjectDialog({ project, onClose }: { project: Project; onClose: ()
           hint="Aparece na sala do projeto, no Escritório."
         />
         {update.error && Object.keys(errors).length === 0 && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(update.error)}
-          </p>
+          <FormError>{errorMessage(update.error)}</FormError>
         )}
       </form>
     </Modal>

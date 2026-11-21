@@ -58,6 +58,22 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - Modelos de fluxo (Fase 18): `modules/tasks/templates.ts`. O conteúdo é sempre conferido com `templateContentSchema`, ao gravar e ao ler; o que um modelo pode levar é decidido por esse esquema estrito, então campo novo de papel precisa entrar nele de propósito. Aplicar um modelo (`createAreaFromTemplate`) grava toda ferramenta como `ask` e pula as de `scope: 'task'`.
 - Agendamentos (Fase 19): `modules/schedules`. O relógio (`scheduler.ts`) começa no `onReady` e para no `preClose`; `fireDue` grava a próxima vez antes de criar a tarefa (no máximo uma por horário) e cria por `createTask` com `TaskOrigin`. `tasks.schedule_id` não tem cascata no banco: exclua agendamento só por `deleteScheduleRow`, que limpa a coluna antes. Nos testes, um agendamento vencido gravado antes de `makeApp({ database })` é disparado na partida; depois dela, qualquer `PATCH` reprograma o relógio.
 
+## Moldura (Fase 21)
+
+`modules/frame`: busca global e perfil do usuário. A busca compara em JavaScript (`searchRank` de `@ea/shared`), nunca por `LIKE` com o texto do usuário. O perfil fica em `settings` (chave `profile`) e é conferido com `profileSchema` ao ser lido.
+
+## Atividade recente (Fase 29)
+
+`modules/activity`: `GET /api/activity` junta, em `service.ts`, as fontes lidas em `repository.ts` (tarefa movida para etapa `done`, entrega gravada na tarefa pedida, `created` de tarefa com `schedule_id`, aprovações por `coalesce(decided_at, created_at)`, execuções `failed`/`timed_out`), cada uma cortada em `ACTIVITY_LIMIT`, e ordena por data em texto ISO. Fonte nova entra no esquema de `@ea/shared` (`activityEntrySchema`) e em `test/activity.test.ts`. A execução atual em `/api/office` conta os passos pelas etapas `model_call_started` gravadas.
+
+## Indicadores (Fase 30)
+
+`modules/indicators`: o repositório lê duas semanas (conclusões, como na atividade, e execuções `completed`/`failed`/`timed_out`); `countIndicators(conclusões, execuções, agora)` é pura e conta por dia local do servidor, com cada tarefa uma vez. Os testes passam o relógio; não use `Date.now()` dentro da conta.
+
+## Guia (Fase 32)
+
+`modules/frame`: `GET`/`PUT /api/guide`, gravado em `settings` (chave `guide`) como o perfil. O que vai para o banco é só a escolha do usuário (`guideSchema`); `done` de cada etapa vem de `guideProgress`, lido dos dados a cada pedido. Etapa nova entra em `GUIDE_STEPS`, em `guideStateSchema` e em `guideProgress`.
+
 ## Exportar e importar agentes
 
 `modules/agents/transfer.ts`. O arquivo nomeia projeto, modelo e provedor (nunca ids, endereço ou chave) e a importação nunca grava `allow`: tudo entra como `ask`. Campo novo de agente precisa entrar em `exportedAgentSchema` e nos dois sentidos de `transfer.ts`. O acesso à pasta da área é exportado, mas a importação sempre grava `none`, com aviso.

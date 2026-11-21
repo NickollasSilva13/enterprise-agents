@@ -27,36 +27,43 @@ const api = {
 };
 
 const sidebar = () => within(screen.getAllByRole('navigation', { name: 'Principal' })[0]!);
+/** The whole desktop menu column: the main list, help and the user's card. */
+const menuColumn = () => within(screen.getAllByRole('complementary')[0]!);
 
 describe('navigation', () => {
   it('offers every area and marks the ones not built yet with their phase', async () => {
-    renderApp('/', api);
+    renderApp('/relatorios', api);
     const links = sidebar().getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual(
       NAV_ITEMS.map((item) => item.to),
     );
     for (const area of PLANNED_AREAS) {
-      const link = sidebar().getByRole('link', { name: new RegExp(area.title) });
+      const link = menuColumn().getByRole('link', { name: (name) => name.startsWith(area.title) });
       expect(link.textContent).toContain(`Fase ${area.phase}`);
     }
-    expect(sidebar().getByRole('link', { name: 'Painel' }).textContent).not.toContain('Fase');
-    expect(sidebar().getByRole('link', { name: 'Painel' }).getAttribute('aria-current')).toBe(
+    expect(sidebar().getByRole('link', { name: 'Relatórios' }).textContent).not.toContain('Fase');
+    expect(sidebar().getByRole('link', { name: 'Relatórios' }).getAttribute('aria-current')).toBe(
       'page',
     );
   });
 
-  it.each(PLANNED_AREAS.map((area) => [area.title, area] as const))(
-    'opens %s as a planned area, not as a working screen',
-    async (_title, area) => {
-      renderApp('/', api);
-      fireEvent.click(sidebar().getByRole('link', { name: new RegExp(area.title) }));
-      expect(await screen.findByRole('heading', { name: area.title, level: 1 })).toBeTruthy();
-      expect(
-        screen.getByRole('heading', { name: `Planejado para a Fase ${area.phase}` }),
-      ).toBeTruthy();
-      expect(screen.getByText(area.capabilities[0]!)).toBeTruthy();
-    },
-  );
+  it('opens the office at the root address, the home of the platform (Phase 29, D1)', async () => {
+    renderApp('/', { ...api, '/api/office': { layout: null } });
+    expect(await screen.findByRole('heading', { name: 'Escritório', level: 1 })).toBeTruthy();
+    expect(sidebar().getByRole('link', { name: 'Escritório' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(sidebar().getAllByRole('link')[0]?.textContent).toContain('Escritório');
+  });
+
+  it('opens the help from the foot of the menu (Phase 32)', async () => {
+    renderApp('/relatorios', api);
+    fireEvent.click(menuColumn().getByRole('link', { name: 'Precisa de ajuda?' }));
+    expect(await screen.findByRole('heading', { name: 'Ajuda', level: 1 })).toBeTruthy();
+    expect(menuColumn().getByRole('link', { name: 'Precisa de ajuda?' }).textContent).not.toContain(
+      'Fase',
+    );
+  });
 
   it('shows the installation details in settings', async () => {
     renderApp('/configuracoes', api);
@@ -68,7 +75,9 @@ describe('navigation', () => {
   it('shows a not-found page for unknown addresses', async () => {
     renderApp('/nao-existe', api);
     expect(await screen.findByRole('heading', { name: 'Página não encontrada' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Voltar ao painel' }).getAttribute('href')).toBe('/');
+    expect(screen.getByRole('link', { name: 'Voltar ao escritório' }).getAttribute('href')).toBe(
+      '/escritorio',
+    );
   });
 });
 

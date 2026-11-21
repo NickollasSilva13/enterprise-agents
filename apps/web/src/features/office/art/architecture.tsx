@@ -6,20 +6,28 @@ import {
   type OfficeProject,
 } from '@ea/shared';
 import type { ReactNode } from 'react';
-import { type BoxColors, floorPoints, IsoBox, project } from './iso';
+import { type BoxColors, floorPoints, IsoBox, project, tones } from './iso';
 
 // Floors and walls. Back walls (north and west edges) are tall; front walls
 // (south and east) are low, so nothing in a room is hidden behind them, as in
-// a cutaway drawing. A door is a gap in a wall.
+// a cutaway drawing. A door is a gap in a wall. Since Phase 23 every room is
+// walled in glass with light frames, as in the proposal, and the walls are
+// tall enough for the 32-bit characters.
 
-export const WALL_HEIGHT = 34;
-const LOW_WALL = 5;
-const THICK = 0.14;
+export const WALL_HEIGHT = 52;
+/** Front walls are glass too, lower and clearer, so nothing behind them is hidden. */
+export const LOW_WALL = 20;
+export const THICK = 0.12;
 
-const WALL: BoxColors = { top: '#6b5c9e', left: '#ddd4f3', right: '#c4b7e6' };
-const GLASS: BoxColors = { top: '#5f74b8', left: '#b9d8f5', right: '#a3c6ea' };
+/** Translucent panes, a light post at each tile and a light rail on top. */
+const PANE: BoxColors = { top: '#cfe2fb', left: '#bcd5f7', right: '#a9c4ee' };
+const FRAME = tones('#eeeaf8');
+const PANE_OPACITY = 0.38;
 
-const FLOOR: Record<Floor, { fill: string; line: string; pattern: 'planks' | 'tiles' | 'none' }> = {
+export const FLOOR: Record<
+  Floor,
+  { fill: string; line: string; pattern: 'planks' | 'tiles' | 'none' }
+> = {
   wood: { fill: '#c99a6b', line: '#ae8053', pattern: 'planks' },
   tile: { fill: '#ece5f6', line: '#d3c8e6', pattern: 'tiles' },
   stone: { fill: '#bdb5cf', line: '#a39bb8', pattern: 'tiles' },
@@ -28,7 +36,7 @@ const FLOOR: Record<Floor, { fill: string; line: string; pattern: 'planks' | 'ti
   carpet_green: { fill: '#75b892', line: '#64a681', pattern: 'none' },
 };
 
-const CORRIDOR = { fill: '#e4d6ea', line: '#d2c1da' };
+export const CORRIDOR = { fill: '#e1d8f4', line: '#cbbfe6' };
 
 /** Lines across a rectangle of tiles: every tile both ways, or planks along x. */
 function patternPath(
@@ -90,8 +98,6 @@ export function Ground({ layout }: { layout: OfficeLayout }) {
   );
 }
 
-const glassy = (area: OfficeArea) => area.kind === 'meeting' || area.kind === 'focus';
-
 /**
  * The walls of every area, by drawing band: `back` walls are drawn before
  * whatever stands on the tiles of that band, `front` walls after.
@@ -108,13 +114,18 @@ export function wallsByBand(layout: OfficeLayout): {
     map.set(band, list);
   };
   for (const area of layout.areas) {
-    const colors = glassy(area) ? GLASS : WALL;
-    const opacity = glassy(area) ? 0.7 : 1;
     const door = (side: 'n' | 's' | 'w' | 'e', offset: number) =>
       area.doors.some((each) => each.side === side && each.offset === offset);
+    // A post every other tile: wide panes, as in the proposal.
     const wall = (key: string, x: number, y: number, w: number, d: number, h: number) => (
-      <g key={key} opacity={opacity}>
-        <IsoBox x={x} y={y} w={w} d={d} h={h} colors={colors} />
+      <g key={key}>
+        <g opacity={h === LOW_WALL ? PANE_OPACITY * 0.6 : PANE_OPACITY}>
+          <IsoBox x={x} y={y} w={w} d={d} h={h} colors={PANE} />
+        </g>
+        {Math.round(x + y) % 2 === 0 && (
+          <IsoBox x={x} y={y} w={Math.min(w, THICK)} d={Math.min(d, THICK)} h={h} colors={FRAME} />
+        )}
+        <IsoBox x={x} y={y} w={w} d={d} z={h} h={1.5} colors={FRAME} />
       </g>
     );
     const right = area.x + area.width;

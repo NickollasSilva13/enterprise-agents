@@ -16,6 +16,7 @@ import { useToast } from '../../components/Toast';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 import { useCreateProvider, useSyncModels, useUpdateProvider } from '../../lib/provider-queries';
 import { ExternalNotice } from './ExternalNotice';
+import { FormError } from '../../components/Notice';
 
 type Errors = Partial<Record<'name' | 'baseUrl' | 'command' | 'apiKey', string>>;
 
@@ -232,11 +233,7 @@ export function ProviderDialog({ provider, onClose }: ProviderDialogProps) {
           <ExternalNotice harness={isCommand} />
         )}
 
-        {generalError && (
-          <p role="alert" className="text-sm text-fail">
-            {generalError}
-          </p>
-        )}
+        {generalError && <FormError>{generalError}</FormError>}
       </form>
     </Modal>
   );

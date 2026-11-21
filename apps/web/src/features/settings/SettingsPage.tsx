@@ -4,6 +4,7 @@ import { Panel } from '../../components/Panel';
 import { ErrorState, LoadingState } from '../../components/States';
 import { formatDateTime } from '../../lib/format';
 import { useSystemInfo } from '../../lib/queries';
+import { ProfilePanel } from './ProfilePanel';
 
 const ENVIRONMENTS: Record<SystemInfo['environment'], string> = {
   production: 'Uso normal',
@@ -33,7 +34,12 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Configurações" description="Como esta instalação está configurada." />
+      <PageHeader
+        title="Configurações"
+        description="Seu perfil e como esta instalação está configurada."
+      />
+
+      <ProfilePanel />
 
       <Panel title="Sistema" className="max-w-3xl">
         {isPending && <LoadingState label="Carregando as configurações…" />}

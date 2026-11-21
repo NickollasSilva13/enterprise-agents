@@ -1,21 +1,40 @@
 import type { Approval, OfficeAgent } from '@ea/shared';
-import { Bell, Bot, LocateFixed, PencilRuler, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Bell, CalendarPlus, ListPlus, PencilRuler, UserPlus } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { ActivityFeed } from '../../components/ActivityFeed';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { Button, buttonClass } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
+import { QuickAction } from '../../components/QuickAction';
 import { ErrorState, LoadingState } from '../../components/States';
-import { useOffice } from '../../lib/queries';
+import { useActivity, useOffice } from '../../lib/queries';
 import { useApprovals } from '../../lib/tool-queries';
 import { areaName, sceneBounds } from './art/architecture';
 import { buildGeometry } from './geometry';
-import { Minimap } from './Minimap';
-import { conversationPath, OfficePanel } from './OfficePanel';
-import { type BalloonInfo, OfficeDrawing, useOfficeScene } from './OfficeScene';
+import { IndicatorRow } from '../indicators/IndicatorRow';
+import { activityOf } from './activity';
+import { OfficePanel } from './OfficePanel';
+import { useDaylight } from './daylight';
+import {
+  type BalloonInfo,
+  deskScreens,
+  figuresOf,
+  OfficeDrawing,
+  useOfficeScene,
+  useReducedMotion,
+} from './OfficeScene';
 import { placesOf } from './scene';
-import { useViewport } from './viewport';
+import { OfficeOverlay } from './three/OfficeOverlay';
+import { hasWebGL, useElementSize } from './three/support';
+import { officeView } from './three/view';
+import { TONES } from '../../lib/tone';
+import { FirstSteps, useFirstStepsOpen } from '../guide/FirstSteps';
+import { Tip } from '../../components/Tip';
+
+/** The 3D scene and three.js are loaded only when the office opens (Phase 24, D1). */
+const OfficeCanvas = lazy(() => import('./three/OfficeCanvas'));
 
 /** Who is working for whom right now (RF-09). */
 interface Delegations {
@@ -86,6 +105,86 @@ function useNow(intervalMs: number): number {
   return now;
 }
 
+type SideTab = 'team' | 'activity';
+
+const SIDE_TABS: readonly { readonly id: SideTab; readonly label: string }[] = [
+  { id: 'team', label: 'Time' },
+  { id: 'activity', label: 'Atividade' },
+];
+
+/** What happened lately in the office (Phase 29, D5). */
+function RecentActivity() {
+  const activity = useActivity();
+  return (
+    <section aria-labelledby="office-activity" className="flex min-h-0 flex-1 flex-col">
+      <h2 id="office-activity" className="px-4 pt-3 pb-2 font-bold">
+        Atividade recente
+      </h2>
+      {/* Scrolls when there is a lot: it takes the keyboard focus so it can (WCAG 2.1.1). */}
+      <div
+        tabIndex={0}
+        aria-labelledby="office-activity"
+        className="min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+      >
+        <ActivityFeed
+          label="Atividade recente"
+          status={
+            activity.data
+              ? { kind: 'ready', items: activity.data.map(activityOf) }
+              : activity.error
+                ? { kind: 'error', error: activity.error, onRetry: () => void activity.refetch() }
+                : { kind: 'loading' }
+          }
+          emptyText="Tarefas concluídas, entregas entre áreas, agendamentos, pedidos de aprovação e falhas aparecem aqui."
+        />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The next things to do from the office (Phase 29, D6): off, with the reason,
+ * when not possible yet. At the foot of the side column since Phase 30 (D4).
+ */
+function QuickActions({ hasAreas }: { hasAreas: boolean }) {
+  const noArea = hasAreas ? undefined : 'Crie uma área primeiro, em Tarefas.';
+  return (
+    <section
+      aria-labelledby="office-quick"
+      className="shrink-0 border-t border-line px-3 pt-2 pb-2"
+    >
+      <h2 id="office-quick" className="mb-1.5 text-sm font-bold">
+        Ações rápidas
+      </h2>
+      <div className="grid gap-1.5">
+        <QuickAction
+          icon={ListPlus}
+          label="Criar tarefa"
+          description="No quadro de uma área."
+          to="/tarefas?nova=1"
+          disabledReason={noArea}
+          compact
+        />
+        <QuickAction
+          icon={UserPlus}
+          label="Novo agente"
+          description="Com nome, objetivo e modelo."
+          to="/agentes/novo"
+          compact
+        />
+        <QuickAction
+          icon={CalendarPlus}
+          label="Agendar tarefa"
+          description="Uma vez ou repetindo."
+          to="/tarefas/agendamentos?novo=1"
+          disabledReason={noArea}
+          compact
+        />
+      </div>
+    </section>
+  );
+}
+
 /** The decision an agent is waiting for, answered without leaving the office (RF-09). */
 function DecisionDialog({
   approval,
@@ -109,14 +208,13 @@ function DecisionDialog({
   );
 }
 
-const BAR_BUTTON =
-  'grid size-11 place-items-center rounded-full text-chalk transition-colors hover:bg-sheet-raised';
-
 export function OfficePage() {
   const { data, error, isPending, refetch } = useOffice();
   const { data: approvals } = useApprovals();
   const [deciding, setDeciding] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [pointed, setPointed] = useState<string | null>(null);
+  const [tab, setTab] = useState<SideTab>('team');
   const now = useNow(CLOCK_MS);
 
   const agents = useMemo(() => data?.agents ?? [], [data]);
@@ -138,10 +236,17 @@ export function OfficePage() {
       : null;
   const scene = useOfficeScene(geometry, places);
 
-  const stage = useRef<HTMLDivElement>(null);
-  const svg = useRef<SVGSVGElement>(null);
+  const [webgl] = useState(hasWebGL);
+  const stage = useElementSize();
+  const light = useDaylight();
+  const reduced = useReducedMotion();
+  const firstSteps = useFirstStepsOpen();
   const bounds = useMemo(() => (layout ? sceneBounds(layout) : null), [layout]);
-  const viewport = useViewport(stage, svg, bounds);
+  const size = stage.size;
+  const view = useMemo(
+    () => (layout && size ? officeView(layout, size.width, size.height) : null),
+    [layout, size],
+  );
 
   const delegations = delegationsOf(agents);
   const balloons = new Map<string, BalloonInfo>();
@@ -158,18 +263,20 @@ export function OfficePage() {
     }
   }
 
-  const openAgent = (agent: OfficeAgent) => {
-    if (viewport.dragged()) return;
-    if (agent.pendingApproval) setDeciding(agent.pendingApproval.id);
-    else void navigate(conversationPath(agent));
+  // An agent picked in the scene lights its card; pointing at a card lights the agent (D3).
+  const pick = (agent: OfficeAgent) => {
+    setSelected(agent.id);
+    setTab('team');
   };
+  const lit = pointed ?? selected;
+  const figures = geometry ? figuresOf(agents, geometry, scene) : new Map<string, never>();
   const pending = approvals?.filter((approval) => approval.status === 'pending').length ?? 0;
 
   return (
     <>
       <PageHeader
         title="Escritório"
-        description="Cada projeto tem a sua sala e cada agente, a sua mesa. Quem fica sem tarefa vai à copa, quem delega reúne-se com quem recebeu a tarefa e agente inativo fica fora. Clique em um agente para conversar."
+        description="Cada área tem a sua sala e cada agente, a sua mesa. Clique num agente na cena para achar o cartão dele; o cartão abre a conversa."
         actions={
           <div className="flex items-center gap-2">
             <Link to="/escritorio/editar" className={buttonClass('secondary')}>
@@ -185,7 +292,7 @@ export function OfficePage() {
               <Bell className="size-5" aria-hidden />
               {pending > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full bg-fail px-1 text-xs font-bold text-ink"
+                  className={`absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full px-1 text-xs font-bold text-ink ${TONES.fail.dot}`}
                   aria-hidden
                 >
                   {pending}
@@ -195,6 +302,11 @@ export function OfficePage() {
           </div>
         }
       />
+
+      <Tip id="office-pick" className="mb-3">
+        Clique num agente na cena para destacar o cartão dele à direita; passar o mouse num cartão
+        acende o agente na cena.
+      </Tip>
 
       {isPending && <LoadingState label="Carregando o escritório…" />}
 
@@ -207,98 +319,116 @@ export function OfficePage() {
       )}
 
       {data && layout && geometry && places && bounds && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
-          <div
-            ref={stage}
-            className="office-stage relative h-[min(68dvh,44rem)] min-h-80 overflow-hidden rounded-xl border border-line"
-          >
-            <OfficeDrawing
-              svgRef={svg}
-              className="absolute inset-0 size-full touch-none select-none"
-              layout={layout}
-              projects={data.projects}
-              agents={agents}
-              geometry={geometry}
-              places={places}
-              scene={scene}
-              balloons={balloons}
-              onAgent={openAgent}
-            />
-            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3">
-              <div
-                role="toolbar"
-                aria-label="Ações do escritório"
-                className="pointer-events-auto flex items-center gap-1 rounded-full border border-line-strong bg-ink/90 p-1.5 shadow-lg"
-              >
-                <button
-                  type="button"
-                  className={BAR_BUTTON}
-                  onClick={viewport.zoomIn}
-                  aria-label="Aproximar"
-                  title="Aproximar"
-                >
-                  <ZoomIn className="size-5" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={BAR_BUTTON}
-                  onClick={viewport.zoomOut}
-                  aria-label="Afastar"
-                  title="Afastar"
-                >
-                  <ZoomOut className="size-5" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={BAR_BUTTON}
-                  onClick={viewport.fit}
-                  aria-label="Mostrar o escritório inteiro"
-                  title="Mostrar o escritório inteiro"
-                >
-                  <LocateFixed className="size-5" aria-hidden />
-                </button>
-                <Link
-                  to="/agentes/novo"
-                  className={BAR_BUTTON}
-                  aria-label="Novo agente"
-                  title="Novo agente"
-                >
-                  <Bot className="size-5" aria-hidden />
-                </Link>
-                <Link
-                  to="/escritorio/editar"
-                  className={BAR_BUTTON}
-                  aria-label="Editar o escritório"
-                  title="Editar o escritório"
-                >
-                  <PencilRuler className="size-5" aria-hidden />
-                </Link>
-              </div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="min-w-0 space-y-4">
+            <div
+              ref={stage.ref}
+              data-office-scene={webgl ? '' : undefined}
+              className="office-stage relative h-[min(46dvh,44rem)] min-h-80 overflow-hidden rounded-xl border border-line"
+            >
+              {webgl ? (
+                view && (
+                  <>
+                    <Suspense fallback={null}>
+                      <OfficeCanvas
+                        layout={layout}
+                        agents={agents}
+                        scene={scene}
+                        looks={new Map([...figures].map(([id, figure]) => [id, figure.request]))}
+                        screens={deskScreens(agents, geometry, places)}
+                        view={view}
+                        light={light}
+                        reduced={reduced}
+                        lit={lit}
+                      />
+                    </Suspense>
+                    <OfficeOverlay
+                      layout={layout}
+                      projects={data.projects}
+                      agents={agents}
+                      figures={figures}
+                      balloons={balloons}
+                      view={view}
+                      light={light}
+                      scene={scene}
+                      onAgent={pick}
+                      lit={lit}
+                    />
+                  </>
+                )
+              ) : (
+                <OfficeDrawing
+                  className="absolute inset-0 size-full select-none"
+                  viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
+                  layout={layout}
+                  projects={data.projects}
+                  agents={agents}
+                  geometry={geometry}
+                  places={places}
+                  scene={scene}
+                  balloons={balloons}
+                  onAgent={pick}
+                />
+              )}
             </div>
-            <Minimap
-              className="absolute right-3 bottom-3 hidden md:block"
-              layout={layout}
-              bounds={bounds}
-              agents={agents}
-              scene={scene}
-              viewport={viewport}
-            />
+            <IndicatorRow />
           </div>
-          <div className="lg:h-[min(68dvh,44rem)] lg:min-h-80">
-            <OfficePanel
-              agents={agents}
-              places={places}
-              seated={(id) => scene.view(id)?.seated ?? places.get(id)?.kind === 'desk'}
-              rooms={rooms}
-              balloons={balloons}
-              onDecide={setDeciding}
-            />
-            {agents.length === 0 && (
-              <Link to="/agentes/novo" className={`${buttonClass('primary')} mt-3 w-full`}>
-                Criar o primeiro agente
-              </Link>
-            )}
-          </div>
+
+          <aside
+            aria-label="Time e atividade"
+            className="surface-glass rounded-xl border border-line lg:relative"
+          >
+            {/* On a wide screen the column is as tall as the scene and the quick actions beside it. */}
+            <div className="flex min-h-0 flex-col lg:absolute lg:inset-0">
+              {/* A new installation's first steps (Phase 32), above the team, until done or put aside. */}
+              <FirstSteps className="m-2 mb-0 max-h-3/5 shrink-0 overflow-y-auto" />
+              {/* On a phone the team and the activity take turns under the scene (D8). */}
+              <div role="tablist" aria-label="Mostrar" className="flex gap-1 p-2 lg:hidden">
+                {SIDE_TABS.map((each) => (
+                  <button
+                    key={each.id}
+                    type="button"
+                    role="tab"
+                    id={`office-tab-${each.id}`}
+                    aria-selected={tab === each.id}
+                    aria-controls={`office-panel-${each.id}`}
+                    onClick={() => setTab(each.id)}
+                    className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold ${
+                      tab === each.id ? 'bg-accent text-white' : 'text-chalk hover:bg-sheet-raised'
+                    }`}
+                  >
+                    {each.label}
+                  </button>
+                ))}
+              </div>
+              <div
+                id="office-panel-team"
+                className={`min-h-0 flex-col overflow-hidden lg:flex lg:flex-[3] ${tab === 'team' ? 'flex flex-1' : 'hidden'}`}
+              >
+                <OfficePanel
+                  agents={agents}
+                  places={places}
+                  seated={(id) => scene.view(id)?.seated ?? places.get(id)?.kind === 'desk'}
+                  rooms={rooms}
+                  balloons={balloons}
+                  onDecide={setDeciding}
+                  now={now}
+                  selected={selected}
+                  onHighlight={setPointed}
+                />
+              </div>
+              <div
+                id="office-panel-activity"
+                className={`min-h-0 flex-col overflow-hidden border-line lg:flex lg:flex-[2] lg:border-t ${
+                  tab === 'activity' ? 'flex flex-1' : 'hidden'
+                }`}
+              >
+                <RecentActivity />
+              </div>
+              {/* While the first steps are open they are the way forward: the quick actions wait. */}
+              {!firstSteps && <QuickActions hasAreas={data.projects.length > 0} />}
+            </div>
+          </aside>
         </div>
       )}
 

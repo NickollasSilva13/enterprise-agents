@@ -32,6 +32,7 @@ const item = (fields: Partial<OfficeItem> & Pick<OfficeItem, 'kind' | 'x' | 'y'>
   facing: 's',
   agentId: null,
   label: null,
+  color: 'default',
   ...fields,
 });
 
@@ -133,6 +134,25 @@ describe('validation', () => {
       ]);
       expect(validateLayout(layout), preset).toEqual([]);
     }
+  });
+
+  it('furnishes the common rooms of the complete layout, with no empty room (Phase 26)', () => {
+    const layout = buildPresetLayout('complete', [{ projectId: 'a', agents: 2 }]);
+    const inside = (kind: string) => {
+      const area = layout.areas.find((each) => each.kind === kind);
+      if (!area) return [];
+      return layout.items.filter(
+        (item) =>
+          item.x >= area.x &&
+          item.x < area.x + area.width &&
+          item.y >= area.y &&
+          item.y < area.y + area.height,
+      );
+    };
+    expect(inside('reception').length).toBeGreaterThanOrEqual(10);
+    expect(inside('pantry').length).toBeGreaterThanOrEqual(10);
+    expect(inside('lounge').length).toBeGreaterThanOrEqual(9);
+    expect(inside('meeting').filter((item) => item.kind === 'chair')).toHaveLength(8);
   });
 
   const messages = (layout: LayoutShape) => validateLayout(layout).map((issue) => issue.message);

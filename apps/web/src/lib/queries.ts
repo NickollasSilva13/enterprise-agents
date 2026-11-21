@@ -1,4 +1,5 @@
 import {
+  activityFeedSchema,
   type AgentCreateInput,
   type AgentExport,
   agentExportSchema,
@@ -7,6 +8,7 @@ import {
   agentSchema,
   type AgentUpdate,
   dashboardSummarySchema,
+  indicatorsSchema,
   modelListSchema,
   type OfficeLayoutInput,
   officeLayoutSchema,
@@ -43,6 +45,22 @@ export const useOffice = () =>
   useQuery({
     queryKey: ['office'],
     queryFn: () => apiFetch('/api/office', officeSchema),
+    refetchInterval: REFRESH_MS,
+  });
+
+/** The office's recent activity (Phase 29, D5). */
+export const useActivity = () =>
+  useQuery({
+    queryKey: ['activity'],
+    queryFn: async () => (await apiFetch('/api/activity', activityFeedSchema)).entries,
+    refetchInterval: REFRESH_MS,
+  });
+
+/** The office's indicators, counted from the history (Phase 30). */
+export const useIndicators = () =>
+  useQuery({
+    queryKey: ['indicators'],
+    queryFn: () => apiFetch('/api/indicators', indicatorsSchema),
     refetchInterval: REFRESH_MS,
   });
 

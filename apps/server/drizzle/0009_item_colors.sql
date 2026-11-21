@@ -1,0 +1,1 @@
+ALTER TABLE `office_items` ADD `color` text DEFAULT 'default' NOT NULL;

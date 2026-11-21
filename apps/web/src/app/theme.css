@@ -13,18 +13,29 @@
   --color-sheet: #1f1836;
   --color-sheet-raised: #2a2147;
   --color-line: #392d5c;
-  --color-line-strong: #574a8c;
+  /* Bright enough for a field's edge to read against any surface (3:1). */
+  --color-line-strong: #7a6bb5;
   --color-chalk: #f1edff;
   --color-dim: #a99fcc;
   --color-accent: #6d4dff;
-  --color-accent-strong: #8467ff;
+  /* Hover of the main button: darker, so white text keeps 4.5:1. */
+  --color-accent-strong: #5b3df0;
+  /* The lit edge of glass and the keyboard focus ring. */
+  --color-glow: #b9a8ff;
 
   /* Status lamps */
   --color-ok: #5fe3a1;
   --color-wait: #ffc24b;
-  --color-fail: #ff7b72;
+  --color-fail: #ff8a80;
   --color-info: #7cc4ff;
-  --color-idle: #7f92b3;
+  --color-idle: #9aabc9;
+
+  /*
+   * Type scale (Phase 20): Tailwind's, except that the smallest step is 13 px
+   * instead of 12, the floor for any text outside the office scene.
+   */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
 
   --animate-lamp: lamp 1.6s ease-in-out infinite;
 
@@ -53,7 +64,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #b9a8ff;
+    outline: 2px solid var(--color-glow);
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -69,6 +80,21 @@
 }
 
 @layer components {
+  /*
+   * Surfaces (Phase 20), from back to front: the page (ink), a panel (sheet),
+   * something lifted from a panel (sheet-raised), and glass, which floats over
+   * the office scene with a lit lilac edge, as in the user's proposal. Glass is
+   * opaque enough (94%) that text on it is checked against sheet (theme.test.ts).
+   */
+  .surface-glass {
+    border: 1px solid color-mix(in srgb, var(--color-glow) 38%, transparent);
+    background-color: color-mix(in srgb, var(--color-sheet) 94%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 0 18px -6px color-mix(in srgb, var(--color-accent) 55%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
   /*
    * The isometric office (Phase 14). Furniture and characters are pixel art
    * drawn in SVG (features/office/art, components/pixel-art); here are the
@@ -105,6 +131,16 @@
     text-shadow: 0 0 2px rgb(0 0 0 / 0.5);
   }
 
+  /* Over the 3D office (Phase 24) the layer is in screen pixels, not scaled with the scene. */
+  .office-overlay .office-sign {
+    padding: 2px 10px;
+    font-size: var(--text-xs);
+  }
+
+  .office-overlay .office-mural {
+    font-size: 11px;
+  }
+
   /* What the agent is doing, said in a speech balloon above its head. */
   .office-balloon {
     position: relative;
@@ -124,17 +160,73 @@
     border-top-color: #f4f1ff;
   }
 
+  /* A character on its way bobs as it steps (Phase 15). */
   /*
-   * A character on its way (Phase 15): two leg frames take turns, shown and
-   * hidden in steps as 16-bit sprites are, and the body bobs.
+   * The 32-bit characters (Phase 22): a walk in four frames, typing and
+   * talking in two, each frame shown a fraction of the cycle in turn. With
+   * reduced motion only the first frame stays.
    */
-  .pixel-frame-a {
-    animation: pixel-frame 0.36s linear infinite;
+  .pixel-walk-1,
+  .pixel-walk-2,
+  .pixel-walk-3,
+  .pixel-walk-4 {
+    animation: pixel-quarter 0.48s linear infinite;
   }
 
-  .pixel-frame-b {
-    animation: pixel-frame 0.36s linear infinite;
-    animation-delay: -0.18s;
+  .pixel-walk-2 {
+    animation-delay: -0.36s;
+  }
+
+  .pixel-walk-3 {
+    animation-delay: -0.24s;
+  }
+
+  .pixel-walk-4 {
+    animation-delay: -0.12s;
+  }
+
+  .pixel-type-1,
+  .pixel-type-2 {
+    animation: pixel-frame 0.32s linear infinite;
+  }
+
+  .pixel-type-2 {
+    animation-delay: -0.16s;
+  }
+
+  .pixel-wave-1,
+  .pixel-wave-2 {
+    animation: pixel-frame 0.8s linear infinite;
+  }
+
+  .pixel-wave-2 {
+    animation-delay: -0.4s;
+  }
+
+  .pixel-talk-1,
+  .pixel-talk-2 {
+    animation: pixel-frame 1.6s linear infinite;
+  }
+
+  .pixel-talk-2 {
+    animation-delay: -0.8s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pixel-alt {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pixel-quarter {
+    0%,
+    24.9% {
+      opacity: 1;
+    }
+    25%,
+    100% {
+      opacity: 0;
+    }
   }
 
   .walker-bob {
@@ -159,20 +251,6 @@
     to {
       transform: translateY(-1px);
     }
-  }
-
-  .desk-type-a {
-    animation: desk-type 0.42s ease-in-out infinite alternate;
-  }
-
-  .desk-type-b {
-    animation: desk-type 0.42s ease-in-out infinite alternate-reverse;
-  }
-
-  .desk-wave {
-    transform-box: fill-box;
-    transform-origin: 50% 100%;
-    animation: desk-wave 0.8s ease-in-out infinite alternate;
   }
 
   .desk-shake {
@@ -201,30 +279,8 @@
     animation-delay: 1.2s;
   }
 
-  .desk-steam {
-    animation: desk-steam 2.2s ease-out infinite;
-  }
-
   .desk-saver {
     animation: desk-saver 6s linear infinite alternate;
-  }
-
-  @keyframes desk-type {
-    from {
-      transform: translateY(0);
-    }
-    to {
-      transform: translateY(-3px);
-    }
-  }
-
-  @keyframes desk-wave {
-    from {
-      transform: rotate(-9deg);
-    }
-    to {
-      transform: rotate(14deg);
-    }
   }
 
   @keyframes desk-shake {
@@ -260,20 +316,6 @@
     }
     25% {
       opacity: 1;
-    }
-  }
-
-  @keyframes desk-steam {
-    0% {
-      opacity: 0;
-      transform: translateY(2px);
-    }
-    40% {
-      opacity: 0.8;
-    }
-    100% {
-      opacity: 0;
-      transform: translateY(-5px);
     }
   }
 

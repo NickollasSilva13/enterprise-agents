@@ -4,20 +4,18 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import { errorMessage } from '../lib/errors';
 import { useDecideApproval } from '../lib/tool-queries';
+import type { Tone } from '../lib/tone';
 import { Button } from './Button';
+import { StatusPill } from './StatusPill';
 
-export const RISK: Record<ToolRisk, { label: string; tone: string }> = {
-  low: { label: 'Risco baixo', tone: 'border-line-strong text-dim' },
-  medium: { label: 'Risco médio', tone: 'border-wait text-wait' },
-  high: { label: 'Risco alto', tone: 'border-fail text-fail' },
+export const RISK: Record<ToolRisk, { label: string; tone: Tone }> = {
+  low: { label: 'Risco baixo', tone: 'idle' },
+  medium: { label: 'Risco médio', tone: 'wait' },
+  high: { label: 'Risco alto', tone: 'fail' },
 };
 
 export function RiskBadge({ risk }: { risk: ToolRisk }) {
-  return (
-    <span className={`whitespace-nowrap rounded border px-1.5 py-0.5 text-xs ${RISK[risk].tone}`}>
-      {RISK[risk].label}
-    </span>
-  );
+  return <StatusPill tone={RISK[risk].tone}>{RISK[risk].label}</StatusPill>;
 }
 
 /** Exactly what the tool will receive: nothing is summarised or hidden (C-16). */

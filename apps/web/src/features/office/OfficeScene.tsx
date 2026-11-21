@@ -12,7 +12,12 @@ import {
   useState,
 } from 'react';
 import { areaName, Ground, signPoint, wallsByBand } from './art/architecture';
-import { type Direction, PixelCharacter } from '../../components/pixel-art/character';
+import { useDaylight } from './daylight';
+import {
+  type Direction,
+  type FrameRequest,
+  PixelCharacter,
+} from '../../components/pixel-art/character';
 import { Chair, FlatItem, Furniture, isFlat, type Screen } from './art/furniture';
 import { project } from './art/iso';
 import {
@@ -48,14 +53,19 @@ export function useReducedMotion(): boolean {
   return reduced;
 }
 
-/** Something drawn at an agent's position: the character, its balloon, its dot on the minimap. */
-export type SpriteRole = 'body' | 'balloon' | 'dot';
+/** Something drawn at an agent's position: the character, its balloon, its 3D model. */
+export type SpriteRole = 'body' | 'balloon' | 'model';
+
+/** Puts something at a point of the floor (tiles), lifted to the seat when seated. */
+export type Mover = (x: number, y: number, seated: boolean) => void;
 
 export interface OfficeSceneState {
   /** How an agent is drawn now; undefined until the scene has seen it. */
   readonly view: (agentId: string) => ActorView | undefined;
-  /** Gives the scene an element to keep at an agent's position. */
+  /** Gives the scene an SVG element of the isometric drawing to keep at an agent's position. */
   readonly sprite: (agentId: string, role: SpriteRole) => (element: SVGGElement | null) => void;
+  /** Gives the scene anything to keep at an agent's position (the 3D scene, Phase 24). */
+  readonly track: (agentId: string, role: SpriteRole, mover: Mover | null) => void;
 }
 
 const SEAT_HEIGHT = 8;
@@ -70,19 +80,16 @@ export function useOfficeScene(
 ): OfficeSceneState {
   const [engine] = useState(() => new SceneEngine());
   const [, redraw] = useReducer((count: number) => count + 1, 0);
-  const sprites = useRef(new Map<string, Map<SpriteRole, SVGGElement>>());
+  const movers = useRef(new Map<string, Map<SpriteRole, Mover>>());
   const frame = useRef(0);
   const reduced = useReducedMotion();
 
   const apply = useCallback(() => {
     for (const { id, x, y } of engine.positions()) {
-      const roles = sprites.current.get(id);
+      const roles = movers.current.get(id);
       if (!roles) continue;
-      const view = engine.view(id);
-      const lift = view?.seated ? SEAT_HEIGHT : 0;
-      const at = project(x, y, lift);
-      const transform = `translate(${at.x.toFixed(1)} ${at.y.toFixed(1)})`;
-      for (const element of roles.values()) element.setAttribute('transform', transform);
+      const seated = engine.view(id)?.seated ?? false;
+      for (const move of roles.values()) move(x, y, seated);
     }
   }, [engine]);
 
@@ -124,17 +131,34 @@ export function useOfficeScene(
     [],
   );
 
-  const sprite = useCallback(
-    (agentId: string, role: SpriteRole) => (element: SVGGElement | null) => {
-      const roles = sprites.current.get(agentId) ?? new Map<SpriteRole, SVGGElement>();
-      if (element) roles.set(role, element);
+  const track = useCallback(
+    (agentId: string, role: SpriteRole, mover: Mover | null) => {
+      const roles = movers.current.get(agentId) ?? new Map<SpriteRole, Mover>();
+      if (mover) roles.set(role, mover);
       else roles.delete(role);
-      sprites.current.set(agentId, roles);
+      movers.current.set(agentId, roles);
+      // Something that appears between two frames is put in place at once.
+      const at = mover ? engine.positions().find((each) => each.id === agentId) : undefined;
+      if (mover && at) mover(at.x, at.y, engine.view(agentId)?.seated ?? false);
     },
-    [],
+    [engine],
+  );
+  const sprite = useCallback(
+    (agentId: string, role: SpriteRole) => (element: SVGGElement | null) =>
+      track(
+        agentId,
+        role,
+        element
+          ? (x, y, seated) => {
+              const at = project(x, y, seated ? SEAT_HEIGHT : 0);
+              element.setAttribute('transform', `translate(${at.x.toFixed(1)} ${at.y.toFixed(1)})`);
+            }
+          : null,
+      ),
+    [track],
   );
   const view = useCallback((agentId: string) => engine.view(agentId), [engine]);
-  return { view, sprite };
+  return { view, sprite, track };
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +166,8 @@ export function useOfficeScene(
 
 /** The movement of a seated agent, by state (the `desk-*` classes of the theme). */
 const SEATED_MOTION: Record<OfficeAgent['state'], { head?: string; body?: string }> = {
-  working: { body: 'desk-type-a' },
+  // Working is shown by the typing frames of the character (Phase 22).
+  working: {},
   waiting: {},
   failed: { head: 'desk-shake' },
   idle: { body: 'desk-breathe' },
@@ -178,6 +203,8 @@ interface SceneProps {
   readonly onAgent: (agent: OfficeAgent) => void;
   readonly svgRef?: Ref<SVGSVGElement>;
   readonly className?: string;
+  /** A fixed view, when no viewport moves it. */
+  readonly viewBox?: string;
 }
 
 /** Furniture and walls by drawing band; changes only with the layout. */
@@ -216,22 +243,26 @@ function useStaticBands(layout: OfficeLayout, screens: ReadonlyMap<number, Scree
   }, [layout, screens]);
 }
 
-/** What is around the office, behind it; drawn once per layout. */
+/**
+ * What is around the office, behind it; drawn again only when the layout or
+ * the hour changes (Phase 23: day and night follow the clock).
+ */
 export const Around = memo(function Around({ layout }: { layout: OfficeLayout }) {
-  return <SurroundingsBack layout={layout} />;
+  return <SurroundingsBack layout={layout} light={useDaylight()} />;
 });
 
 /** The outer walls behind the office, standing on the edge of its floor. */
 export const Perimeter = memo(function Perimeter({ layout }: { layout: OfficeLayout }) {
-  return <PerimeterBack layout={layout} />;
+  return <PerimeterBack layout={layout} light={useDaylight()} />;
 });
 
-/** The low outer walls, trees and lamps in front of the office. */
+/** The low outer walls, trees, lamps and the lit edge in front of the office. */
 export const AroundFront = memo(function AroundFront({ layout }: { layout: OfficeLayout }) {
+  const light = useDaylight();
   return (
     <>
       <PerimeterFront layout={layout} />
-      <SurroundingsFront layout={layout} />
+      <SurroundingsFront layout={layout} light={light} />
     </>
   );
 });
@@ -297,6 +328,7 @@ export function OfficeDrawing({
   onAgent,
   svgRef,
   className,
+  viewBox,
 }: SceneProps) {
   // A screen is on while its agent is at the desk; the key keeps the memo below stable.
   const screenKey = agents
@@ -345,6 +377,9 @@ export function OfficeDrawing({
           headClass={seated ? motion.head : undefined}
           bodyClass={seated ? motion.body : view?.moving ? 'walker-bob' : undefined}
           raisedHand={seated && agent.state === 'waiting'}
+          activity={
+            seated && agent.state === 'working' ? 'typing' : view?.talking ? 'talking' : null
+          }
         />
       </g>
     );
@@ -360,6 +395,7 @@ export function OfficeDrawing({
     <svg
       ref={svgRef}
       className={className}
+      viewBox={viewBox}
       aria-hidden
       data-office-scene
       preserveAspectRatio="xMidYMid meet"
@@ -403,4 +439,55 @@ export function OfficeDrawing({
       })}
     </svg>
   );
+}
+
+// ---------------------------------------------------------------------------
+// The same decisions, for the 3D scene (Phase 24).
+
+export interface AgentFigure {
+  readonly request: FrameRequest;
+  readonly seated: boolean;
+  readonly moving: boolean;
+}
+
+/** How each agent in sight is drawn now; agents out of the office are left out. */
+export function figuresOf(
+  agents: readonly OfficeAgent[],
+  geometry: OfficeGeometry,
+  scene: OfficeSceneState,
+): Map<string, AgentFigure> {
+  const figures = new Map<string, AgentFigure>();
+  for (const agent of agents) {
+    const view = scene.view(agent.id);
+    const seat = geometry.seats.get(agent.id);
+    const seated = view ? view.seated : seat !== undefined;
+    if (!seated && !view?.standing) continue;
+    figures.set(agent.id, {
+      seated,
+      moving: !seated && (view?.moving ?? false),
+      request: {
+        pose: seated ? 'sit' : view?.moving ? 'walk' : 'stand',
+        facing: seated && seat ? SITTER_FACING[seat.side] : (view?.heading ?? 'sw'),
+        holding: view?.carrying ? 'paper' : view?.resting ? 'cup' : null,
+        raisedHand: seated && agent.state === 'waiting',
+        activity: seated && agent.state === 'working' ? 'typing' : view?.talking ? 'talking' : null,
+      },
+    });
+  }
+  return figures;
+}
+
+/** The screen of each desk: on while its agent sits there, by the agent's state. */
+export function deskScreens(
+  agents: readonly OfficeAgent[],
+  geometry: OfficeGeometry,
+  places: ReadonlyMap<string, Place>,
+): Map<number, Screen> {
+  const screens = new Map<number, Screen>();
+  for (const agent of agents) {
+    const seat = geometry.seats.get(agent.id);
+    if (seat && places.get(agent.id)?.kind === 'desk')
+      screens.set(seat.desk, SCREEN_OF[agent.state]);
+  }
+  return screens;
 }

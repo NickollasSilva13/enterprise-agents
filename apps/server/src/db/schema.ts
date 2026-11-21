@@ -6,6 +6,7 @@ import {
   AUDIT_ACTORS,
   type Door,
   FLOORS,
+  ITEM_COLORS,
   ITEM_KINDS,
   MESSAGE_ROLES,
   PROVIDER_KINDS,
@@ -307,6 +308,8 @@ export const officeItems = sqliteTable(
     // Agents are deleted softly, so the layout ignores desks of deleted agents when it is read.
     agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
     label: text('label'),
+    /** Phase 23: a colour from `ITEM_COLORS`; the old pieces keep their own. */
+    color: text('color', { enum: ITEM_COLORS }).notNull().default('default'),
     createdAt: createdAt(),
   },
   (table) => [index('office_items_agent_idx').on(table.agentId)],

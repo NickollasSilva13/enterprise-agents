@@ -7,10 +7,14 @@ import { Panel } from '../../components/Panel';
 import { ErrorState, LoadingState } from '../../components/States';
 import { errorMessage } from '../../lib/errors';
 import { formatCount, formatDateTime, formatDuration, NO_VALUE } from '../../lib/format';
-import { endReasonText, isActiveRun, RUN_STATUS } from '../../lib/run-labels';
+import { endReasonText, isActiveRun } from '../../lib/run-labels';
 import { useCancelRun, useRunDetail } from '../../lib/run-queries';
 import { useApprovals } from '../../lib/tool-queries';
 import { RunTimeline } from './RunTimeline';
+import { LINK } from '../../components/TextLink';
+import { FormError } from '../../components/Notice';
+import { RunStatusPill } from '../../components/RunStatusPill';
+import { TONES } from '../../lib/tone';
 
 const TRIGGERS: Record<RunSummary['trigger'], string> = {
   chat: 'Mensagem no chat',
@@ -52,14 +56,14 @@ function RunTree({ nodes, currentId }: { nodes: readonly RunTreeNode[]; currentI
           <li
             key={run.id}
             className={`${INDENT[Math.min(depth, INDENT.length - 1)]} flex flex-wrap items-baseline gap-x-3 rounded-md border px-3 py-2 ${
-              current ? 'border-info bg-sheet-raised' : 'border-line'
+              current ? 'border-glow bg-sheet-raised' : 'border-line'
             }`}
           >
             <span className="font-semibold">
               {depth > 0 && <span aria-hidden>↳ </span>}
               {run.agentName}
             </span>
-            <span className={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</span>
+            <RunStatusPill status={run.status} />
             <span className="text-dim">
               {depth === 0 ? 'iniciada por você' : 'tarefa delegada'} ·{' '}
               {formatDuration(run.durationMs)}
@@ -71,7 +75,7 @@ function RunTree({ nodes, currentId }: { nodes: readonly RunTreeNode[]; currentI
             ) : (
               <Link
                 to={`/logs/${run.id}`}
-                className="ml-auto text-info underline underline-offset-4"
+                className={`ml-auto ${LINK}`}
                 aria-label={`Abrir a execução de ${run.agentName}`}
               >
                 Abrir
@@ -111,7 +115,7 @@ export function RunDetailPage() {
           </h1>
           {run && (
             <p className="text-sm">
-              <span className={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</span>
+              <RunStatusPill status={run.status} />
               {run.agentDeleted && <span className="text-dim"> · agente excluído</span>}
             </p>
           )}
@@ -138,20 +142,16 @@ export function RunDetailPage() {
         />
       )}
 
-      {cancel.error && (
-        <p role="alert" className="mb-4 text-sm text-fail">
-          {errorMessage(cancel.error)}
-        </p>
-      )}
+      {cancel.error && <FormError className="mb-4">{errorMessage(cancel.error)}</FormError>}
 
       {data && run && (
         <div className="space-y-6">
           {(run.errorMessage || (run.endReason && run.endReason !== 'completed')) && (
             <div
               role={failed ? 'alert' : undefined}
-              className={`rounded-lg border p-4 ${failed ? 'border-fail' : 'border-line bg-sheet'}`}
+              className={`rounded-lg border p-4 ${failed ? TONES.fail.edge : 'border-line bg-sheet'}`}
             >
-              <p className={`font-semibold ${failed ? 'text-fail' : ''}`}>
+              <p className={`font-semibold ${failed ? TONES.fail.text : ''}`}>
                 {run.errorMessage ?? endReasonText(run.endReason)}
               </p>
               {run.errorMessage && run.endReason && (
@@ -171,7 +171,7 @@ export function RunDetailPage() {
               !run.agentDeleted && (
                 <Link
                   to={`/agentes/${run.agentId}/conversa/${run.conversationId}`}
-                  className="text-info underline underline-offset-4"
+                  className={LINK}
                 >
                   Abrir a conversa
                 </Link>

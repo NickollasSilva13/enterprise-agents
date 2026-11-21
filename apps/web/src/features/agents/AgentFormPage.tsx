@@ -19,6 +19,8 @@ import {
 } from '../../lib/queries';
 import { AppearanceFields } from './AppearanceFields';
 import { type AgentFormErrors, type AgentFormValues, parseForm, toFormValues } from './agent-form';
+import { LINK } from '../../components/TextLink';
+import { FormError } from '../../components/Notice';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -198,7 +200,7 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
         </SelectField>
         {models.length === 0 && (
           <p className="text-sm">
-            <Link to="/modelos" className="text-info underline underline-offset-4">
+            <Link to="/modelos" className={LINK}>
               Conectar um provedor de modelos
             </Link>
           </p>
@@ -255,12 +257,12 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
           Cancelar
         </Link>
         {(errorCount > 0 || generalError) && (
-          <p role="alert" className="text-sm text-fail">
+          <FormError>
             {generalError ??
               (errorCount === 1
                 ? 'Corrija o campo destacado.'
                 : `Corrija os ${errorCount} campos destacados.`)}
-          </p>
+          </FormError>
         )}
       </div>
     </form>

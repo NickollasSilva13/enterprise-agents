@@ -1,4 +1,11 @@
-import type { Agent, DashboardSummary, RunSummary } from '@ea/shared';
+import {
+  type Agent,
+  type DashboardSummary,
+  type GuideState,
+  type Indicators,
+  type RunSummary,
+  TIP_IDS,
+} from '@ea/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -13,6 +20,25 @@ export const json = (status: number, body: unknown) =>
   });
 
 export const noContent = () => new Response(null, { status: 204 });
+
+/** The indicators of an installation where nothing was done yet (Phase 30). */
+export const emptyIndicators: Indicators = {
+  doneToday: { today: 0, yesterday: 0, series: [0, 0, 0, 0, 0, 0, 0] },
+  meanTaskTime: { ms: null, tasks: 0, series: [null, null, null, null, null, null, null] },
+  runsWithoutFailure: { rate: null, runs: 0, series: [null, null, null, null, null, null, null] },
+  doneThisWeek: { week: 0, previousWeek: 0, series: [0, 0, 0, 0, 0, 0, 0] },
+  generatedAt: '2026-11-19T12:00:00.000Z',
+};
+
+/**
+ * An installation past its first steps, with every tip closed (Phase 32):
+ * screens look as they did before, unless a test asks for the checklist or a tip.
+ */
+export const setUpGuide: GuideState = {
+  skipped: false,
+  dismissedTips: [...TIP_IDS],
+  done: { provider: true, model: true, area: true, task: true },
+};
 
 export const emptySummary: DashboardSummary = {
   agents: { total: 0, active: 0, inactive: 0, failed: 0, working: 0, waiting: 0 },
@@ -97,8 +123,8 @@ type Handler = (request: RecordedRequest) => Response | Promise<Response>;
  * `api` maps "METHOD /path" (or just "/path", for any method) to a JSON body
  * or to a function returning a Response. A request with a query string also
  * matches the entry for its path alone. The session handshake the dashboard
- * summary used by the status strip and an empty approval queue are answered
- * for you.
+ * summary used by the status strip, an empty approval queue, no waiting
+ * tasks or requests and an empty profile are answered for you.
  */
 export function renderApp(path: string, api: Record<string, unknown>) {
   resetSessionForTests();
@@ -106,6 +132,14 @@ export function renderApp(path: string, api: Record<string, unknown>) {
   const routesByKey: Record<string, unknown> = {
     '/api/dashboard/summary': emptySummary,
     '/api/approvals': { approvals: [] },
+    // The frame of every screen (Phase 21): bell, menu counters and the user's card.
+    '/api/tasks/waiting': { tasks: [] },
+    '/api/requests': { requests: [] },
+    '/api/profile': { name: null, appearance: null },
+    // The office and the reports, the home and its neighbour (Phase 30).
+    '/api/indicators': emptyIndicators,
+    // Everything done and no tip closed: screens without the checklist (Phase 32).
+    '/api/guide': setUpGuide,
     ...api,
   };
 

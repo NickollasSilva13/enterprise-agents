@@ -20,6 +20,8 @@ import {
   useRequests,
   useUpdateAreaLink,
 } from '../../lib/task-queries';
+import { BACK_LINK, LINK } from '../../components/TextLink';
+import { FormError } from '../../components/Notice';
 
 // Requests between areas (Phase 17): what is open now, and the rules saying
 // which area may ask which (D2). Without a rule, no request is accepted.
@@ -30,19 +32,13 @@ function RequestItem({ request }: { request: RequestSummary }) {
   return (
     <li className="space-y-2 px-4 py-3 text-sm" data-request={request.id}>
       <p>
-        <Link
-          to={`/tarefas/${encodeURIComponent(request.id)}`}
-          className="font-semibold text-info underline underline-offset-4"
-        >
+        <Link to={`/tarefas/${encodeURIComponent(request.id)}`} className={`font-semibold ${LINK}`}>
           {request.title}
         </Link>
       </p>
       <p className="text-dim">
         {request.fromAreaName} → {request.toAreaName}, pela tarefa{' '}
-        <Link
-          to={`/tarefas/${encodeURIComponent(request.parentTaskId)}`}
-          className="text-info underline underline-offset-4"
-        >
+        <Link to={`/tarefas/${encodeURIComponent(request.parentTaskId)}`} className={LINK}>
           {request.parentTitle}
         </Link>{' '}
         · {formatDateTime(request.createdAt)}
@@ -76,11 +72,7 @@ function RequestItem({ request }: { request: RequestSummary }) {
       ) : (
         <p>Em andamento, na etapa "{request.stageName}".</p>
       )}
-      {decide.error && (
-        <p role="alert" className="text-fail">
-          {errorMessage(decide.error)}
-        </p>
-      )}
+      {decide.error && <FormError>{errorMessage(decide.error)}</FormError>}
     </li>
   );
 }
@@ -163,11 +155,7 @@ function NewRule({ areas }: { areas: readonly { id: string; name: string }[] }) 
       >
         Exigir minha aprovação para cada pedido
       </Switch>
-      {create.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(create.error)}
-        </p>
-      )}
+      {create.error && <FormError>{errorMessage(create.error)}</FormError>}
       <Button variant="primary" type="submit" disabled={create.isPending || from === to}>
         Criar regra
       </Button>
@@ -198,9 +186,7 @@ function RuleItem({ link }: { link: AreaLink }) {
         </IconButton>
       </span>
       {(update.error ?? remove.error) && (
-        <p role="alert" className="w-full text-fail">
-          {errorMessage(update.error ?? remove.error)}
-        </p>
+        <FormError className="w-full">{errorMessage(update.error ?? remove.error)}</FormError>
       )}
       {removing && (
         <ConfirmDialog
@@ -260,10 +246,7 @@ function Rules() {
 export function RequestsPage() {
   return (
     <>
-      <Link
-        to="/tarefas"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-info underline underline-offset-4"
-      >
+      <Link to="/tarefas" className={BACK_LINK}>
         <ArrowLeft className="size-4" aria-hidden />
         Tarefas
       </Link>

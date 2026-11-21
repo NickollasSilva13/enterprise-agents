@@ -182,6 +182,34 @@ describe('office layout', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('keeps the colour of each piece, and refuses a colour off the palette (Phase 23)', async () => {
+    const layout = inputOf(buildPresetLayout('complete', []));
+    const sofa = layout.items.findIndex((item) => item.kind === 'sofa');
+    expect(sofa).toBeGreaterThanOrEqual(0);
+    const input = {
+      ...layout,
+      items: layout.items.map((item, index) =>
+        index === sofa ? { ...item, color: 'teal' } : item,
+      ),
+    };
+    expect((await call('PUT', '/api/office/layout', input)).status).toBe(200);
+    const items = (await office()).layout.items;
+    expect(items.find((item) => item.kind === 'sofa')?.color).toBe('teal');
+    expect(
+      items.filter((item) => item.kind !== 'sofa').every((item) => item.color === 'default'),
+    ).toBe(true);
+    // A piece sent without a colour, as before Phase 23, gets the default.
+    const { color: _unused, ...plain } = input.items[0]!;
+    void _unused;
+    const old = await call('PUT', '/api/office/layout', {
+      ...input,
+      items: [plain, ...input.items.slice(1)],
+    });
+    expect(old.status).toBe(200);
+    const off = { ...input, items: input.items.map((item) => ({ ...item, color: '#ff00ff' })) };
+    expect((await call('PUT', '/api/office/layout', off)).status).toBe(400);
+  });
+
   it('goes back to the automatic layout on request', async () => {
     const input = inputOf(buildPresetLayout('spacious', []));
     expect((await call('PUT', '/api/office/layout', input)).status).toBe(200);

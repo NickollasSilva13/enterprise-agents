@@ -3,11 +3,11 @@ import { expectNoHorizontalScroll, figure, navigateTo, watchForProblems } from '
 import { EMPTY_URL } from './servers';
 
 test.describe('fresh installation', () => {
-  test('the dashboard shows real zeros and says what is missing', async ({ page }) => {
+  test('the reports show real zeros and say what is missing', async ({ page }) => {
     const problems = watchForProblems(page);
-    await page.goto(EMPTY_URL);
+    await page.goto(`${EMPTY_URL}/relatorios`);
 
-    await expect(page.getByRole('heading', { name: 'Painel', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Relatórios', level: 1 })).toBeVisible();
     await expect(figure(page, 'Agentes', 'Agentes cadastrados')).toHaveText('0');
     await expect(figure(page, 'Agentes', 'Com falha')).toHaveText('0');
     await expect(figure(page, 'Execuções', 'Execuções em andamento')).toHaveText('0');
@@ -65,8 +65,8 @@ test.describe('fresh installation', () => {
     await expect(page.getByText('Uso normal')).toBeVisible();
     await expectNoHorizontalScroll(page);
 
-    await navigateTo(page, 'Painel');
-    await expect(page).toHaveURL(`${EMPTY_URL}/`);
+    await navigateTo(page, 'Relatórios');
+    await expect(page).toHaveURL(`${EMPTY_URL}/relatorios`);
     expect(problems).toEqual([]);
   });
 
@@ -78,21 +78,23 @@ test.describe('fresh installation', () => {
 
     await page.goto(`${EMPTY_URL}/nada-aqui`);
     await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
-    await page.getByRole('link', { name: 'Voltar ao painel' }).click();
-    await expect(page.getByRole('heading', { name: 'Painel', level: 1 })).toBeVisible();
+    await page.getByRole('link', { name: 'Voltar ao escritório' }).click();
+    await expect(page.getByRole('heading', { name: 'Escritório', level: 1 })).toBeVisible();
   });
 
   test('the navigation can be used with the keyboard alone', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Keyboard navigation is checked on the desktop layout.');
+    // The root address opens the office, the home of the platform (Phase 29, D1).
     await page.goto(EMPTY_URL);
-    await expect(page.getByRole('heading', { name: 'Painel', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Escritório', level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(`${EMPTY_URL}/escritorio`);
 
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'Painel' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Escritório', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'Escritório' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Relatórios', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Escritório', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Relatórios', level: 1 })).toBeVisible();
   });
 });
 
@@ -100,7 +102,8 @@ test.describe('browser security (C-01 to C-05)', () => {
   test('pages carry a strict content security policy and the session is hidden from scripts', async ({
     page,
   }) => {
-    const response = await page.goto(EMPTY_URL);
+    // The reports page: the office's 3D scene adds nothing to what is checked here.
+    const response = await page.goto(`${EMPTY_URL}/relatorios`);
     const headers = response?.headers() ?? {};
     expect(headers['content-security-policy']).toContain("script-src 'self'");
     expect(headers['content-security-policy']).not.toContain('unsafe-inline');
@@ -114,7 +117,7 @@ test.describe('browser security (C-01 to C-05)', () => {
   });
 
   test('inline scripts injected into the page do not run', async ({ page }) => {
-    await page.goto(EMPTY_URL);
+    await page.goto(`${EMPTY_URL}/relatorios`);
     await expect(page.getByRole('group', { name: 'Agentes' })).toBeVisible();
     const ran = await page.evaluate(async () => {
       const script = document.createElement('script');
@@ -127,7 +130,7 @@ test.describe('browser security (C-01 to C-05)', () => {
   });
 
   test('another origin cannot read the API or obtain a session', async ({ page, request }) => {
-    await page.goto(EMPTY_URL);
+    await page.goto(`${EMPTY_URL}/relatorios`);
     await expect(page.getByRole('group', { name: 'Agentes' })).toBeVisible();
     const cookie = (await page.context().cookies())
       .map((entry) => `${entry.name}=${entry.value}`)

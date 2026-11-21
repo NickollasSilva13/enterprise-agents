@@ -99,6 +99,11 @@ describe('the schedules screen (Phase 19)', () => {
     );
   });
 
+  it('opens the new schedule form from the office quick action (Phase 29)', async () => {
+    renderApp('/tarefas/agendamentos?novo=1', { ...base, '/api/schedules': { schedules: [] } });
+    expect(await screen.findByRole('dialog', { name: 'Novo agendamento' })).toBeTruthy();
+  });
+
   it('creates a weekly schedule', async () => {
     const { writes } = renderApp('/tarefas/agendamentos', {
       ...base,

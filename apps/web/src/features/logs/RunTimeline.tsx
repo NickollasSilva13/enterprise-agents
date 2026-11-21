@@ -1,11 +1,12 @@
 import type { RunStep } from '@ea/shared';
 import { formatTime } from '../../lib/format';
 import { describeStep, type StepView } from '../../lib/run-labels';
+import { TONES } from '../../lib/tone';
 
 const DOT: Record<StepView['tone'], string> = {
   neutral: 'bg-line-strong',
-  ok: 'bg-ok',
-  fail: 'bg-fail',
+  ok: TONES.ok.dot,
+  fail: TONES.fail.dot,
 };
 
 /** The steps of a run in order, each with its time (RF-33, RF-70). */
@@ -22,7 +23,7 @@ export function RunTimeline({ steps, label }: { steps: readonly RunStep[]; label
             />
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-                <span className={`font-semibold ${view.tone === 'fail' ? 'text-fail' : ''}`}>
+                <span className={`font-semibold ${view.tone === 'fail' ? TONES.fail.text : ''}`}>
                   {view.title}
                 </span>
                 <time dateTime={step.createdAt} className="text-dim">

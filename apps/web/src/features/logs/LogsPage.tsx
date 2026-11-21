@@ -1,7 +1,7 @@
 import { RUN_STATUSES, type RunStatus, type RunSummary } from '@ea/shared';
 import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button } from '../../components/Button';
+import { Button, buttonClass } from '../../components/Button';
 import { type Column, DataTable } from '../../components/DataTable';
 import { SelectField } from '../../components/Form';
 import { PageHeader } from '../../components/PageHeader';
@@ -11,6 +11,8 @@ import { formatCount, formatDateTime, formatDuration, NO_VALUE, plural } from '.
 import { useAgents } from '../../lib/queries';
 import { RUN_STATUS, totalTokens } from '../../lib/run-labels';
 import { type RunFilters, useRuns } from '../../lib/run-queries';
+import { LINK } from '../../components/TextLink';
+import { RunStatusPill } from '../../components/RunStatusPill';
 
 const PERIODS = [
   { value: '24h', label: 'Últimas 24 horas', hours: 24 },
@@ -22,7 +24,7 @@ const COLUMNS: readonly Column<RunSummary>[] = [
   {
     header: 'Início',
     cell: (run) => (
-      <Link to={`/logs/${run.id}`} className="text-info underline underline-offset-4">
+      <Link to={`/logs/${run.id}`} className={LINK}>
         {formatDateTime(run.createdAt)}
       </Link>
     ),
@@ -38,9 +40,7 @@ const COLUMNS: readonly Column<RunSummary>[] = [
   },
   {
     header: 'Estado',
-    cell: (run) => (
-      <span className={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</span>
-    ),
+    cell: (run) => <RunStatusPill status={run.status} />,
   },
   { header: 'Duração', cell: (run) => formatDuration(run.durationMs), align: 'right' },
   {
@@ -159,6 +159,17 @@ export function LogsPage() {
           <EmptyState
             title={
               filtered ? 'Nenhuma execução corresponde aos filtros.' : 'Nenhuma execução ainda.'
+            }
+            action={
+              filtered ? (
+                <Link to="/logs" className={buttonClass()}>
+                  Limpar os filtros
+                </Link>
+              ) : (
+                <Link to="/agentes" className={buttonClass('primary')}>
+                  Conversar com um agente
+                </Link>
+              )
             }
           >
             {!filtered && 'Cada mensagem enviada a um agente cria uma execução, que aparece aqui.'}

@@ -10,6 +10,7 @@ import {
   conversations,
   messages,
   models,
+  officeItems,
   providers,
   runs,
   runSteps,
@@ -278,6 +279,23 @@ describe('migrations over existing data', () => {
     expect(() =>
       database.sqlite.prepare("UPDATE tasks SET schedule_id = 'nada' WHERE id = 't1'").run(),
     ).toThrow(/FOREIGN KEY/);
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+
+  it('keep the office pieces saved before, in their default colour (0009)', () => {
+    const database = databaseUpTo(8);
+    database.sqlite.exec(`
+      INSERT INTO office_items (id, position, kind, x, y, facing)
+        VALUES ('i1', 0, 'sofa', 2, 3, 's');
+    `);
+
+    runMigrations(database);
+
+    expect(database.db.select().from(officeItems).get()).toMatchObject({
+      id: 'i1',
+      kind: 'sofa',
+      color: 'default',
+    });
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
   });
 });

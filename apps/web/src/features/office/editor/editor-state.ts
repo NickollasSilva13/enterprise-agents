@@ -181,6 +181,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         facing: action.kind === 'desk' ? 'n' : 's',
         agentId: null,
         label: action.kind === 'mural' ? 'Boas ideias!' : null,
+        color: 'default',
       };
       return change(
         state,

@@ -1,11 +1,13 @@
 import type { OfficeAgent } from '@ea/shared';
 import { ArrowRight, Hand } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { AgentAvatar } from '../../components/AgentAvatar';
-import { Button } from '../../components/Button';
-import { StateLamp } from '../../components/StateLamp';
+import { AgentCard } from '../../components/AgentCard';
+import { Button, buttonClass } from '../../components/Button';
+import { byUrgency, runFacts } from './activity';
 import type { BalloonInfo } from './OfficeScene';
 import type { Place } from './scene';
+import { TONES } from '../../lib/tone';
 
 /** Where the agent is, in words. */
 export function whereabouts(
@@ -37,9 +39,11 @@ export const conversationPath = (agent: OfficeAgent) =>
   `/agentes/${agent.id}/conversa${agent.currentRun?.conversationId ? `/${agent.currentRun.conversationId}` : ''}`;
 
 /**
- * The people of the office in words (RF-07, RF-80): who is where, doing what,
- * and the decision each one is waiting for. It is what the picture shows, for
- * anyone who does not see the picture.
+ * The team of the office (RF-07, RF-80, Phase 29): a card per agent, who
+ * needs the user first, with where it is, what it is doing and the decision
+ * it waits for. It is what the picture shows, for anyone who does not see
+ * the picture. Pointing at a card lights the agent in the scene; picking an
+ * agent in the scene lights its card and brings it into view (D3).
  */
 export function OfficePanel({
   agents,
@@ -48,6 +52,9 @@ export function OfficePanel({
   rooms,
   balloons,
   onDecide,
+  now,
+  selected,
+  onHighlight,
 }: {
   agents: readonly OfficeAgent[];
   places: ReadonlyMap<string, Place>;
@@ -57,27 +64,43 @@ export function OfficePanel({
   rooms: ReadonlyMap<string, string>;
   balloons: ReadonlyMap<string, BalloonInfo>;
   onDecide: (approvalId: string) => void;
+  /** The page's clock, for how long each run has been going. */
+  now: number;
+  /** The agent picked in the scene. */
+  selected: string | null;
+  /** The card pointed at or focused, to light the agent in the scene; null when none. */
+  onHighlight: (agentId: string | null) => void;
 }) {
   const names = new Map(agents.map((agent) => [agent.id, agent.name]));
   const present = agents.filter((agent) => places.get(agent.id)?.kind !== 'outside').length;
+  const list = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (!selected) return;
+    const card = [...(list.current?.querySelectorAll('[data-agent]') ?? [])].find(
+      (element) => element.getAttribute('data-agent') === selected,
+    );
+    card?.scrollIntoView?.({ block: 'nearest' });
+  }, [selected]);
   return (
-    <section
-      aria-labelledby="office-people"
-      className="flex min-h-0 flex-col rounded-xl border border-line bg-sheet/95 shadow-lg lg:h-full"
-    >
+    <section aria-labelledby="office-people" className="flex min-h-0 flex-1 flex-col">
       <h2 id="office-people" className="flex items-center gap-2 px-4 pt-3 pb-2 font-bold">
-        <span className="size-2.5 rounded-full bg-ok" aria-hidden />
+        <span className={`size-2.5 rounded-full ${TONES.ok.dot}`} aria-hidden />
         Agentes no escritório ({present})
       </h2>
       {agents.length === 0 ? (
-        <p className="px-4 pb-4 text-sm text-dim">
-          Ninguém ainda. Cada agente criado ganha uma mesa na sala do seu projeto.
-        </p>
+        <div className="flex-1 px-4 pb-4">
+          <p className="text-sm text-dim">
+            Ninguém ainda. Cada agente criado ganha uma mesa na sala do seu projeto.
+          </p>
+          <Link to="/agentes/novo" className={`${buttonClass('primary')} mt-3 w-full`}>
+            Criar o primeiro agente
+          </Link>
+        </div>
       ) : (
-        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
-          {agents.map((agent) => {
+        // The list scrolls when the team is long: it takes the keyboard focus so it can (WCAG 2.1.1).
+        <ul ref={list} tabIndex={0} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+          {byUrgency(agents).map((agent) => {
             const place: Place = places.get(agent.id) ?? { kind: 'desk' };
-            const balloon = balloons.get(agent.id);
             const approval = agent.pendingApproval;
             return (
               <li
@@ -85,46 +108,32 @@ export function OfficePanel({
                 data-agent={agent.id}
                 data-place={place.kind === 'visit' ? `visit:${place.hostId}` : place.kind}
                 data-seated={seated(agent.id) ? 'true' : 'false'}
-                className="rounded-lg hover:bg-sheet-raised"
+                onMouseEnter={() => onHighlight(agent.id)}
+                onMouseLeave={() => onHighlight(null)}
+                onFocus={() => onHighlight(agent.id)}
+                onBlur={() => onHighlight(null)}
               >
-                <Link
+                <AgentCard
+                  agentId={agent.id}
+                  name={agent.name}
+                  role={whereabouts(place, names, rooms.get(agent.id) ?? null)}
+                  appearance={agent.appearance}
+                  state={agent.state}
+                  activity={balloons.get(agent.id)?.text ?? null}
+                  meta={runFacts(agent, now)}
                   to={conversationPath(agent)}
-                  title={`Conversar com ${agent.name}`}
-                  className="flex items-start gap-3 rounded-lg px-2 py-2"
-                >
-                  <AgentAvatar
-                    agentId={agent.id}
-                    appearance={agent.appearance}
-                    size={36}
-                    dimmed={agent.state === 'inactive'}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{agent.name}</span>
-                    <StateLamp state={agent.state} />
-                    <span className="block truncate text-xs text-dim">
-                      {whereabouts(place, names, rooms.get(agent.id) ?? null)}
-                    </span>
-                    {balloon && (
-                      <span
-                        className={`mt-0.5 line-clamp-2 text-xs ${balloon.tone === 'strong' ? 'font-semibold' : 'text-dim'}`}
-                      >
-                        {balloon.text}
-                      </span>
-                    )}
-                  </span>
-                </Link>
+                  selected={selected === agent.id}
+                />
                 {approval && (
-                  <div className="px-2 pb-2">
-                    <Button
-                      variant="primary"
-                      className="w-full"
-                      onClick={() => onDecide(approval.id)}
-                      aria-label={`Decidir o pedido de ${agent.name}`}
-                    >
-                      <Hand className="size-4" aria-hidden />
-                      Decidir
-                    </Button>
-                  </div>
+                  <Button
+                    variant="primary"
+                    className="mt-1 w-full"
+                    onClick={() => onDecide(approval.id)}
+                    aria-label={`Decidir o pedido de ${agent.name}`}
+                  >
+                    <Hand className="size-4" aria-hidden />
+                    Decidir
+                  </Button>
                 )}
               </li>
             );
@@ -133,7 +142,7 @@ export function OfficePanel({
       )}
       <Link
         to="/agentes"
-        className="flex items-center justify-center gap-1.5 border-t border-line px-4 py-2.5 text-sm font-semibold text-info hover:text-chalk"
+        className={`flex items-center justify-center gap-1.5 border-t border-line px-4 py-2.5 text-sm font-semibold hover:text-chalk ${TONES.info.text}`}
       >
         Ver todos os agentes
         <ArrowRight className="size-4" aria-hidden />

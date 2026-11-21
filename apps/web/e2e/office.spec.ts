@@ -12,6 +12,14 @@ import { CRUD_URL, EMPTY_URL } from './servers';
 
 test.describe.configure({ mode: 'serial' });
 
+// The 3D office (Phase 24) is drawn here on the machine's graphics card, as a
+// person sees it: without these switches headless Chromium draws WebGL in
+// software (SwiftShader), several times slower than any real GPU, and the
+// frame count of thirty walkers would measure the emulator, not the scene.
+test.use({
+  launchOptions: { args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] },
+});
+
 /**
  * Makes the office read the server again, until `seen` holds. The page does
  * that when the window comes back to the front, unless what it has is fresh
@@ -228,6 +236,129 @@ test('the look chosen for an agent shows in the office and in its avatar', async
   await expect(page.locator(`[data-sitter="${created?.id}"]`)).toHaveCount(1);
   await expect(entry(page, created?.id ?? '')).toContainText(name);
   await api(page, 'DELETE', `/api/agents/${created?.id}`);
+  expect(problems).toEqual([]);
+});
+
+test('the office is the home: the scene and the cards light each other, the quick actions lead on (Phase 29)', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop',
+    'pointing at a card with a mouse is for the desktop',
+  );
+  const problems = watchForProblems(page);
+  await page.goto(CRUD_URL);
+  await expect(page).toHaveURL(`${CRUD_URL}/escritorio`);
+  await expect(page.getByRole('heading', { name: 'Escritório', level: 1 })).toBeVisible();
+
+  const tag = `${testInfo.project.name} lar`;
+  const project = await api<Created>(page, 'POST', '/api/projects', { name: `Casa ${tag}` });
+  const agent = await api<Created>(page, 'POST', '/api/agents', {
+    name: `Morador ${tag}`,
+    projectId: project.id,
+  });
+  // While the first steps are open they take the place of the quick actions (Phase 32).
+  await api(page, 'PUT', '/api/guide', { skipped: true, dismissedTips: [] });
+  await page.reload();
+  const sitter = page.locator(`[data-sitter="${agent.id}"] rect`);
+  await expect(sitter).toHaveCount(1);
+  const card = page.locator(`[data-agent-card="${agent.id}"]`);
+  await expect(card).toBeVisible();
+
+  // Pointing at its card lights the agent in the scene; pointing away puts it out.
+  const lit = page.locator(`[data-sitter="${agent.id}"][data-lit="true"]`);
+  await card.hover();
+  await expect(lit).toHaveCount(1);
+  await page.getByRole('heading', { name: 'Escritório', level: 1 }).hover();
+  await expect(lit).toHaveCount(0);
+
+  // Picked in the scene: its card lights up, the agent stays lit, and the page stays in the office.
+  await sitter.click();
+  await expect(card.getByRole('link', { name: `Morador ${tag}` })).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  await expect(lit).toHaveCount(1);
+  await expect(page).toHaveURL(`${CRUD_URL}/escritorio`);
+
+  // The quick actions lead to where the thing is made (the board opens its form when the
+  // area has a flow; the form itself is covered in TasksPage.test.tsx).
+  await page.getByRole('link', { name: /Criar tarefa/ }).click();
+  await expect(page).toHaveURL(/\/tarefas\?nova=1$/);
+  await page.goBack();
+  await page.getByRole('link', { name: /Agendar tarefa/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Novo agendamento' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await api(page, 'DELETE', `/api/agents/${agent.id}`);
+  await api(page, 'DELETE', `/api/projects/${project.id}`);
+  expect(problems).toEqual([]);
+});
+
+test('the editor draws the office in 3D and takes the pointer on it (Phase 28)', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'dragging with a mouse is for the desktop');
+  const problems = watchForProblems(page);
+  await page.goto(`${EMPTY_URL}/escritorio/editar`);
+  await expect(page.locator('[data-editor-canvas="3d"]')).toBeVisible();
+  await expect(page.locator('.office-stage canvas')).toHaveCount(1);
+
+  // A piece of furniture alone on its tile, found on screen by the mark the layer keeps over it.
+  const office = await api<{
+    layout: {
+      width: number;
+      items: { id: string; kind: string; x: number; y: number }[];
+    };
+  }>(page, 'GET', '/api/office');
+  const { items, width } = office.layout;
+  const alone = items.find(
+    (item) =>
+      item.kind === 'plant' &&
+      items.filter((other) => other.x === item.x && other.y === item.y).length === 1,
+  );
+  if (!alone) throw new Error('the automatic layout has no plant alone on its tile');
+  const mark = page.locator(`[data-editor-item="${alone.id}"]`);
+  const corners = async () =>
+    mark.evaluate((polygon: SVGPolygonElement) => {
+      const matrix = polygon.getScreenCTM();
+      if (!matrix) throw new Error('the layer is not on screen');
+      return Array.from(polygon.points, (point) =>
+        new DOMPoint(point.x, point.y).matrixTransform(matrix),
+      ).map((point) => ({ x: point.x, y: point.y }));
+    });
+  const [a, b, c] = await corners();
+  if (!a || !b || !c) throw new Error('the mark has no corners');
+  const centre = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 };
+
+  // A click on the floor under it selects it: the pixel goes back to the right tile.
+  await page.mouse.click(centre.x, centre.y);
+  const column = page.getByRole('spinbutton', { name: 'Coluna' });
+  await expect(column).toHaveValue(String(alone.x + 1));
+  await expect(page.getByRole('spinbutton', { name: 'Linha' })).toHaveValue(String(alone.y + 1));
+
+  // Dragging it one tile along x moves it one column.
+  const step = alone.x < width - 1 ? 1 : -1;
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(centre.x + (b.x - a.x) * step, centre.y + (b.y - a.y) * step, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(column).toHaveValue(String(alone.x + 1 + step));
+  await expect(page.getByRole('heading', { name: 'Alterações não salvas' })).toBeVisible();
+
+  // The wheel brings the camera closer, and the marks with it.
+  const before = await mark.boundingBox();
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.wheel(0, -400);
+  await expect(async () => {
+    const after = await mark.boundingBox();
+    expect(after?.width ?? 0).toBeGreaterThan((before?.width ?? 0) * 1.2);
+  }).toPass();
+
+  await page.getByRole('button', { name: 'Descartar alterações' }).click();
+  await expect(page.getByRole('heading', { name: 'Alterações não salvas' })).toHaveCount(0);
   expect(problems).toEqual([]);
 });
 

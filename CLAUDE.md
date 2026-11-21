@@ -9,7 +9,7 @@ Documentos de referência, sempre mais detalhados que este:
 
 ## Regras de processo (obrigatórias)
 
-0. **São dezenove fases concluídas** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11; a 12 e a 13 trazem o harness local como provedor, com as ferramentas da plataforma; a 14 é o Escritório isométrico personalizável e a 15, os personagens 16 bits e o entorno; a 16, a 17 e a 18 transformam a plataforma numa empresa de agentes, com áreas, quadro de tarefas e fluxos configuráveis; a 19 traz o agendamento de tarefas). A fonte da numeração é `ROADMAP.md`.
+0. **São trinta e duas fases concluídas** (uma "Escritório vivo" foi inserida como Fase 9; segurança e qualidade é a 10, finalização é a 11; a 12 e a 13 trazem o harness local como provedor, com as ferramentas da plataforma; a 14 é o Escritório isométrico personalizável e a 15, os personagens 16 bits e o entorno; a 16, a 17 e a 18 transformam a plataforma numa empresa de agentes, com áreas, quadro de tarefas e fluxos configuráveis; a 19 traz o agendamento de tarefas; da 20 à 32, a nova interface, começando pelo sistema visual, pela moldura, pelos personagens 32 bits e pelo prédio; da 24 à 28, o Escritório em 3D). A fonte da numeração é `ROADMAP.md`.
 1. **Desenvolvimento por fases.** Trabalhe apenas na fase em curso segundo `ROADMAP.md`. Não adiante itens de fases futuras.
 2. **Parada entre fases.** Ao concluir uma fase, apresente: o que foi feito; arquivos criados ou modificados; decisões técnicas; testes executados e resultados; problemas e pendências; resumo; o que vem na próxima fase. Depois pergunte explicitamente se pode prosseguir e **aguarde**.
 3. **Decisão arquitetural não coberta:** apresente alternativas e peça aprovação antes de implementar.
@@ -98,7 +98,7 @@ Fatos da fundação que valem para todo o repositório e não são óbvios pelo 
 | `npm run format` | Formatar com Prettier (o lint falha se houver arquivo fora do padrão). |
 | `npm test -w @ea/server -- test/db.test.ts` | Rodar um único arquivo de teste. |
 | `npm run test:e2e` | Compila a interface e roda o Playwright (desktop e celular). |
-| `npm run test:e2e -w @ea/web -- -g "texto"` | Rodar testes E2E pelo nome (exige `npm run build` antes). |
+| `npm run test:e2e -w @ea/web -- -g "texto"` | Rodar testes E2E pelo nome (exige `npm run build:e2e -w @ea/web` antes). |
 | `npm run test:coverage` | Testes do servidor com cobertura; falha abaixo das metas de `TESTING.md`. |
 | `npm run test:perf` | Desempenho da API sobre um banco volumoso; falha acima dos limites. |
 | `npm run db:generate` | Gerar migração a partir do esquema. |

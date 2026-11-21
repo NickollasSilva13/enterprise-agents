@@ -21,7 +21,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage -w @ea/server",
     "test:perf": "npm run test:perf -w @ea/server",
-    "test:e2e": "npm run build && npm run test:e2e -w @ea/web",
+    "test:e2e": "npm run build:e2e -w @ea/web && npm run test:e2e -w @ea/web",
     "check": "npm run typecheck && npm run lint && npm test",
     "check:full": "npm run check && npm run test:coverage && npm run test:e2e",
     "clean": "node scripts/clean.mjs",

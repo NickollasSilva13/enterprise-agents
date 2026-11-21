@@ -38,9 +38,7 @@ const COMPONENTS: Components = {
       {children}
     </pre>
   ),
-  code: ({ children }) => (
-    <code className="rounded bg-ink px-1 py-0.5 font-mono text-[0.9em]">{children}</code>
-  ),
+  code: ({ children }) => <code className="rounded bg-ink px-1 py-0.5 font-mono">{children}</code>,
 };
 
 export function Markdown({ text }: { text: string }) {

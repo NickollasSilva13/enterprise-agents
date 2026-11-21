@@ -196,6 +196,8 @@ export interface ActorView {
   readonly carrying: boolean;
   /** Having a coffee at the pantry. */
   readonly resting: boolean;
+  /** In a meeting or visiting another desk: talking (Phase 22). */
+  readonly talking: boolean;
   readonly heading: Heading;
   /** Drawing order: characters on a higher band are in front. */
   readonly band: number;
@@ -302,6 +304,7 @@ export class SceneEngine {
       moving,
       carrying: moving && actor.carrying,
       resting: !moving && kind === 'pantry',
+      talking: !moving && (kind === 'meeting' || kind === 'visit'),
       heading: moving ? actor.heading : 'sw',
       band: bandOf(actor.x, actor.y),
     };

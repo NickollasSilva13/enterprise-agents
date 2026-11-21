@@ -1,19 +1,28 @@
 import type { Approval } from '@ea/shared';
 import { Link } from 'react-router';
 import { ApprovalCard } from '../../components/ApprovalCard';
+import { buttonClass } from '../../components/Button';
 import { PageHeader } from '../../components/PageHeader';
 import { Panel } from '../../components/Panel';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
+import { StatusPill } from '../../components/StatusPill';
 import { formatDateTime, plural } from '../../lib/format';
+import type { Tone } from '../../lib/tone';
 import { useRequests, useWaitingTasks } from '../../lib/task-queries';
 import { useApprovals } from '../../lib/tool-queries';
 import { TaskStatus } from '../tasks/TaskBadges';
+import { LINK } from '../../components/TextLink';
+import { Tip } from '../../components/Tip';
 
-const OUTCOME: Record<Approval['status'], { label: string; tone: string }> = {
-  pending: { label: 'Pendente', tone: 'text-wait' },
-  approved: { label: 'Aprovada', tone: 'text-ok' },
-  denied: { label: 'Negada', tone: 'text-fail' },
-  cancelled: { label: 'Retirada: a execução terminou antes da resposta', tone: 'text-dim' },
+const OUTCOME: Record<Approval['status'], { label: string; tone: Tone; why?: string }> = {
+  pending: { label: 'Pendente', tone: 'wait' },
+  approved: { label: 'Aprovada', tone: 'ok' },
+  denied: { label: 'Negada', tone: 'fail' },
+  cancelled: {
+    label: 'Retirada',
+    tone: 'idle',
+    why: 'A execução terminou antes da resposta.',
+  },
 };
 
 function DecidedList({ approvals }: { approvals: readonly Approval[] }) {
@@ -28,12 +37,15 @@ function DecidedList({ approvals }: { approvals: readonly Approval[] }) {
               <span className="block text-sm text-dim">Motivo: {approval.reason}</span>
             )}
           </p>
-          <p className={`text-sm ${OUTCOME[approval.status].tone}`}>
-            {OUTCOME[approval.status].label}
+          <p className="text-sm text-dim">
+            <StatusPill tone={OUTCOME[approval.status].tone}>
+              {OUTCOME[approval.status].label}
+            </StatusPill>
+            {OUTCOME[approval.status].why && <> {OUTCOME[approval.status].why}</>}
           </p>
           <p className="text-sm text-dim">
             {formatDateTime(approval.decidedAt ?? approval.createdAt)} ·{' '}
-            <Link to={`/logs/${approval.runId}`} className="text-info underline underline-offset-4">
+            <Link to={`/logs/${approval.runId}`} className={LINK}>
               Execução
             </Link>
           </p>
@@ -57,10 +69,7 @@ function WaitingTasks() {
         {waiting.data.map((task) => (
           <li key={task.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5">
             <p className="min-w-0 flex-1 basis-56">
-              <Link
-                to={`/tarefas/${task.id}`}
-                className="font-semibold text-info underline underline-offset-4"
-              >
+              <Link to={`/tarefas/${task.id}`} className={`font-semibold ${LINK}`}>
                 {task.title}
               </Link>
               <span className="text-dim">
@@ -91,10 +100,7 @@ function PendingRequests() {
       <ul className="divide-y divide-line">
         {pending.map((request) => (
           <li key={request.id} className="px-4 py-2.5">
-            <Link
-              to={`/tarefas/${request.id}`}
-              className="font-semibold text-info underline underline-offset-4"
-            >
+            <Link to={`/tarefas/${request.id}`} className={`font-semibold ${LINK}`}>
               {request.title}
             </Link>
             <span className="text-dim">
@@ -105,7 +111,7 @@ function PendingRequests() {
         ))}
       </ul>
       <p className="border-t border-line px-4 py-2.5 text-sm">
-        <Link to="/tarefas/pedidos" className="text-info underline underline-offset-4">
+        <Link to="/tarefas/pedidos" className={LINK}>
           Aprovar ou recusar em Pedidos entre áreas
         </Link>
       </p>
@@ -125,6 +131,11 @@ export function ApprovalsPage() {
         description="Ações que um agente quer fazer e que esperam a sua decisão. A execução fica parada até você responder."
       />
 
+      <Tip id="approvals-wait" className="mb-6">
+        Enquanto você não responde, a execução do agente fica parada esperando. Nada do que está
+        aqui acontece sem a sua decisão.
+      </Tip>
+
       <WaitingTasks />
       <PendingRequests />
 
@@ -142,9 +153,17 @@ export function ApprovalsPage() {
           <section aria-label="Aprovações pendentes">
             {pending.data.length === 0 ? (
               <div className="rounded-lg border border-line bg-sheet">
-                <EmptyState title="Nada esperando por você.">
+                <EmptyState
+                  title="Nada esperando por você."
+                  action={
+                    <Link to="/ferramentas" className={buttonClass()}>
+                      Ver as ferramentas dos agentes
+                    </Link>
+                  }
+                >
                   Quando um agente pedir uma ferramenta marcada como “Pede aprovação”, o pedido
-                  aparece aqui, com os argumentos exatos.
+                  aparece aqui, com os argumentos exatos. Em Ferramentas você escolhe o que cada
+                  agente pode usar sozinho e o que passa por você.
                 </EmptyState>
               </div>
             ) : (

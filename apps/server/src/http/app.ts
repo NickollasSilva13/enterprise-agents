@@ -6,16 +6,19 @@ import type { SessionResponse } from '@ea/shared';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config/env';
 import type { Database } from '../db/client';
+import { registerActivityRoutes } from '../modules/activity/routes';
 import { registerAgentRoutes } from '../modules/agents/routes';
 import { registerApprovalRoutes } from '../modules/approvals/routes';
 import { registerConversationRoutes } from '../modules/conversations/routes';
 import { registerDashboardRoutes } from '../modules/dashboard/routes';
+import { registerFrameRoutes } from '../modules/frame/routes';
 import { registerModelRoutes } from '../modules/models/routes';
 import { registerProjectRoutes } from '../modules/projects/routes';
 import { registerProviderRoutes } from '../modules/providers/routes';
 import { registerRunRoutes } from '../modules/runs/routes';
 import { createRunsContext } from '../modules/runs/service';
 import { registerHealthRoutes } from '../modules/health/routes';
+import { registerIndicatorRoutes } from '../modules/indicators/routes';
 import { registerOfficeRoutes } from '../modules/office/routes';
 import { registerSystemRoutes } from '../modules/system/routes';
 import { registerTaskRoutes } from '../modules/tasks/routes';
@@ -134,6 +137,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerHealthRoutes(app, { database: deps.database, version: deps.version });
   registerSystemRoutes(app, { config, version: deps.version, startedAt: new Date() });
   registerDashboardRoutes(app, { database: deps.database });
+  registerFrameRoutes(app, { db: deps.database.db });
   registerProjectRoutes(app, { database: deps.database });
   const registry = deps.toolRegistry ?? createBuiltinRegistry();
   registerAgentRoutes(app, { database: deps.database, registry });
@@ -149,6 +153,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerOfficeRoutes(app, { database: deps.database, registry });
+  registerActivityRoutes(app, { db: deps.database.db, registry });
+  registerIndicatorRoutes(app, { db: deps.database.db });
   const runs = createRunsContext({
     db: deps.database.db,
     secrets: deps.secrets,

@@ -8,10 +8,19 @@ import {
   type PresetRoom,
   validateLayout,
 } from '@ea/shared';
-import { and, asc, desc, eq, inArray, max, notInArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, max, notInArray } from 'drizzle-orm';
 import { ValidationError } from '../../core/errors';
 import type { Db } from '../../db/client';
-import { approvals, messages, projects, runs, tasks, toolCalls } from '../../db/schema';
+import {
+  agents,
+  approvals,
+  messages,
+  projects,
+  runs,
+  runSteps,
+  tasks,
+  toolCalls,
+} from '../../db/schema';
 import type { ToolRegistry } from '../../tools/registry';
 import { listAgentsWithState, storedAppearance } from '../agents/repository';
 import { messageText } from '../runs/service';
@@ -49,23 +58,46 @@ function taskTitleOf(db: Db, taskId: string): string | null {
     : text;
 }
 
+/** How many model calls a run has made: each one is a step of its limit (Phase 29, D4). */
+function stepsOf(db: Db, runId: string): number {
+  return (
+    db
+      .select({ value: count() })
+      .from(runSteps)
+      .where(and(eq(runSteps.runId, runId), eq(runSteps.type, 'model_call_started')))
+      .get()?.value ?? 0
+  );
+}
+
 /** Per agent, its most recent run in progress. */
 function currentRuns(db: Db): Map<string, CurrentRun> {
   const result = new Map<string, CurrentRun>();
   const active = db
-    .select()
+    .select({ run: runs, maxSteps: agents.maxSteps })
     .from(runs)
+    .innerJoin(agents, eq(runs.agentId, agents.id))
     .where(inArray(runs.status, ACTIVE_RUN_STATUSES))
     .orderBy(desc(runs.id))
     .all();
-  for (const run of active) {
+  for (const { run, maxSteps } of active) {
     if (result.has(run.agentId)) continue;
+    const task = run.taskId
+      ? (db
+          .select({ id: tasks.id, title: tasks.title })
+          .from(tasks)
+          .where(eq(tasks.id, run.taskId))
+          .get() ?? null)
+      : null;
     result.set(run.agentId, {
       id: run.id,
       conversationId: run.conversationId,
       status: run.status,
       // A run on a board task opens with the whole brief: the task's title says more.
       prompt: run.taskId ? taskTitleOf(db, run.taskId) : promptOf(db, run.id),
+      startedAt: run.startedAt,
+      steps: stepsOf(db, run.id),
+      maxSteps,
+      task,
     });
   }
   return result;

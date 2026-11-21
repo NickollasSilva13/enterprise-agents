@@ -141,10 +141,16 @@ const places = (entries: Record<string, Place['kind']>) =>
 describe('SceneEngine', () => {
   it('puts everyone in place at once on the first sync', () => {
     const engine = new SceneEngine();
-    engine.sync(places({ a: 'desk', b: 'pantry', c: 'outside' }), lineGeometry(), true);
+    engine.sync(
+      places({ a: 'desk', b: 'pantry', c: 'outside', d: 'meeting' }),
+      lineGeometry(),
+      true,
+    );
     expect(engine.moving).toBe(false);
-    expect(engine.view('a')).toMatchObject({ seated: true, standing: false });
+    expect(engine.view('a')).toMatchObject({ seated: true, standing: false, talking: false });
     expect(engine.view('b')).toMatchObject({ seated: false, standing: true, resting: true });
+    // In a meeting the character talks (Phase 22).
+    expect(engine.view('d')).toMatchObject({ standing: true, talking: true });
     expect(engine.view('c')).toMatchObject({ seated: false, standing: false });
   });
 

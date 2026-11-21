@@ -3,6 +3,7 @@ import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router';
 import { type Column, DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
+import { IndicatorRow } from '../indicators/IndicatorRow';
 import { Panel } from '../../components/Panel';
 import { type Stat, StatBoard } from '../../components/StatBoard';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
@@ -15,7 +16,9 @@ import {
   plural,
 } from '../../lib/format';
 import { useDashboardSummary } from '../../lib/queries';
-import { RUN_STATUS } from '../../lib/run-labels';
+import { LINK } from '../../components/TextLink';
+import { TONES } from '../../lib/tone';
+import { RunStatusPill } from '../../components/RunStatusPill';
 
 const RUN_COLUMNS: readonly Column<RecentRun>[] = [
   {
@@ -28,9 +31,7 @@ const RUN_COLUMNS: readonly Column<RecentRun>[] = [
   },
   {
     header: 'Estado',
-    cell: (run) => (
-      <span className={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</span>
-    ),
+    cell: (run) => <RunStatusPill status={run.status} />,
   },
   { header: 'Início', cell: (run) => formatDateTime(run.createdAt), wideOnly: true },
   { header: 'Duração', cell: (run) => formatDuration(run.durationMs), align: 'right' },
@@ -52,9 +53,9 @@ function alertText(alert: DashboardAlert): string {
 }
 
 const ALERT_ICON = {
-  error: { icon: CircleAlert, tone: 'text-fail' },
-  warning: { icon: TriangleAlert, tone: 'text-wait' },
-  info: { icon: Info, tone: 'text-info' },
+  error: { icon: CircleAlert, tone: TONES.fail.ink },
+  warning: { icon: TriangleAlert, tone: TONES.wait.ink },
+  info: { icon: Info, tone: TONES.info.ink },
 } as const;
 
 function Alerts({ alerts }: { alerts: readonly DashboardAlert[] }) {
@@ -71,18 +72,12 @@ function Alerts({ alerts }: { alerts: readonly DashboardAlert[] }) {
             <div>
               <p>{alertText(alert)}</p>
               {alert.kind === 'provider_unreachable' && (
-                <Link
-                  to="/modelos"
-                  className="mt-1 inline-block text-info underline underline-offset-4"
-                >
+                <Link to="/modelos" className={`mt-1 inline-block ${LINK}`}>
                   Testar a conexão
                 </Link>
               )}
               {alert.kind === 'no_provider' && (
-                <Link
-                  to="/modelos"
-                  className="mt-1 inline-block text-info underline underline-offset-4"
-                >
+                <Link to="/modelos" className={`mt-1 inline-block ${LINK}`}>
                   Conectar um provedor
                 </Link>
               )}
@@ -96,14 +91,14 @@ function Alerts({ alerts }: { alerts: readonly DashboardAlert[] }) {
 
 /** What an activity item says, after the agent's name (RF-04). */
 function activityText(item: ActivityItem): { text: string; tone: string } {
-  if (item.kind === 'started') return { text: 'começou a trabalhar', tone: 'text-ok' };
+  if (item.kind === 'started') return { text: 'começou a trabalhar', tone: TONES.ok.text };
   switch (item.status) {
     case 'completed':
       return { text: 'concluiu a execução', tone: 'text-chalk' };
     case 'failed':
-      return { text: 'falhou na execução', tone: 'text-fail' };
+      return { text: 'falhou na execução', tone: TONES.fail.text };
     case 'timed_out':
-      return { text: 'passou do tempo máximo', tone: 'text-fail' };
+      return { text: 'passou do tempo máximo', tone: TONES.fail.text };
     case 'cancelled':
       return { text: 'foi interrompido por você', tone: 'text-dim' };
     case 'interrupted':
@@ -182,15 +177,18 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Painel"
+        title="Relatórios"
         description={data ? `Atualizado às ${formatTime(data.generatedAt)}` : undefined}
       />
 
-      {isPending && <LoadingState label="Carregando o painel…" />}
+      {/* The same indicators as the office (Phase 30, D5), loaded on their own. */}
+      <IndicatorRow className="mb-6" />
+
+      {isPending && <LoadingState label="Carregando os relatórios…" />}
 
       {error && !data && (
         <ErrorState
-          title="Não foi possível carregar o painel."
+          title="Não foi possível carregar os relatórios."
           error={error}
           onRetry={() => void refetch()}
         />

@@ -68,7 +68,7 @@ test('a local provider can be connected, tested and given to an agent', async ({
       .getByRole('list', { name: 'Agentes' })
       .getByRole('listitem')
       .filter({ hasText: agentName }),
-  ).toContainText('Sem projeto, llama3.2:3b');
+  ).toContainText('Sem projeto · llama3.2:3b');
 
   // While the agent uses it, neither the model nor the provider can go away.
   await navigateTo(page, 'Modelos');

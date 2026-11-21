@@ -20,6 +20,8 @@ import {
   useWorkflowTemplates,
 } from '../../lib/task-queries';
 import { TemplateDetails } from './TemplateDetails';
+import { BACK_LINK } from '../../components/TextLink';
+import { FormError } from '../../components/Notice';
 
 // The catalogue of workflow templates (Phase 18): the ready-made ones and the
 // user's own, saved from an area or imported from a file. A template is
@@ -103,9 +105,7 @@ function EditDialog({
           salve-o de novo como modelo.
         </p>
         {update.error && !errors.name && !errors.description && !errors.practices && (
-          <p role="alert" className="text-sm text-fail">
-            {errorMessage(update.error)}
-          </p>
+          <FormError>{errorMessage(update.error)}</FormError>
         )}
       </form>
     </Modal>
@@ -156,11 +156,7 @@ function TemplateItem({ template }: { template: WorkflowTemplateSummary }) {
         </span>
       </div>
       <TemplateDetails template={template} />
-      {remove.error && (
-        <p role="alert" className="text-sm text-fail">
-          {errorMessage(remove.error)}
-        </p>
-      )}
+      {remove.error && <FormError>{errorMessage(remove.error)}</FormError>}
       {editing && <EditDialog template={template} onClose={() => setEditing(false)} />}
       {removing && (
         <ConfirmDialog
@@ -283,10 +279,7 @@ export function TemplatesPage() {
   const own = templates.data?.filter((template) => template.origin === 'user') ?? [];
   return (
     <>
-      <Link
-        to="/tarefas"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-info underline underline-offset-4"
-      >
+      <Link to="/tarefas" className={BACK_LINK}>
         <ArrowLeft className="size-4" aria-hidden />
         Tarefas
       </Link>

@@ -165,7 +165,7 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 | ID | Requisito | Fase |
 |---|---|---|
 | RF-80 | Personagens andam entre as salas e as áreas comuns (recepção e copa) conforme o estado: ocioso vai à copa, inativo sai do escritório, delegação aparece como visita à mesa do outro agente. Respeita a preferência de reduzir movimento. Na Fase 14: com sala de reunião no layout, a delegação vira reunião nela; com área de descompressão, quem está ocioso há 10 minutos vai para lá. | 9, 14 |
-| RF-81 | Escritório isométrico em pixel art, com placas nas salas, balões, painel de agentes (estado e onde está), sino de aprovações pendentes, barra de ações (aproximar, afastar, ver tudo, novo agente, editar) e minimapa. | 14 |
+| RF-81 | Escritório isométrico em pixel art, com placas nas salas, balões, painel de agentes (estado e onde está), sino de aprovações pendentes, barra de ações (aproximar, afastar, ver tudo, novo agente, editar) e minimapa. Desde a Fase 24 a cena é 3D, enquadrada sozinha, sem a barra de ações e sem o minimapa (o editor mantém o zoom). | 14, 24 |
 | RF-82 | O usuário edita o layout do escritório: áreas com tipo, nome, projeto, piso e portas; móveis de um catálogo, com posição, orientação, dono da mesa e texto do mural; modelos prontos; desfazer e refazer; validação antes de salvar; volta ao layout automático. | 14 |
 | RF-84 | Personagens em pixel art 16 bits, vistos em 3/4 em quatro direções, com contorno, sombreamento e caminhada em quadros; opções de olhos, barba ou bigode, calçado, estampa e mais penteados. | 15 |
 | RF-85 | Entorno do escritório escolhido no editor: andar de prédio, casa ou parque, desenhado em volta da planta. | 15 |

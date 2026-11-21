@@ -138,6 +138,14 @@ describe('the board (Phase 16)', () => {
     );
   });
 
+  it('opens the new task form from the office quick action (Phase 29)', async () => {
+    renderApp('/tarefas?nova=1', {
+      '/api/projects': { projects: [area] },
+      '/api/areas/p1/board': board,
+    });
+    expect(await screen.findByRole('dialog', { name: 'Nova tarefa' })).toBeTruthy();
+  });
+
   it('creates a task in the area', async () => {
     const { writes } = renderApp('/tarefas', {
       '/api/projects': { projects: [area] },
@@ -165,6 +173,78 @@ describe('the board (Phase 16)', () => {
             priority: 'normal',
           },
         },
+      ]),
+    );
+  });
+
+  it('moves a task from its card, after the user confirms (Phase 31, D2)', async () => {
+    const { writes } = renderApp('/tarefas', {
+      '/api/projects': { projects: [area] },
+      '/api/areas/p1/board': board,
+      'POST /api/tasks/k3/move': task({ id: 'k3', title: 'Página inicial', state: 'done' }),
+    });
+    // A task an agent is working on has no way out from the board.
+    await screen.findByRole('region', { name: 'Desenvolvimento' });
+    expect(screen.queryByRole('button', { name: /Mover "Formulário de contato"/ })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Mover "Página inicial" para outra etapa' }),
+    );
+    const dialog = within(screen.getByRole('dialog', { name: 'Mover "Página inicial"' }));
+    const options = dialog.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['Desenvolvimento', 'Concluído']);
+    expect(writes()).toEqual([]);
+
+    fireEvent.change(dialog.getByRole('combobox', { name: 'Para a etapa' }), {
+      target: { value: 's3' },
+    });
+    fireEvent.change(dialog.getByRole('textbox', { name: 'Nota para quem vem depois' }), {
+      target: { value: 'Aprovado.' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Mover' }));
+    await waitFor(() =>
+      expect(writes()).toEqual([
+        { method: 'POST', url: '/api/tasks/k3/move', body: { toStageId: 's3', note: 'Aprovado.' } },
+      ]),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('lets a card be dropped only where the flow allows (Phase 31, D1)', async () => {
+    const { writes } = renderApp('/tarefas', {
+      '/api/projects': { projects: [area] },
+      '/api/areas/p1/board': board,
+      'POST /api/tasks/k2/move': task({ id: 'k2', title: 'Rodapé', stageId: 's2' }),
+    });
+    const dev = await screen.findByRole('region', { name: 'Desenvolvimento' });
+    const card = (title: string) => within(dev).getByText(title).closest('li')!;
+    const column = (name: string) => screen.getByRole('region', { name });
+    const dataTransfer = { setData: () => undefined, effectAllowed: '', dropEffect: '' };
+
+    // Working on it: the card does not leave.
+    expect(card('Formulário de contato').getAttribute('draggable')).toBe('false');
+
+    fireEvent.dragStart(card('Rodapé'), { dataTransfer });
+    expect(column('Sua revisão').dataset.accepts).toBe('true');
+    expect(column('Concluído').dataset.accepts).toBe('false');
+
+    // Dropped where the flow does not go: nothing happens.
+    fireEvent.drop(column('Concluído'), { dataTransfer });
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.dragStart(card('Rodapé'), { dataTransfer });
+    fireEvent.drop(column('Sua revisão'), { dataTransfer });
+    const dialog = within(screen.getByRole('dialog', { name: 'Mover "Rodapé"' }));
+    expect(dialog.getByRole<HTMLSelectElement>('combobox', { name: 'Para a etapa' }).value).toBe(
+      's2',
+    );
+    // Nothing moves before the confirmation: a slip of the mouse delivers nothing.
+    expect(writes()).toEqual([]);
+    expect(column('Sua revisão').dataset.accepts).toBeUndefined();
+    fireEvent.click(dialog.getByRole('button', { name: 'Mover' }));
+    await waitFor(() =>
+      expect(writes()).toEqual([
+        { method: 'POST', url: '/api/tasks/k2/move', body: { toStageId: 's2', note: '' } },
       ]),
     );
   });

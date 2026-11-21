@@ -10,6 +10,13 @@ import { FAKE_PROVIDER_URL, TOOLS_URL } from './servers';
 
 test.describe.configure({ mode: 'serial' });
 
+// The approval is answered from the 3D office: drawn in software (SwiftShader),
+// two of these pages at once starve the server and the chat of the processor,
+// so the graphics card is switched on as in office.spec.ts.
+test.use({
+  launchOptions: { args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] },
+});
+
 const messages = (page: Page) => page.getByRole('list', { name: 'Mensagens' });
 const composer = (page: Page) => page.getByRole('textbox', { name: 'Mensagem' });
 
@@ -116,7 +123,10 @@ test('an agent uses tools only as granted, waits for approval and delegates', as
   await expect(request).toBeVisible();
   const officePage = await context.newPage();
   await officePage.goto(`${TOOLS_URL}/escritorio`);
-  const desk = officePage.getByRole('listitem').filter({ hasText: writer });
+  const desk = officePage
+    .getByRole('region', { name: /^Agentes no escritório/ })
+    .getByRole('listitem')
+    .filter({ hasText: writer });
   await expect(desk).toContainText('Posso usar “Escrever arquivo”?');
   await expect(desk).toContainText('Aguardando você');
   await desk.getByRole('button', { name: `Decidir o pedido de ${writer}` }).click();
@@ -128,6 +138,10 @@ test('an agent uses tools only as granted, waits for approval and delegates', as
     messages(page).getByText(/Ferramenta respondeu: Arquivo "nota\.txt" criado/),
   ).toBeVisible();
   await expect(desk).toContainText('Ocioso');
+  // The office's recent activity tells both answers (Phase 29, D5).
+  const activity = officePage.getByRole('list', { name: 'Atividade recente', includeHidden: true });
+  await expect(activity).toContainText(`Você aprovou “Escrever arquivo” para ${writer}`);
+  await expect(activity).toContainText(`Você negou “Escrever arquivo” a ${writer}`);
   await officePage.close();
   await expect(page.getByRole('button', { name: 'Enviar' })).toBeVisible();
 
