@@ -1617,7 +1617,17 @@ Pedido do usuário: em "Adicionar provedor", conexão por API com OpenAI, Anthro
 - **Logotipos:** desenhados em SVG dentro da página (a CSP não permite imagem de fora nem o atributo `style`), em `components/ProviderLogo.tsx`; os traços vêm do LobeHub Icons (licença MIT), e cada marca pertence à sua empresa e só identifica o serviço. Os de uma cor seguem a cor do texto.
 - Não validado com o serviço real: não há chave de nenhum dos novos serviços nesta máquina. Os endereços são os documentados por cada um para o protocolo da OpenAI.
 
-## Pendências ao final do projeto
+## Cidade refeita (2026-11-23)
+
+Pedido do usuário: a cidade estava feia, com o entorno cinza, sem detalhes nem profundidade.
+
+- **Nível da rua:** o chão liso deu lugar a uma praça de pedra com juntas em volta do escritório, avenidas na frente e ao lado (faixa dupla amarela, faixas brancas, faixas de pedestre, linha de parada e semáforos nos quatro cantos), calçadas com meio-fio, canteiros com árvores, bancos, frades, postes (com a luz no chão à noite), um ponto de ônibus e carros estacionados, andando e parados no sinal vermelho.
+- **Prédios baixos com lojas** do outro lado das avenidas, em duas fileiras: vitrine (acesa à noite), toldo colorido, janelas dos andares de cima (acesas uma a uma ao anoitecer), platibanda, telhado cinza, máquinas e caixa-d'água. Cada um fica tão alto quanto o lugar permite sem esconder o escritório.
+- **Torres:** um quarto anel ao fundo, mais alto, para dar profundidade; tom mais escuro no pé e mais claro no alto; base com saguão e faixa de pedra nos anéis mais próximos; coroa nova em degraus. Nenhuma torre fica sobre as avenidas.
+- Névoa mais longa (o anel novo some no horizonte) e nuvens de dia.
+- Atrás e à esquerda a praça vai até as torres, sem rua: o fundo aparece pelo vidro do escritório, e o asfalto ali mudava o miolo que `scenery.spec.ts` compara entre os ambientes.
+- Feito com as peças do bairro e do condomínio (`town.ts`, `kit.ts`), sem luz nova nem quadro próprio. As capturas `cidade-dia` e `cidade-noite` foram refeitas.
+
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.
 

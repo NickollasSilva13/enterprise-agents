@@ -72,14 +72,14 @@ export const CAR_COLORS = [
 const FLOOR = 1.05;
 
 /** A seed of any size as a fraction in [0, 1), as `windowLit` wants: spread by the golden ratio. */
-const fraction = (seed: number) => {
+export const fraction = (seed: number) => {
   const value = seed * 0.618_033_988_7;
   return value - Math.floor(value);
 };
 const GLASS_DAY = '#86a0c4';
 
 /** A window: its frame, and the glass, lit at night one window at a time. */
-function windowParts(
+export function windowParts(
   dx: number,
   dy: number,
   dz: number,
@@ -625,7 +625,7 @@ export type Thing =
       readonly lift: number;
     }
   /** Anything else, already as pieces (coloured by the hour through `tone`). */
-  | { readonly kind: 'pieces'; readonly pieces: (ink: Ink) => Piece[] };
+  | { readonly kind: 'pieces'; readonly pieces: (ink: Ink, light: number) => Piece[] };
 
 /** The pieces of a thing at this hour. */
 export function thingPieces(thing: Thing, ink: Ink, light: number): Piece[] {
@@ -663,7 +663,7 @@ export function thingPieces(thing: Thing, ink: Ink, light: number): Piece[] {
         strip(thing.x0, thing.y0, thing.x1, thing.y1, thing.color, ink, thing.height, thing.lift),
       ];
     case 'pieces':
-      return thing.pieces(ink);
+      return thing.pieces(ink, light);
   }
 }
 

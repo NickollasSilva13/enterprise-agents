@@ -149,8 +149,8 @@ test('the office is the same in every environment', async ({ page }, testInfo) =
 });
 
 // Each environment around the office by day and by night, from the same
-// answer of the server: the city of Phase 25 (kept as it was when it became an
-// environment, Phase 34), the residential neighbourhood and the modern
+// answer of the server: the city of Phase 25 (an environment since Phase 34,
+// redrawn after Phase 38), the residential neighbourhood and the modern
 // condominium (Phase 35), the tropical island and the technological garden
 // (Phase 36). The park is in the pictures of the office above.
 for (const [place, surroundings, label] of [

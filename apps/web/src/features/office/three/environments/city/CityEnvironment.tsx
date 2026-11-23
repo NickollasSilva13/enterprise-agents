@@ -1,4 +1,4 @@
-import type { OfficeLayout } from '@ea/shared';
+import { entranceOf, type OfficeLayout } from '@ea/shared';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -7,18 +7,22 @@ import { GROUND, seeded } from '../../approach';
 import { Blocks } from '../../Blocks';
 import type { Block } from '../../model';
 import type { SkyPalette } from '../../Surroundings';
+import { inkOf } from '../kit';
+import { Lawn, LightPools, PieceMeshes } from '../scenery';
+import { townPieces } from '../town';
 import type { EnvironmentDefinition, EnvironmentProps } from '../types';
-import { type Tower, towersOf, treeBlocks, treesOf } from './plan';
+import { cityPlan, type Tower, towersOf } from './plan';
 
-// The city around the 3D office (Phase 25), an environment since Phase 34:
-// the towers with their lit windows, the street far below and the trees at
-// the foot of the building. Everything follows the clock (`light`, 0 at
-// night and 1 by day). Drawn exactly as before it joined the registry.
+// The city around the 3D office (Phase 25), an environment since Phase 34 and
+// redrawn after Phase 38: the towers with their lit windows rising behind,
+// and at street level the square, the avenues, the shops, the trees, the
+// lamps and the cars of `cityPlan`. Everything follows the clock (`light`, 0
+// at night and 1 by day).
 
 export const CITY_SKY: SkyPalette = {
   night: { top: '#0d0a26', bottom: '#3a2878' },
   day: { top: '#7fb6ef', bottom: '#dcecff' },
-  clouds: 0,
+  clouds: 5,
 };
 
 /** Windows per tile across a facade, and floor height in tiles. */
@@ -104,9 +108,16 @@ function towerGeometry(tower: Tower, light: number): THREE.BufferGeometry {
   const tint = new THREE.Color(
     mix(TOWER_NIGHT[tower.tone] ?? '#4a4088', TOWER_DAY[tower.tone] ?? '#b8c2e6', light),
   );
-  const count = geometry.getAttribute('position').count;
+  const position = geometry.getAttribute('position');
+  const count = position.count;
   const colors = new Float32Array(count * 3);
-  for (let index = 0; index < count; index += 1) tint.toArray(colors, index * 3);
+  const shaded = new THREE.Color();
+  // Darker at the foot, as the street's shade and the haze between towers; lighter up top.
+  for (let index = 0; index < count; index += 1) {
+    const rise = (position.getY(index) - GROUND) / tower.h;
+    shaded.copy(tint).multiplyScalar(0.62 + rise * 0.45);
+    shaded.toArray(colors, index * 3);
+  }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }
@@ -175,9 +186,56 @@ function crownBlocks(tower: Tower, light: number): Block[] {
           color: tone,
         },
       ];
+    case 'tier':
+      return [
+        {
+          x: tower.x + tower.w * 0.15,
+          y: tower.y + tower.d * 0.15,
+          z: top,
+          w: tower.w * 0.7,
+          d: tower.d * 0.7,
+          h: 0.9,
+          color: tone,
+        },
+        {
+          x: tower.x + tower.w * 0.3,
+          y: tower.y + tower.d * 0.3,
+          z: top + 0.9,
+          w: tower.w * 0.4,
+          d: tower.d * 0.4,
+          h: 0.6,
+          color: tone,
+        },
+      ];
     case 'none':
       return [];
   }
+}
+
+/** The foot of a tower: a lobby of glass, warm at night, under a stone band. */
+function podiumBlocks(tower: Tower, light: number): Block[] {
+  const stone = mix('#2e2950', '#d9d4cc', light);
+  return [
+    {
+      x: tower.x - 0.12,
+      y: tower.y - 0.12,
+      z: GROUND,
+      w: tower.w + 0.24,
+      d: tower.d + 0.24,
+      h: 0.75,
+      // Warm by night without the bloom: a whole lit floor at every foot would glare.
+      color: mix('#b0844f', '#7f9bbf', light),
+    },
+    {
+      x: tower.x - 0.16,
+      y: tower.y - 0.16,
+      z: GROUND + 0.75,
+      w: tower.w + 0.32,
+      d: tower.d + 0.32,
+      h: 0.22,
+      color: stone,
+    },
+  ];
 }
 
 export function City({ layout, light }: { layout: OfficeLayout; light: number }) {
@@ -214,7 +272,11 @@ export function City({ layout, light }: { layout: OfficeLayout; light: number })
     [geometry, material],
   );
   const crowns = useMemo(
-    () => towers.flatMap((tower) => crownBlocks(tower, light)),
+    () =>
+      towers.flatMap((tower) => [
+        ...crownBlocks(tower, light),
+        ...(tower.ring < 2 ? podiumBlocks(tower, light) : []),
+      ]),
     [towers, light],
   );
   return (
@@ -225,40 +287,47 @@ export function City({ layout, light }: { layout: OfficeLayout; light: number })
   );
 }
 
-/** The street of the city far below the floor and the trees at the foot of the building. */
-export function Street({ layout, light }: { layout: OfficeLayout; light: number }) {
-  const { width, height } = layout;
+/** The streets at the foot of the office: the square, avenues, shops, trees, lamps and cars. */
+function Streets({ layout, light }: { layout: OfficeLayout; light: number }) {
   const dusk = 1 - light;
-  const trees = useMemo(
-    () => treesOf(layout).flatMap((tree) => treeBlocks(tree, dusk)),
-    [layout, dusk],
+  // The streets depend only on the size of the floor and where its entrance is.
+  const entrance = entranceOf(layout);
+  const key = `${layout.width}x${layout.height}@${entrance ? `${entrance.x},${entrance.y}` : '-'}`;
+  const plan = useMemo(
+    () => cityPlan(layout),
+    // The key stands for the size and the entrance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
+  );
+  // The windows change with the light, minute by minute at dusk.
+  const pieces = useMemo(() => townPieces(plan.things, dusk, light), [plan, dusk, light]);
+  const pools = useMemo(
+    () => plan.lamps.map((lamp) => ({ x: lamp.x, y: lamp.y, z: GROUND, r: 1.8 })),
+    [plan],
   );
   return (
     <group>
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[width / 2, GROUND, height / 2]}
-        receiveShadow
-      >
-        <planeGeometry args={[220, 220]} />
-        <meshStandardMaterial color={mix('#1c1640', '#8a9cbd', light)} roughness={0.9} />
-      </mesh>
-      <Blocks blocks={trees} castShadow receiveShadow />
+      <Lawn color={inkOf(dusk).tone(PAVEMENT_FAR)} />
+      <PieceMeshes pieces={pieces} layout={layout} />
+      <LightPools spots={pools} dusk={dusk} />
     </group>
   );
 }
+
+/** The ground of the far blocks, under the towers. */
+const PAVEMENT_FAR = '#aaa59b';
 
 function CityScene({ layout, light }: EnvironmentProps) {
   return (
     <>
       <City layout={layout} light={light} />
-      <Street layout={layout} light={light} />
+      <Streets layout={layout} light={light} />
     </>
   );
 }
 
 export const CITY: EnvironmentDefinition = {
   sky: CITY_SKY,
-  fog: { start: 4, depth: 30 },
+  fog: { start: 6, depth: 46 },
   Scene: CityScene,
 };

@@ -2,6 +2,7 @@ import { buildPresetLayout, OFFICE_PRESETS } from '@ea/shared';
 import { describe, expect, it } from 'vitest';
 import { hidesOffice, intrudes, sightPoints } from './clearance';
 import { GROUND } from '../approach';
+import { cityPlan } from './city/plan';
 import { condoPlan } from './condo/plan';
 import { gardenPlan } from './garden/plan';
 import { coastDistance, islandHeight, islandPlan, SEA } from './island/plan';
@@ -9,7 +10,8 @@ import { neighborhoodPlan } from './neighborhood/plan';
 import { volumeOf } from './pieces';
 import { townPieces } from './town';
 
-// The residential neighbourhood and the modern condominium (Phase 35), the
+// The city (redrawn after Phase 38), the residential neighbourhood and the
+// modern condominium (Phase 35), the
 // tropical island and the technological garden (Phase 36) keep
 // the office as it is, as the park does: nothing on the platform, its free
 // ground or the steps, nothing hiding the floor or someone standing on it,
@@ -24,6 +26,7 @@ const layouts = OFFICE_PRESETS.map((preset) =>
 );
 
 const plans = {
+  city: (layout: (typeof layouts)[number]) => cityPlan(layout).things,
   neighborhood: (layout: (typeof layouts)[number]) => neighborhoodPlan(layout).things,
   condo: (layout: (typeof layouts)[number]) => condoPlan(layout).things,
   island: (layout: (typeof layouts)[number]) => islandPlan(layout).things,

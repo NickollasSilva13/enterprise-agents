@@ -1,8 +1,9 @@
 import { buildPresetLayout, OFFICE_PRESETS } from '@ea/shared';
 import { describe, expect, it } from 'vitest';
-import { GROUND, stepBlocks } from '../../approach';
+import { GROUND } from '../../approach';
 import { hidesOffice, sightPoints } from '../clearance';
-import { towersOf, treeBlocks, treesOf } from './plan';
+import { inkOf } from '../kit';
+import { cityPlan, shop, streetsOf, towersOf } from './plan';
 
 const layout = { width: 18, height: 12, items: [] };
 
@@ -23,7 +24,7 @@ describe('towersOf', () => {
 
   it('spaces the towers in rings that rise with distance, with room between them', () => {
     const towers = towersOf(layout);
-    const rings = [0, 1, 2].map((ring) => towers.filter((tower) => tower.ring === ring));
+    const rings = [0, 1, 2, 3].map((ring) => towers.filter((tower) => tower.ring === ring));
     for (const ring of rings) expect(ring.length).toBeGreaterThan(0);
     const tallest = rings.map((ring) => Math.max(...ring.map((tower) => tower.h)));
     expect(tallest[0]).toBeLessThan(tallest[2] ?? 0);
@@ -39,63 +40,54 @@ describe('towersOf', () => {
   });
 });
 
-describe('the street around the building', () => {
-  it('puts the trees in front of the office, on the street', () => {
-    const trees = treesOf(layout);
-    expect(trees.length).toBeGreaterThan(4);
-    for (const tree of trees) expect(tree.x > layout.width || tree.y > layout.height).toBe(true);
-    for (const block of treeBlocks(trees[0] ?? { x: 0, y: 0, size: 1 }, 0))
-      expect(block.z).toBeGreaterThanOrEqual(GROUND);
-  });
-
-  it('darkens the leaves at night', () => {
-    const tree = { x: 20, y: 3, size: 1 };
-    const day = treeBlocks(tree, 0).map((block) => block.color);
-    const night = treeBlocks(tree, 1).map((block) => block.color);
-    expect(night).not.toEqual(day);
-  });
-});
-
-describe('the city as an environment (Phase 34)', () => {
-  it('hides nothing of the office, in every preset, by day and by night', () => {
+describe('the city as an environment (Phase 34, redrawn after Phase 38)', () => {
+  it('keeps every tower off the avenues and hides nothing of the office, in every preset', () => {
     for (const preset of OFFICE_PRESETS) {
       const office = buildPresetLayout(preset, [{ projectId: 'a', agents: 4 }]);
       const points = sightPoints(office);
-      const volumes = [
-        ...towersOf(office).map((tower) => ({
-          x0: tower.x,
-          x1: tower.x + tower.w,
-          y0: tower.y,
-          y1: tower.y + tower.d,
-          z0: GROUND,
-          z1: GROUND + tower.h + 1.2,
-        })),
-        ...[0, 1].flatMap((dusk) =>
-          treesOf(office).flatMap((tree) =>
-            treeBlocks(tree, dusk).map((block) => ({
-              x0: block.x,
-              x1: block.x + block.w,
-              y0: block.y,
-              y1: block.y + block.d,
-              z0: block.z,
-              z1: block.z + block.h,
-            })),
-          ),
-        ),
-      ];
+      const { side, sideWalk, front, frontWalk } = streetsOf(office);
+      const towers = towersOf(office);
+      for (const tower of towers) {
+        expect(tower.x + tower.w <= side.x0 || tower.x >= sideWalk.x1).toBe(true);
+        expect(tower.y + tower.d <= front.y0 || tower.y >= frontWalk.y1).toBe(true);
+      }
+      const volumes = towers.map((tower) => ({
+        x0: tower.x - 0.16,
+        x1: tower.x + tower.w + 0.16,
+        y0: tower.y - 0.16,
+        y1: tower.y + tower.d + 0.16,
+        z0: GROUND,
+        z1: GROUND + tower.h + 1.6,
+      }));
       expect(volumes.filter((volume) => hidesOffice(office, volume, points))).toEqual([]);
-      // Its trees keep their place of Phase 25 (some crowns nearer the platform
-      // than the park's free ground, low enough to hide nothing), but none on the steps.
-      for (const step of stepBlocks(office))
-        for (const tree of treesOf(office)) {
-          const r = tree.size * 0.5 + 0.1;
-          const apart =
-            tree.x + r <= step.x ||
-            tree.x - r >= step.x + step.w ||
-            tree.y + r <= step.y ||
-            tree.y - r >= step.y + step.d;
-          expect(apart).toBe(true);
-        }
     }
+  });
+
+  it('has the square, shops, traffic lights, street trees, lamps and cars', () => {
+    const plan = cityPlan(layout);
+    const count = (kind: string) => plan.things.filter((thing) => thing.kind === kind).length;
+    expect(count('car')).toBeGreaterThan(10);
+    expect(count('bench')).toBeGreaterThan(2);
+    expect(count('bollard')).toBeGreaterThan(5);
+    expect(count('pieces')).toBeGreaterThan(30);
+    expect(plan.lamps.length).toBeGreaterThan(8);
+  });
+
+  it('builds shops with windows that light at night only', () => {
+    const spec = {
+      x: 0,
+      y: 30,
+      yaw: Math.PI,
+      w: 4,
+      d: 4,
+      floors: 3,
+      wall: '#e8d9c0',
+      awning: '#c8553d',
+      seed: 7,
+    };
+    const glowing = (dusk: number, light: number) =>
+      shop(spec, inkOf(dusk), light).filter((piece) => piece.surface === 'glow').length;
+    expect(glowing(0, 1)).toBe(0);
+    expect(glowing(1, 0)).toBeGreaterThan(3);
   });
 });
