@@ -1,125 +1,85 @@
+<div align="center">
+
+<img src="docs/assets/logo.svg" width="96" height="96" alt="Logo do Enterprise Agents" />
+
 # Enterprise Agents
 
-Plataforma local para criar, configurar, executar e monitorar agentes de IA por uma interface gráfica. Roda inteiramente na sua máquina, com modelos locais (Ollama) ou externos (OpenAI, Anthropic e compatíveis).
+**Uma empresa de agentes de IA rodando no seu computador.**
 
-> **Estado do projeto:** trinta e sete fases concluídas. É possível cadastrar agentes e projetos, conectar provedores de modelos, conversar com cada agente com a resposta em tempo real, liberar ferramentas por agente (arquivos, busca na web, delegação, scripts), aprovar ou negar ações, exportar e importar agentes, acompanhar tudo no escritório, nos relatórios e nos logs, e organizar os agentes em áreas com quadro de tarefas, fluxos, pedidos entre áreas, um catálogo de modelos de fluxo e tarefas agendadas. A Fase 20 começou a nova interface com o sistema visual (cores com contraste AA, componentes e uma página de referência só para desenvolvimento), e a Fase 21 trouxe a moldura nova: menu com contadores, busca global (Ctrl K), sino com o que espera por você e o seu cartão; a Fase 22 redesenhou os personagens em 32 bits, com quatro direções e andar em 4 quadros; a Fase 23 trouxe o andar de vidro sobre a cidade, dia e noite, móveis novos e cor por móvel; a Fase 24 passou o Escritório para 3D, com a câmera da proposta, a Fase 25 trouxe a luz roxa, as sombras, o brilho e a cidade noturna em volume, a Fase 26, os móveis modelados em detalhe, a Fase 27, os personagens voxel 3D, a Fase 28, o editor do escritório em 3D, a Fase 29 fez do Escritório a tela inicial, com o time em cartões, a atividade recente e ações rápidas, a Fase 30 trouxe os indicadores calculados do histórico, cada um com a sua conta explicada, a Fase 31 pôs as telas internas no mesmo padrão: agentes em cartões, estados em pílulas e o quadro de tarefas com arrastar entre etapas, e a Fase 32 trouxe os primeiros passos de uma instalação nova, a Ajuda com o guia dentro da plataforma, dicas que somem depois de lidas e a auditoria de acessibilidade WCAG 2.1 AA, e a Fase 33 trouxe os ambientes externos em 3D, começando pelo parque, o novo entorno padrão do Escritório, a Fase 34 pôs a cidade na mesma arquitetura, a Fase 35 trouxe o bairro residencial e o condomínio moderno, a Fase 36 a ilha tropical e o jardim tecnológico, e a Fase 37 fez a validação final. O que ficou sem verificação está em [ROADMAP.md](ROADMAP.md), "Pendências ao final do projeto". Para aprender a usar, comece pelo [guia de utilização](docs/GUIA.md).
+Monte equipes, defina como o trabalho anda e acompanhe tudo num escritório 3D,
+com modelos locais ou na nuvem, sem que nada saia da sua máquina sem você saber.
 
-## Funcionalidades
+![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-3c873a?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-local-0f80cc?logo=sqlite&logoColor=white)
+![Local-first](https://img.shields.io/badge/100%25-local--first-6a50f5)
 
-Cada uma é marcada como disponível quando é entregue.
+<img src="docs/assets/escritorio.jpg" alt="O Escritório em 3D, com as salas de cada equipe, agentes trabalhando e a cidade à noite" />
 
-| Funcionalidade | Fase | Disponível |
-|---|---|---|
-| Relatórios (o antigo Painel) com estado dos agentes, execuções, atividade e alertas, ao vivo | 4 / 7 / 29 | Sim |
-| Escritório ilustrado: salas, agentes às mesas, animação por estado; clique para conversar | 4 / 7 | Sim |
-| Escritório vivo: recepção e copa; agentes que andam, vão à copa quando ociosos, saem quando inativos e visitam a mesa do colega ao delegar | 9 | Sim |
-| Criar, editar, duplicar, ativar e excluir agentes; projetos | 5 | Sim |
-| Provedores e modelos (Ollama, OpenAI-compatível, Anthropic) | 6 | Sim (OpenAI e Anthropic ainda não validados com o serviço real) |
-| Chat com streaming, histórico e interrupção | 7 | Sim (validado com o Ollama) |
-| Logs e linha do tempo das execuções | 7 | Sim |
-| Ferramentas com permissões por agente e aprovação humana | 8 | Sim (validado com o Ollama) |
-| Delegação entre agentes, com árvore de execução | 8 | Sim (validado com o Ollama) |
-| Exportar e importar agentes em JSON, sem segredos | 11 | Sim |
-| Claude Code e Codex instalados na máquina como provedores, com as ferramentas da plataforma | 12 / 13 | Sim (Claude Code validado com a conta do usuário; Codex não validado) |
-| Escritório isométrico personalizável, personagens 16 bits e entorno | 14 / 15 | Sim |
-| Áreas com quadro de tarefas e fluxos configuráveis; modelo pronto Desenvolvimento | 16 | Sim (validado com o provedor simulado) |
-| Pedidos entre áreas, com regras, aprovação e entrega de arquivos | 17 | Sim (validado com o provedor simulado) |
-| Catálogo de modelos de fluxo: Desenvolvimento, Marketing, Dados, Produto e Conteúdo; salvar uma área como modelo; exportar e importar | 18 | Sim (fluxos novos não percorridos por um modelo real) |
-| Tarefas agendadas: uma vez, todo dia, toda semana ou todo mês, no quadro de uma área | 19 | Sim |
+</div>
 
-## Pré-requisitos
+## O que ele faz
 
-- Node.js 22 ou superior e npm 10 ou superior.
-- Windows 10/11 (plataforma de desenvolvimento e validação). macOS e Linux são suportados pela stack, mas não validados.
-- Opcional: [Ollama](https://ollama.com) para modelos locais, com ao menos um modelo baixado (por exemplo, `ollama pull llama3.2:3b`).
-- Docker **não** é necessário.
+- **Equipes com fluxo de trabalho.** Cada equipe tem um quadro e um fluxo (Refinamento → Desenvolvimento → Testes → Sua revisão, por exemplo). Os agentes pegam as tarefas, trabalham e passam adiante sozinhos, pelas regras que você definiu.
+- **Papéis que escalam.** Dois agentes no papel de Dev tocam duas tarefas ao mesmo tempo. Uma tarefa devolvida volta para quem já trabalhou nela.
+- **Você no controle.** Etapas de aprovação suas, ferramentas liberadas uma a uma, e cada ação sensível pedindo o seu "sim" antes de acontecer.
+- **Escritório vivo em 3D.** Cada equipe tem a sua sala, e cada agente tem a sua mesa e o seu personagem. Seis ambientes externos, de dia e de noite.
+- **Qualquer modelo.** Ollama no seu computador, OpenAI, Anthropic, Google, DeepSeek, Groq, Mistral e OpenRouter, ou o Claude Code e o Codex que você já usa.
+- **Modelos prontos.** Desenvolvimento, Marketing, Dados, Produto e Conteúdo, com boas práticas embutidas, e os seus próprios fluxos salvos como modelo.
 
-## Instalação
+## Por dentro
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/quadro.jpg" alt="Quadro de tarefas de uma equipe" /></td>
+    <td width="50%"><img src="docs/assets/fluxo.jpg" alt="Editor do fluxo em desenho" /></td>
+  </tr>
+  <tr>
+    <td><b>Quadro de tarefas.</b> As tarefas andam sozinhas entre as etapas; arraste para mover quando a decisão é sua.</td>
+    <td><b>Fluxo em desenho.</b> Etapas, setas e devoluções; o fluxo explicado em frases, avisos e uma simulação passo a passo.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/funcao.jpg" alt="Função do agente na empresa: modelo, equipe e papel" /></td>
+    <td><img src="docs/assets/provedores.jpg" alt="Escolha do provedor de modelos de IA" /></td>
+  </tr>
+  <tr>
+    <td><b>Função na empresa.</b> Escolha o modelo, a equipe e o papel; o agente já nasce com as instruções do cargo.</td>
+    <td><b>Provedores.</b> Serviços de API e harness locais, cada um com o seu logotipo.</td>
+  </tr>
+</table>
+
+## Comece em um minuto
+
+Você precisa do [Node.js 22](https://nodejs.org) ou mais recente. Para modelos locais, instale também o [Ollama](https://ollama.com) e baixe um modelo (`ollama pull llama3.2:3b`).
 
 ```bash
 npm install
-```
-
-## Configuração
-
-Opcional. Para mudar algum padrão, copie `.env.example` para `.env` e ajuste. Valores inválidos impedem a inicialização, com uma mensagem que aponta a variável.
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `APP_PORT` | `4317` | Porta do servidor local. |
-| `DATA_DIR` | `./data` | Pasta do banco e das pastas de trabalho dos agentes. |
-| `LOG_LEVEL` | `info` | Nível de log do servidor. |
-| `MAX_CONCURRENT_RUNS` | `4` | Execuções simultâneas; o excedente espera na fila. |
-| `MAX_DELEGATION_DEPTH` | `3` | Quantos níveis uma cadeia de delegação entre agentes pode ter. |
-| `WEB_DEV_PORT` | `5173` | Porta da interface no modo de desenvolvimento. |
-
-O servidor sempre escuta em `127.0.0.1`; isso não é configurável, por segurança.
-
-**Chaves de API não vão no `.env`.** Elas são informadas na tela Modelos e guardadas no cofre de credenciais do sistema operacional. Veja [SECURITY.md](SECURITY.md).
-
-## Inicialização
-
-```bash
 npm start
 ```
 
-O comando compila a interface, cria o banco em `data/app.db` se ele não existir, aplica as migrações e inicia o servidor. Depois abra `http://127.0.0.1:4317` no navegador. Para encerrar, pressione `Ctrl+C` no terminal.
+Abra **http://127.0.0.1:4317**. Os primeiros passos guiam você por conectar um provedor, habilitar um modelo, criar a primeira equipe e mandar a primeira tarefa. O [guia de utilização](docs/GUIA.md) também está dentro da plataforma, em **Ajuda**.
 
-Modo de desenvolvimento, com recarga automática (interface em `http://127.0.0.1:5173`):
+## Seguro por padrão
 
-```bash
-npm run dev
-```
+- O servidor só escuta em `127.0.0.1`: a plataforma não fica exposta na rede.
+- As chaves de API ficam no cofre de credenciais do sistema operacional, nunca no banco, nos logs ou no contexto enviado ao modelo.
+- Um agente começa sem nenhuma ferramenta, e a pasta de trabalho de cada um é confinada a ele.
+- Toda chamada de ferramenta passa pelo motor de permissões, e as operações sensíveis ficam numa auditoria que só aceita inserção.
+- A saída dos modelos é tratada como dado não confiável e mostrada sem HTML nem imagens externas.
 
-Verificação completa (tipos, lint e testes):
+Os detalhes estão em [SECURITY.md](SECURITY.md).
 
-```bash
-npm run check
-```
+## Para desenvolvedores
 
-Testes ponta a ponta no navegador (na primeira vez, instale o navegador de teste com `npx playwright install chromium`):
-
-```bash
-npm run test:e2e
-```
-
-## Ferramentas e aprovações
-
-Um agente começa sem nenhuma ferramenta. Na tela **Ferramentas**, escolha o agente e marque cada ferramenta como bloqueada, "pede aprovação" ou permitida:
-
-| Ferramenta | O que faz | Risco |
-|---|---|---|
-| Ler arquivo, Listar pasta | Leem a pasta de trabalho do agente. | Baixo |
-| Escrever arquivo | Cria ou substitui arquivos na pasta de trabalho do agente. | Médio |
-| Buscar URL | Lê páginas públicas da internet; endereços desta máquina e da rede local são bloqueados. | Médio |
-| Delegar a agente | Passa uma tarefa a outro agente, que usa as próprias permissões. | Médio |
-| Executar script | Roda um script Node.js da pasta de trabalho. Desligada por padrão e sempre com aprovação. | Alto |
-| Passar a tarefa adiante, Comentar na tarefa | Só numa tarefa do quadro, pelas passagens do fluxo. Não se concedem por agente. | Baixo |
-| Pedir trabalho a outra área | Só numa tarefa do quadro, e só com uma regra criada pelo usuário. Não se concede por agente. | Médio |
-
-Cada agente tem a sua pasta, em `data/workspaces/<id do agente>` (o caminho aparece na tela). Quando um agente pede uma ferramenta marcada como "pede aprovação", a execução para e o pedido aparece na conversa, na tela **Aprovações** e na mesa do agente no Escritório, com os argumentos exatos. O modelo precisa aceitar ferramentas: no Ollama isso é detectado; em serviços compatíveis com OpenAI, marque o modelo na tela Modelos.
-
-## Estrutura do projeto
-
-```
-apps/server      API, runtime de agentes, banco, segurança
-apps/web         Interface React
-packages/shared  Tipos e esquemas compartilhados
-data/            Banco e pastas de trabalho (não versionado)
-```
-
-## Documentação
-
-| Documento | Conteúdo |
+| Comando | O que faz |
 |---|---|
-| [docs/GUIA.md](docs/GUIA.md) | Guia de utilização, passo a passo. |
-| [SPEC.md](SPEC.md) | Requisitos, casos de uso, regras de negócio, critérios de aceite. |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Componentes, fluxos de dados, persistência. |
-| [SECURITY.md](SECURITY.md) | Modelo de ameaças, controles, segredos, permissões. |
-| [TESTING.md](TESTING.md) | Estratégia de testes e registro de execuções. |
-| [ROADMAP.md](ROADMAP.md) | Fases e andamento. |
-| [CLAUDE.md](CLAUDE.md) | Instruções permanentes para o Claude Code. |
+| `npm run dev` | Servidor e interface com recarga automática. |
+| `npm run check` | Tipos, lint e testes. |
+| `npm run check:full` | Também cobertura e testes de ponta a ponta no navegador. |
 
-## Privacidade
+Monólito modular em TypeScript: Fastify, SQLite (Drizzle), React 19, Tailwind, three.js e Playwright. Leia mais em [ARCHITECTURE.md](ARCHITECTURE.md), [SPEC.md](SPEC.md), [TESTING.md](TESTING.md) e [ROADMAP.md](ROADMAP.md).
 
-Com modelos locais, nada sai da sua máquina. Ao usar um provedor externo, o prompt de sistema e o objetivo do agente, todas as mensagens da conversa (suas e do agente), a descrição das ferramentas liberadas e os resultados delas (o conteúdo de um arquivo lido, o texto de uma página buscada, a resposta de outro agente) são enviados a esse provedor a cada mensagem. A interface sinaliza isso ao cadastrar o provedor, ao escolher o modelo do agente e na própria tela de conversa. Chaves de API nunca são enviadas ao modelo.
+<div align="center">
+<sub>Feito para rodar na sua máquina. Seus agentes, seus dados.</sub>
+</div>

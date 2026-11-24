@@ -24,10 +24,9 @@ export function taskStatus(task: TaskSummary): { label: string; tone: Tone } {
   }
   if (task.queued) {
     // Waits for the agent it goes back to, or for anyone of the role (Phase 39).
+    // Short, so the pill fits the narrow board card whatever the role is called.
     return {
-      label: task.agentName
-        ? `Na fila de ${task.agentName}`
-        : `Na fila: ${task.roleName ? `todos de ${task.roleName}` : 'agentes'} ocupados`,
+      label: task.agentName ? `Na fila de ${task.agentName}` : 'Na fila: papel ocupado',
       tone: 'idle',
     };
   }

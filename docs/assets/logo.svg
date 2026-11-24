@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Enterprise Agents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#262a3d"/>
+      <stop offset="1" stop-color="#121420"/>
+    </linearGradient>
+    <linearGradient id="room" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a99cff"/>
+      <stop offset="1" stop-color="#6a50f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <rect x="22" y="22" width="84" height="84" rx="10" fill="none" stroke="#eceef6" stroke-width="7"/>
+  <path d="M64 22 V53 M64 75 V106 M22 64 H43 M85 64 H106" stroke="#eceef6" stroke-width="7" stroke-linecap="round"/>
+  <rect x="72.5" y="30.5" width="25" height="25" rx="5" fill="url(#room)"/>
+</svg>
