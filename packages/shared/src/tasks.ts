@@ -14,7 +14,14 @@ import {
 const id = z.string().min(1).max(40);
 const count = z.number().int().nonnegative();
 
-export const WORKFLOW_LIMITS = { stageName: 40, stages: 12, transitions: 60 } as const;
+export const WORKFLOW_LIMITS = {
+  stageName: 40,
+  stages: 12,
+  transitions: 60,
+  /** Roles of an area (team), Phase 39. */
+  roleName: 40,
+  roles: 12,
+} as const;
 
 export const TASK_LIMITS = {
   title: 200,
@@ -41,6 +48,24 @@ const stageName = z
     `O nome da etapa pode ter até ${WORKFLOW_LIMITS.stageName} caracteres.`,
   );
 
+export const roleName = z
+  .string()
+  .trim()
+  .min(1, 'Dê um nome ao papel.')
+  .max(
+    WORKFLOW_LIMITS.roleName,
+    `O nome do papel pode ter até ${WORKFLOW_LIMITS.roleName} caracteres.`,
+  );
+
+/**
+ * A role as the editor sends it (Phase 39). `key` is the id of a role that
+ * exists, or any temporary key for a new one, so stages can point at it.
+ */
+const roleInputSchema = z.strictObject({
+  key: z.string().min(1).max(40),
+  name: roleName,
+});
+
 /**
  * A stage as the editor sends it. `key` is the id of a stage that exists, or
  * any temporary key for a new one, so transitions can point at new stages.
@@ -49,8 +74,8 @@ const stageInputSchema = z.strictObject({
   key: z.string().min(1).max(40),
   name: stageName,
   kind: z.enum(STAGE_KINDS),
-  /** The agent that works this stage; only for `agent` stages. */
-  agentId: id.nullable(),
+  /** The role whose agents work this stage; only for `agent` stages (Phase 39). */
+  roleKey: z.string().min(1).max(40).nullable(),
 });
 
 const transitionInputSchema = z.strictObject({
@@ -69,6 +94,10 @@ const sameText = (a: string, b: string) =>
  */
 export const workflowUpdateSchema = z
   .strictObject({
+    roles: z
+      .array(roleInputSchema)
+      .max(WORKFLOW_LIMITS.roles, `A equipe pode ter até ${WORKFLOW_LIMITS.roles} papéis.`)
+      .default([]),
     stages: z
       .array(stageInputSchema)
       .min(2, 'O fluxo precisa de pelo menos duas etapas.')
@@ -84,6 +113,16 @@ export const workflowUpdateSchema = z
     const problem = (message: string, path: (string | number)[]) =>
       context.addIssue({ code: 'custom', message, path });
 
+    const roleKeys = new Set(workflow.roles.map((role) => role.key));
+    if (roleKeys.size !== workflow.roles.length) {
+      problem('Há dois papéis com a mesma chave.', ['roles']);
+    }
+    workflow.roles.forEach((role, index) => {
+      if (workflow.roles.findIndex((other) => sameText(other.name, role.name)) !== index) {
+        problem(`Já existe um papel chamado "${role.name}".`, ['roles', index, 'name']);
+      }
+    });
+
     const byKey = new Map(workflow.stages.map((stage) => [stage.key, stage]));
     if (byKey.size !== workflow.stages.length) {
       problem('Há duas etapas com a mesma chave.', ['stages']);
@@ -92,8 +131,11 @@ export const workflowUpdateSchema = z
       if (workflow.stages.findIndex((other) => sameText(other.name, stage.name)) !== index) {
         problem(`Já existe uma etapa chamada "${stage.name}".`, ['stages', index, 'name']);
       }
-      if (stage.kind !== 'agent' && stage.agentId !== null) {
-        problem('Só uma etapa de agente tem responsável.', ['stages', index, 'agentId']);
+      if (stage.kind !== 'agent' && stage.roleKey !== null) {
+        problem('Só uma etapa de agente tem papel.', ['stages', index, 'roleKey']);
+      }
+      if (stage.roleKey !== null && !roleKeys.has(stage.roleKey)) {
+        problem('A etapa aponta para um papel que não existe.', ['stages', index, 'roleKey']);
       }
     });
     if (workflow.stages[0]?.kind === 'done') {
@@ -134,14 +176,31 @@ export const workflowUpdateSchema = z
     });
   });
 export type WorkflowUpdate = z.infer<typeof workflowUpdateSchema>;
+export type WorkflowUpdateInput = z.input<typeof workflowUpdateSchema>;
+
+/** A role of an area and the agents that have it (Phase 39). */
+export const workflowRoleSchema = z.object({
+  id,
+  name: z.string(),
+  agents: z.array(
+    z.object({
+      id,
+      name: z.string(),
+      /** Working on a task right now: a new task waits for another member. */
+      busy: z.boolean(),
+    }),
+  ),
+});
+export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
 export const workflowStageSchema = z.object({
   id,
   name: z.string(),
   kind: z.enum(STAGE_KINDS),
   position: count,
-  agentId: id.nullable(),
-  agentName: z.string().nullable(),
+  /** The role whose agents work this stage (Phase 39); null for user and final stages. */
+  roleId: id.nullable(),
+  roleName: z.string().nullable(),
   /** Tasks in this stage that are not finished. */
   openTasks: count,
 });
@@ -157,6 +216,7 @@ export type WorkflowTransition = z.infer<typeof workflowTransitionSchema>;
 
 export const workflowSchema = z.object({
   areaId: id,
+  roles: z.array(workflowRoleSchema),
   stages: z.array(workflowStageSchema),
   transitions: z.array(workflowTransitionSchema),
 });
@@ -211,14 +271,19 @@ export const taskSummarySchema = z.object({
   stageId: id,
   stageName: z.string(),
   stageKind: z.enum(STAGE_KINDS),
-  /** The agent of the current stage, if it is an agent stage with one. */
+  /** The role of the current stage, if it is an agent stage with one (Phase 39). */
+  roleName: z.string().nullable(),
+  /**
+   * The agent on the task: the one working on it, or, while it waits, the one
+   * it goes back to (who already worked it in this stage). Null otherwise.
+   */
   agentId: id.nullable(),
   agentName: z.string().nullable(),
   /** Why the task stopped and waits for the user; null while it flows. */
   attention: z.string().nullable(),
   /** A run is working on the task right now (queued, running or waiting). */
   working: z.boolean(),
-  /** Waits for its agent, who is busy with another task. */
+  /** Waits for an agent of its role, all busy with other tasks (or for the one it goes back to). */
   queued: z.boolean(),
   returns: count,
   runCount: count,
@@ -382,20 +447,68 @@ export type Requests = z.infer<typeof requestsSchema>;
 
 // ---- Areas from a template -----------------------------------------------------
 
-export const areaFromTemplateSchema = z.strictObject({
-  templateId: z.string().min(1).max(40),
-  name: z
-    .string()
-    .trim()
-    .min(1, 'Informe o nome da área.')
-    .max(60, 'O nome pode ter até 60 caracteres.'),
-  /** The model every agent of the area starts with; changed per agent later. */
-  modelId: id,
-});
+export const areaFromTemplateSchema = z
+  .strictObject({
+    templateId: z.string().min(1).max(40),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Informe o nome da área.')
+      .max(60, 'O nome pode ter até 60 caracteres.'),
+    /**
+     * False creates only the team (area, roles and workflow), for the agent
+     * being created in the agent form to join it (Phase 39, D2).
+     */
+    withAgents: z.boolean().default(true),
+    /** The model every agent of the area starts with; changed per agent later. */
+    modelId: id.nullable().default(null),
+  })
+  .superRefine((input, context) => {
+    if (input.withAgents && input.modelId === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Escolha o modelo de IA dos agentes.',
+        path: ['modelId'],
+      });
+    }
+  });
 export type AreaFromTemplate = z.infer<typeof areaFromTemplateSchema>;
+export type AreaFromTemplateInput = z.input<typeof areaFromTemplateSchema>;
 
 export const areaCreatedSchema = z.object({
   areaId: id,
   agentIds: z.array(id),
+  /** The id each role of the template got in the new area. */
+  roles: z.array(z.object({ key: z.string(), id })),
 });
 export type AreaCreated = z.infer<typeof areaCreatedSchema>;
+
+// ---- Teams (Phase 39) ----------------------------------------------------------
+
+/**
+ * The areas as teams: the template each came from and its roles with their
+ * agents, for the agent form to pick a team and a role.
+ */
+export const teamListSchema = z.object({
+  teams: z.array(
+    z.object({
+      areaId: id,
+      areaName: z.string(),
+      /** The template it was made from; null for an area set up by hand. */
+      templateId: z.string().nullable(),
+      /** That template's name, when it still exists. */
+      templateName: z.string().nullable(),
+      roles: z.array(
+        z.object({
+          id,
+          name: z.string(),
+          agents: z.array(z.object({ id, name: z.string() })),
+          /** The stages of the team's flow this role works, in order. */
+          stages: z.array(z.string()),
+        }),
+      ),
+    }),
+  ),
+});
+export type TeamList = z.infer<typeof teamListSchema>;
+export type Team = TeamList['teams'][number];

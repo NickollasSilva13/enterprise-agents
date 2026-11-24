@@ -32,6 +32,7 @@ import {
   getBoard,
   getTaskDetail,
   getWorkflow,
+  listTeams,
   listWaiting,
   moveTask,
   resumeTask,
@@ -89,6 +90,9 @@ export function registerTaskRoutes(app: FastifyInstance, deps: { tasks: TasksCon
     deleteTemplate(db, id);
     return reply.status(204).send();
   });
+
+  // Areas as teams, with their roles and agents (Phase 39), for the agent form.
+  app.get('/api/teams', async () => listTeams(db));
 
   app.post('/api/areas/from-template', async (request, reply) => {
     const created = createAreaFromTemplate(tasks, parseInput(areaFromTemplateSchema, request.body));

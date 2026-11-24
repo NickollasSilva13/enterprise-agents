@@ -123,7 +123,9 @@ function Column({ stage, tasks, accepts, onDrop, children }: ColumnProps) {
         </h2>
         <p className="text-sm text-dim">
           {stage.kind === 'agent'
-            ? (stage.agentName ?? 'Sem responsável')
+            ? stage.roleName
+              ? `Papel ${stage.roleName}`
+              : 'Sem papel'
             : STAGE_KIND_LABEL[stage.kind]}{' '}
           · {plural(tasks.length, 'tarefa', 'tarefas')}
         </p>

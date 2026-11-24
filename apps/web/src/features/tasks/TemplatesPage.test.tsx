@@ -20,22 +20,31 @@ const builtin: WorkflowTemplateSummary = {
   practices: ['Nada fica pronto sem a sua aprovação.'],
   roles: [
     {
+      key: 'redacao',
       name: 'Redação',
       objective: 'Escrever.',
+      systemPrompt: '',
       tools: ['read_file', 'write_file'],
       areaAccess: 'write',
     },
     {
+      key: 'revisao',
       name: 'Revisão de marketing',
       objective: 'Conferir.',
+      systemPrompt: '',
       tools: ['read_file'],
       areaAccess: 'read',
     },
   ],
   stages: [
-    { name: 'Redação', kind: 'agent' },
-    { name: 'Sua aprovação', kind: 'human' },
-    { name: 'Publicado', kind: 'done' },
+    { key: 'r', name: 'Redação', kind: 'agent', role: 'redacao' },
+    { key: 'a', name: 'Sua aprovação', kind: 'human', role: null },
+    { key: 'p', name: 'Publicado', kind: 'done', role: null },
+  ],
+  transitions: [
+    { from: 'r', to: 'a', actor: 'both' },
+    { from: 'a', to: 'p', actor: 'human' },
+    { from: 'a', to: 'r', actor: 'human' },
   ],
 };
 
@@ -73,7 +82,10 @@ describe('the templates screen (Phase 18)', () => {
   it('lists ready-made and own templates, with what each creates', async () => {
     renderApp('/tarefas/modelos', { '/api/workflow-templates': { templates: [builtin, own] } });
     const ready = within(await screen.findByRole('region', { name: 'Modelos prontos' }));
-    expect(ready.getByText('Redação → Sua aprovação → Publicado')).toBeTruthy();
+    // The flow is drawn (Phase 39), with the stages in order for screen readers.
+    expect(
+      ready.getByRole('img', { name: 'Etapas: Redação → Sua aprovação → Publicado' }),
+    ).toBeTruthy();
     expect(
       ready.getByText(/lê e escreve na pasta da área · ferramentas: read_file, write_file/),
     ).toBeTruthy();
@@ -250,14 +262,15 @@ describe('a new area from a template (Phase 18)', () => {
 describe('saving an area as a template (Phase 18, D3)', () => {
   const workflow: Workflow = {
     areaId: 'p1',
+    roles: [],
     stages: [
       {
         id: 's1',
         name: 'Fila',
         kind: 'human',
         position: 0,
-        agentId: null,
-        agentName: null,
+        roleId: null,
+        roleName: null,
         openTasks: 0,
       },
       {
@@ -265,8 +278,8 @@ describe('saving an area as a template (Phase 18, D3)', () => {
         name: 'Fim',
         kind: 'done',
         position: 1,
-        agentId: null,
-        agentName: null,
+        roleId: null,
+        roleName: null,
         openTasks: 0,
       },
     ],

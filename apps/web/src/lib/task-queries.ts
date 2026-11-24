@@ -1,5 +1,5 @@
 import {
-  type AreaFromTemplate,
+  type AreaFromTemplateInput,
   type AreaLinkInput,
   areaCreatedSchema,
   areaLinkSchema,
@@ -16,6 +16,7 @@ import {
   taskSummarySchema,
   tasksWaitingSchema,
   type TaskUpdate,
+  teamListSchema,
   type TemplateExport,
   type TemplateFromArea,
   templateExportSchema,
@@ -187,17 +188,26 @@ function useRefreshTasks() {
       queryClient.invalidateQueries({ queryKey: ['tasks-waiting'] }),
       queryClient.invalidateQueries({ queryKey: ['workflow'] }),
       queryClient.invalidateQueries({ queryKey: ['requests'] }),
+      queryClient.invalidateQueries({ queryKey: ['teams'] }),
     ]);
 }
+
+/** The areas as teams, with their roles and agents (Phase 39). */
+export const useTeams = () =>
+  useQuery({
+    queryKey: ['teams'],
+    queryFn: async () => (await apiFetch('/api/teams', teamListSchema)).teams,
+  });
 
 export function useCreateAreaFromTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: AreaFromTemplate) =>
+    mutationFn: (input: AreaFromTemplateInput) =>
       apiSend('POST', '/api/areas/from-template', areaCreatedSchema, input),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['teams'] }),
         queryClient.invalidateQueries({ queryKey: ['agents'] }),
         queryClient.invalidateQueries({ queryKey: ['office'] }),
       ]),

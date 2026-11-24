@@ -1,5 +1,11 @@
-import { type Agent, AGENT_LIMITS, type ModelOption, type Project } from '@ea/shared';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import {
+  type Agent,
+  AGENT_LIMITS,
+  type ModelOption,
+  type Team,
+  type WorkflowTemplateSummary,
+} from '@ea/shared';
+import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AgentAvatar } from '../../components/AgentAvatar';
 import { Button, buttonClass } from '../../components/Button';
@@ -10,15 +16,13 @@ import { ErrorState, LoadingState } from '../../components/States';
 import { useToast } from '../../components/Toast';
 import { errorMessage, fieldErrors } from '../../lib/errors';
 import { formatCount } from '../../lib/format';
-import {
-  useAgent,
-  useCreateAgent,
-  useModels,
-  useProjects,
-  useUpdateAgent,
-} from '../../lib/queries';
+import { useAgent, useCreateAgent, useModels, useUpdateAgent } from '../../lib/queries';
+import { useCreateAreaFromTemplate, useTeams, useWorkflowTemplates } from '../../lib/task-queries';
+import { useSetAgentTools } from '../../lib/tool-queries';
 import { AppearanceFields } from './AppearanceFields';
 import { type AgentFormErrors, type AgentFormValues, parseForm, toFormValues } from './agent-form';
+import { FunctionFields } from './FunctionFields';
+import { type FunctionValues, initialFunction, type RoleSuggestion, rolesFor } from './team-role';
 import { LINK } from '../../components/TextLink';
 import { FormError } from '../../components/Notice';
 
@@ -33,20 +37,27 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 interface AgentFormProps {
   agent?: Agent;
-  projects: readonly Project[];
   models: readonly ModelOption[];
+  teams: readonly Team[];
+  templates: readonly WorkflowTemplateSummary[];
 }
 
-function AgentForm({ agent, projects, models }: AgentFormProps) {
+function AgentForm({ agent, models, teams, templates }: AgentFormProps) {
   const [values, setValues] = useState<AgentFormValues>(() => toFormValues(agent));
+  const [role, setRole] = useState<FunctionValues>(() => initialFunction(agent, teams));
   const [errors, setErrors] = useState<AgentFormErrors>({});
+  const [newTeamError, setNewTeamError] = useState<string>();
+  // What the last role chosen filled in, so choosing another replaces only that.
+  const filled = useRef<RoleSuggestion | null>(null);
   const create = useCreateAgent();
   const update = useUpdateAgent();
+  const createTeam = useCreateAreaFromTemplate();
+  const setTools = useSetAgentTools();
   const navigate = useNavigate();
   const notify = useToast();
 
-  const saving = create.isPending || update.isPending;
-  const failure = create.error ?? update.error;
+  const saving = create.isPending || update.isPending || createTeam.isPending;
+  const failure = create.error ?? update.error ?? createTeam.error;
   // A failure that is not about one field is shown next to the buttons.
   const generalError =
     failure && Object.keys(fieldErrors(failure)).length === 0 ? errorMessage(failure) : undefined;
@@ -64,33 +75,91 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
     onChange: (event: { target: { value: string } }) => set(field, event.target.value),
   });
 
-  const submit = (event: FormEvent) => {
+  const roleOptions = rolesFor(role, teams, templates, agent?.id ?? null);
+  const hasTeam = role.team.kind !== 'none';
+
+  /**
+   * Choosing a role fills in what its template suggests, where the user has
+   * not written anything else: objective, instructions and area access.
+   */
+  const chooseRole = (next: FunctionValues) => {
+    setRole(next);
+    setNewTeamError(undefined);
+    const suggestion =
+      roleOptions.find((option) => option.key === next.roleKey)?.suggestion ??
+      rolesFor(next, teams, templates, agent?.id ?? null).find(
+        (option) => option.key === next.roleKey,
+      )?.suggestion ??
+      null;
+    const before = filled.current;
+    if (!suggestion || next.roleKey === role.roleKey) return;
+    setValues((current) => ({
+      ...current,
+      objective:
+        current.objective.trim() === '' || current.objective === before?.objective
+          ? suggestion.objective
+          : current.objective,
+      systemPrompt:
+        current.systemPrompt.trim() === '' || current.systemPrompt === before?.systemPrompt
+          ? suggestion.systemPrompt
+          : current.systemPrompt,
+      areaAccess: agent ? current.areaAccess : suggestion.areaAccess,
+    }));
+    filled.current = suggestion;
+  };
+
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const parsed = parseForm(values);
+    const parsed = parseForm({
+      ...values,
+      projectId: role.team.kind === 'existing' ? role.team.areaId : hasTeam ? 'nova' : '',
+    });
     if (!parsed.ok) {
       setErrors(parsed.errors);
       return;
     }
-    const onError = (error: unknown) => setErrors(fieldErrors(error));
-    if (agent) {
-      update.mutate(
-        { id: agent.id, patch: parsed.agent },
-        {
-          onSuccess: (saved) => {
-            notify(`${saved.name} salvo.`);
-            void navigate('/agentes');
-          },
-          onError,
-        },
-      );
-    } else {
-      create.mutate(parsed.agent, {
-        onSuccess: (saved) => {
-          notify(`${saved.name} criado.`);
-          void navigate('/agentes');
-        },
-        onError,
-      });
+    if (role.team.kind === 'new' && role.team.name.trim() === '') {
+      setNewTeamError('Dê um nome à nova equipe.');
+      return;
+    }
+    try {
+      // A new team is made first, from its template, without other agents (D2).
+      let projectId = role.team.kind === 'existing' ? role.team.areaId : null;
+      let roleId = role.team.kind === 'existing' ? role.roleKey : null;
+      if (role.team.kind === 'new' && role.templateId) {
+        const team = await createTeam.mutateAsync({
+          templateId: role.templateId,
+          name: role.team.name.trim(),
+          withAgents: false,
+        });
+        projectId = team.areaId;
+        roleId = team.roles.find((entry) => entry.key === role.roleKey)?.id ?? null;
+        // If saving the agent fails now, trying again joins this team instead of making another.
+        setRole({ ...role, team: { kind: 'existing', areaId: team.areaId }, roleKey: roleId });
+      }
+      const fields = { ...parsed.agent, projectId, roleId };
+      if (agent) {
+        const saved = await update.mutateAsync({ id: agent.id, patch: fields });
+        notify(`${saved.name} salvo.`);
+      } else {
+        const saved = await create.mutateAsync(fields);
+        // The tools the role suggests come along, each asking first (C-15).
+        const tools = roleOptions.find((option) => option.key === role.roleKey)?.suggestion?.tools;
+        if (tools && tools.length > 0) {
+          await setTools.mutateAsync({
+            agentId: saved.id,
+            grants: tools.map((toolName) => ({ toolName, permission: 'ask' as const })),
+          });
+        }
+        notify(`${saved.name} criado.`);
+      }
+      void navigate('/agentes');
+    } catch (error) {
+      const fields = fieldErrors(error);
+      if (role.team.kind === 'new' && createTeam.error && 'name' in fields) {
+        setNewTeamError(fields.name);
+      }
+      setErrors(fields);
     }
   };
 
@@ -100,7 +169,7 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
   const errorCount = Object.values(errors).filter(Boolean).length;
 
   return (
-    <form onSubmit={submit} noValidate className="max-w-3xl space-y-6">
+    <form onSubmit={(event) => void submit(event)} noValidate className="max-w-3xl space-y-6">
       <Section title="Identidade">
         <TextField label="Nome" maxLength={AGENT_LIMITS.name} required {...text('name')} />
         <TextField
@@ -116,39 +185,6 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
           hint="O que este agente deve alcançar."
           {...text('objective')}
         />
-        <SelectField
-          label="Projeto"
-          hint={
-            projects.length === 0
-              ? 'Nenhum projeto ainda. Crie projetos na tela de agentes.'
-              : 'O projeto define a sala do agente no Escritório.'
-          }
-          {...text('projectId')}
-        >
-          <option value="">Sem projeto</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          label="Pasta compartilhada da área"
-          value={values.projectId === '' ? 'none' : values.areaAccess}
-          disabled={values.projectId === ''}
-          onChange={(event) =>
-            set('areaAccess', event.target.value as AgentFormValues['areaAccess'])
-          }
-          hint={
-            values.projectId === ''
-              ? 'Escolha um projeto: a pasta compartilhada é da área (o projeto).'
-              : 'Onde os agentes da área trocam arquivos, pelo prefixo "area/". Ler e escrever ainda dependem das ferramentas de arquivo liberadas.'
-          }
-        >
-          <option value="none">Sem acesso</option>
-          <option value="read">Só ler</option>
-          <option value="write">Ler e escrever</option>
-        </SelectField>
         <Switch
           checked={values.enabled}
           onChange={(enabled) => set('enabled', enabled)}
@@ -156,6 +192,38 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
         >
           {values.enabled ? 'Ativo: pode ser executado' : 'Inativo: não pode ser executado'}
         </Switch>
+      </Section>
+
+      <Section title="Função na empresa">
+        <p className="text-sm text-dim">
+          Escolha o fluxo de trabalho, a equipe e o papel. Agentes do mesmo papel dividem as tarefas
+          da etapa: quanto mais agentes, mais tarefas andam ao mesmo tempo.
+        </p>
+        <FunctionFields
+          values={role}
+          onChange={chooseRole}
+          teams={teams}
+          templates={templates}
+          agentId={agent?.id ?? null}
+          newTeamError={newTeamError}
+        />
+        <SelectField
+          label="Pasta compartilhada da equipe"
+          value={hasTeam ? values.areaAccess : 'none'}
+          disabled={!hasTeam}
+          onChange={(event) =>
+            set('areaAccess', event.target.value as AgentFormValues['areaAccess'])
+          }
+          hint={
+            hasTeam
+              ? 'Onde os agentes da equipe trocam arquivos, pelo prefixo "area/". Ler e escrever ainda dependem das ferramentas de arquivo liberadas.'
+              : 'Escolha uma equipe: a pasta compartilhada é da equipe.'
+          }
+        >
+          <option value="none">Sem acesso</option>
+          <option value="read">Só ler</option>
+          <option value="write">Ler e escrever</option>
+        </SelectField>
       </Section>
 
       <Section title="Aparência">
@@ -273,11 +341,16 @@ function AgentForm({ agent, projects, models }: AgentFormProps) {
 export function AgentFormPage() {
   const { id } = useParams();
   const agent = useAgent(id);
-  const projects = useProjects();
+  const teams = useTeams();
+  const templates = useWorkflowTemplates();
   const models = useModels();
 
-  const error = agent.error ?? projects.error ?? models.error;
-  const loading = (id !== undefined && agent.isPending) || projects.isPending || models.isPending;
+  const error = agent.error ?? teams.error ?? templates.error ?? models.error;
+  const loading =
+    (id !== undefined && agent.isPending) ||
+    teams.isPending ||
+    templates.isPending ||
+    models.isPending;
   const title = id === undefined ? 'Novo agente' : (agent.data?.name ?? 'Agente');
 
   return (
@@ -313,19 +386,21 @@ export function AgentFormPage() {
           error={error}
           onRetry={() => {
             void agent.refetch();
-            void projects.refetch();
+            void teams.refetch();
+            void templates.refetch();
             void models.refetch();
           }}
         />
       )}
 
-      {!loading && !error && projects.data && models.data && (
+      {!loading && !error && teams.data && templates.data && models.data && (
         <div className="space-y-6">
           <AgentForm
             key={agent.data?.id ?? 'new'}
             {...(agent.data ? { agent: agent.data } : {})}
-            projects={projects.data}
             models={models.data}
+            teams={teams.data}
+            templates={templates.data}
           />
           {agent.data && (
             <section className="max-w-3xl rounded-xl border border-line bg-sheet p-4">

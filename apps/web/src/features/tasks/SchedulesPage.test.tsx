@@ -237,6 +237,7 @@ describe('a scheduled task (Phase 19)', () => {
         stageId: 's1',
         stageName: 'Fila',
         stageKind: 'human',
+        roleName: null,
         agentId: null,
         agentName: null,
         attention: null,

@@ -66,8 +66,8 @@ async function setup(turns: FakeTurn[] = []) {
       const areaId = addProject(test.database, name);
       const { status, body } = await call('PUT', `/api/areas/${areaId}/workflow`, {
         stages: [
-          { key: 'f', name: 'Fila', kind: 'human', agentId: null },
-          { key: 'd', name: 'Fim', kind: 'done', agentId: null },
+          { key: 'f', name: 'Fila', kind: 'human', roleKey: null },
+          { key: 'd', name: 'Fim', kind: 'done', roleKey: null },
         ],
         transitions: [{ from: 'f', to: 'd', actor: 'human' }],
       });
@@ -260,8 +260,8 @@ describe('requests made by the user', () => {
     // The user reopens the request: the parent waits again and gets a second delivery.
     await s.call('PUT', `/api/areas/${dados.areaId}/workflow`, {
       stages: [
-        { key: dados.fila, name: 'Fila', kind: 'human', agentId: null },
-        { key: dados.fim, name: 'Fim', kind: 'done', agentId: null },
+        { key: dados.fila, name: 'Fila', kind: 'human', roleKey: null },
+        { key: dados.fim, name: 'Fim', kind: 'done', roleKey: null },
       ],
       transitions: [
         { from: dados.fila, to: dados.fim, actor: 'human' },
@@ -378,11 +378,13 @@ describe('requests made by agents', () => {
     };
     const site = await fromTemplate('Site');
     const dados = await fromTemplate('Dados');
-    const analyst = dados.agentIds[0]!;
+    // The first role of the template, with the first agent, works the only stage.
+    const analysis = dados.roles[0]!.id;
     await s.call('PUT', `/api/areas/${dados.areaId}/workflow`, {
+      roles: [{ key: analysis, name: 'Produto' }],
       stages: [
-        { key: 'a', name: 'Análise', kind: 'agent', agentId: analyst },
-        { key: 'b', name: 'Entregue', kind: 'done', agentId: null },
+        { key: 'a', name: 'Análise', kind: 'agent', roleKey: analysis },
+        { key: 'b', name: 'Entregue', kind: 'done', roleKey: null },
       ],
       transitions: [{ from: 'a', to: 'b', actor: 'both' }],
     });

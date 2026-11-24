@@ -229,7 +229,9 @@ SQLite em `data/app.db`, modo WAL, chaves estrangeiras ativas. Migrações Drizz
 | `settings` | Preferências da aplicação; `office.layout` guarda o tamanho da grade do layout salvo e o entorno (Fase 15; sem entorno, prédio). Sem essa entrada o layout é o automático. |
 | `office_areas` | Áreas do layout do escritório (Fase 14): tipo, nome, retângulo na grade, piso, portas, projeto (`set null` ao excluir o projeto). |
 | `office_items` | Móveis do layout: tipo do catálogo, posição, orientação, dono da mesa (`agent_id`), texto do mural. |
-| `workflow_stages` | Etapas do fluxo de uma área (Fase 16): ordem, nome, tipo (agente, usuário, final) e o agente responsável (`on delete set null`). |
+| `area_roles` | Papéis de uma área (equipe), Fase 39: nome único na área. Só mudam ao salvar o fluxo, na mesma transação das etapas. |
+| `role_members` | O papel de cada agente (no máximo um, chave primária `agent_id`; cascata nos dois lados). O papel precisa ser da área do agente (conferido no serviço). |
+| `workflow_stages` | Etapas do fluxo de uma área (Fase 16): ordem, nome, tipo (agente, usuário, final) e, desde a Fase 39, o papel que atende a etapa (`role_id`, sem chave estrangeira porque o SQLite não a acrescenta a tabela existente; `agent_id` ficou sem uso). Antes da Fase 39, o agente responsável (`on delete set null`). |
 | `workflow_transitions` | Passagens permitidas entre etapas e quem pode fazê-las (agente, usuário ou os dois). |
 | `tasks` | Tarefas do quadro: área, título, descrição, critérios de aceite, prioridade, estado, etapa atual, motivo de parada e os contadores de voltas e execuções. Área e etapa com tarefas não podem ser apagadas. |
 | `task_events` | Histórico de cada tarefa (criada, movida, comentada, execução iniciada e encerrada, parada, retomada, cancelada), só de inserção. `runs.task_id` liga a execução à tarefa; `agents.area_access` diz o que o agente faz na pasta da área. |

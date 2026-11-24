@@ -1,7 +1,7 @@
 import type { Board, Project, TaskDetail, TaskSummary, Workflow } from '@ea/shared';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { json, makeAgent, renderApp } from '../../test/render';
+import { json, renderApp } from '../../test/render';
 
 const area: Project = {
   id: 'p1',
@@ -14,14 +14,15 @@ const area: Project = {
 
 const workflow: Workflow = {
   areaId: 'p1',
+  roles: [{ id: 'r1', name: 'Dev', agents: [{ id: 'a1', name: 'Ana', busy: false }] }],
   stages: [
     {
       id: 's1',
       name: 'Desenvolvimento',
       kind: 'agent',
       position: 0,
-      agentId: 'a1',
-      agentName: 'Dev',
+      roleId: 'r1',
+      roleName: 'Dev',
       openTasks: 2,
     },
     {
@@ -29,8 +30,8 @@ const workflow: Workflow = {
       name: 'Sua revisão',
       kind: 'human',
       position: 1,
-      agentId: null,
-      agentName: null,
+      roleId: null,
+      roleName: null,
       openTasks: 1,
     },
     {
@@ -38,8 +39,8 @@ const workflow: Workflow = {
       name: 'Concluído',
       kind: 'done',
       position: 2,
-      agentId: null,
-      agentName: null,
+      roleId: null,
+      roleName: null,
       openTasks: 0,
     },
   ],
@@ -57,6 +58,7 @@ const task = (overrides: Partial<TaskSummary> & { id: string; title: string }): 
   stageId: 's1',
   stageName: 'Desenvolvimento',
   stageKind: 'agent',
+  roleName: null,
   agentId: 'a1',
   agentName: 'Dev',
   attention: null,
@@ -83,6 +85,7 @@ const board: Board = {
       stageId: 's2',
       stageName: 'Sua revisão',
       stageKind: 'human',
+      roleName: null,
       agentId: null,
       agentName: null,
     }),
@@ -300,6 +303,7 @@ describe('a task (Phase 16)', () => {
         stageId: 's1',
         stageName: 'Desenvolvimento',
         stageKind: 'agent',
+        roleName: null,
         attention: 'O agente terminou sem passar a tarefa adiante.',
       },
     };
@@ -315,25 +319,31 @@ describe('a task (Phase 16)', () => {
   });
 });
 
-describe('the flow editor (Phase 16, D2)', () => {
-  it('saves the stages and moves, forcing "only you" out of your own stages', async () => {
-    const { writes } = renderApp('/tarefas/fluxo/p1', {
+describe('the flow editor, drawn (Phase 16, D2; Phase 39, D5)', () => {
+  const editor = (extra: Record<string, unknown> = {}) =>
+    renderApp('/tarefas/fluxo/p1', {
       '/api/projects': { projects: [area] },
-      '/api/agents': { agents: [makeAgent({ id: 'a1', name: 'Dev', projectId: 'p1' })] },
       '/api/areas/p1/workflow': workflow,
-      'PUT /api/areas/p1/workflow': workflow,
+      ...extra,
     });
-    const stages = within(await screen.findByRole('region', { name: 'Etapas' }));
-    fireEvent.change(stages.getByRole('textbox', { name: 'Etapa 1' }), {
+
+  it('edits a stage picked in the drawing and saves the flow with its roles', async () => {
+    const { writes } = editor({ 'PUT /api/areas/p1/workflow': workflow });
+    const drawing = within(await screen.findByRole('region', { name: 'Desenho do fluxo' }));
+    fireEvent.click(drawing.getByRole('button', { name: /^Desenvolvimento: Dev, 1 agente/ }));
+    const panel = within(screen.getByRole('region', { name: 'Etapa: Desenvolvimento' }));
+    fireEvent.change(panel.getByRole('textbox', { name: 'Nome da etapa' }), {
       target: { value: 'Construção' },
     });
+    expect(panel.getByText('Ana · livre')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar fluxo' }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toEqual({
+      roles: [{ key: 'r1', name: 'Dev' }],
       stages: [
-        { key: 's1', name: 'Construção', kind: 'agent', agentId: 'a1' },
-        { key: 's2', name: 'Sua revisão', kind: 'human', agentId: null },
-        { key: 's3', name: 'Concluído', kind: 'done', agentId: null },
+        { key: 's1', name: 'Construção', kind: 'agent', roleKey: 'r1' },
+        { key: 's2', name: 'Sua revisão', kind: 'human', roleKey: null },
+        { key: 's3', name: 'Concluído', kind: 'done', roleKey: null },
       ],
       transitions: [
         { from: 's1', to: 's2', actor: 'both' },
@@ -343,19 +353,95 @@ describe('the flow editor (Phase 16, D2)', () => {
     });
   });
 
-  it('points out a flow without a final stage before sending anything', async () => {
-    const { writes } = renderApp('/tarefas/fluxo/p1', {
-      '/api/projects': { projects: [area] },
-      '/api/agents': { agents: [] },
-      '/api/areas/p1/workflow': workflow,
+  it('tells the flow in words and walks a pretend task through it', async () => {
+    editor();
+    const words = within(await screen.findByRole('region', { name: 'Em palavras' }));
+    expect(
+      words.getByText(
+        'Uma tarefa nova chega em Desenvolvimento, onde trabalha Ana (Dev). Daqui segue para Sua revisão (o agente ou você levam).',
+      ),
+    ).toBeTruthy();
+    expect(
+      words.getByText(
+        'Em Sua revisão, onde a tarefa espera a sua decisão. Daqui segue para Concluído (só você leva); ou volta para Desenvolvimento (só você leva).',
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simular uma tarefa' }));
+    const simulation = within(screen.getByRole('region', { name: 'Simulação' }));
+    fireEvent.click(simulation.getByRole('button', { name: 'Passar para Sua revisão' }));
+    fireEvent.click(simulation.getByRole('button', { name: 'Devolver para Desenvolvimento' }));
+    fireEvent.click(simulation.getByRole('button', { name: 'Passar para Sua revisão' }));
+    fireEvent.click(simulation.getByRole('button', { name: 'Passar para Concluído' }));
+    expect(simulation.getByText('Concluída em 4 passagem(ns).')).toBeTruthy();
+    expect(
+      within(simulation.getByRole('list', { name: 'Passos da simulação' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'A tarefa chega em Desenvolvimento: Ana (Dev).',
+      'Passa para Sua revisão: você decide.',
+      'Devolvida para Desenvolvimento: Ana (Dev).',
+      'Passa para Sua revisão: você decide.',
+      'Passa para Concluído: a tarefa termina.',
+    ]);
+  });
+
+  it('points out what would stop tasks: a role nobody has, a stage with no way out', async () => {
+    editor({
+      '/api/areas/p1/workflow': {
+        ...workflow,
+        roles: [{ id: 'r1', name: 'Dev', agents: [] }],
+      },
     });
-    const stages = within(await screen.findByRole('region', { name: 'Etapas' }));
-    const kinds = stages.getAllByRole('combobox', { name: 'Tipo' });
-    fireEvent.change(kinds[2]!, { target: { value: 'human' } });
+    expect(
+      await screen.findByText(
+        'Ninguém tem o papel Dev, de Desenvolvimento: dê esse papel a um agente da equipe.',
+      ),
+    ).toBeTruthy();
+    // Removing the only way out of the review is pointed out too.
+    const drawing = within(screen.getByRole('region', { name: 'Desenho do fluxo' }));
+    fireEvent.click(drawing.getByRole('button', { name: /^Sua revisão/ }));
+    const panel = within(screen.getByRole('region', { name: 'Etapa: Sua revisão' }));
+    for (const button of panel.getAllByRole('button', { name: /Remover a passagem/ })) {
+      fireEvent.click(button);
+    }
+    expect(
+      screen.getByText('Sua revisão não tem saída: uma tarefa que chega lá não anda mais.'),
+    ).toBeTruthy();
+  });
+
+  it('points out a flow without a final stage before sending anything', async () => {
+    const { writes } = editor();
+    const drawing = within(await screen.findByRole('region', { name: 'Desenho do fluxo' }));
+    fireEvent.click(drawing.getByRole('button', { name: /^Concluído/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Você/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Salvar fluxo' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
       'O fluxo precisa de uma etapa final.',
     );
     expect(writes()).toEqual([]);
+  });
+
+  it('adds a stage before the end, linked in, and a role for it', async () => {
+    const { writes } = editor({ 'PUT /api/areas/p1/workflow': workflow });
+    fireEvent.click(await screen.findByRole('button', { name: 'Etapa' }));
+    const panel = within(screen.getByRole('region', { name: 'Etapa: Etapa 4' }));
+    fireEvent.click(panel.getByRole('button', { name: 'Novo papel para esta etapa' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar fluxo' }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    const body = writes()[0]?.body as {
+      roles: { key: string; name: string }[];
+      stages: { name: string; roleKey: string | null }[];
+      transitions: { from: string; to: string }[];
+    };
+    expect(body.roles.map((role) => role.name)).toEqual(['Dev', 'Etapa 4']);
+    expect(body.stages.map((stage) => stage.name)).toEqual([
+      'Desenvolvimento',
+      'Sua revisão',
+      'Etapa 4',
+      'Concluído',
+    ]);
+    expect(body.stages[2]?.roleKey).toBe(body.roles[1]?.key);
   });
 });

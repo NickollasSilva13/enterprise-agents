@@ -52,7 +52,8 @@ test('an agent answers in a chat, can be interrupted, and leaves a trail', async
   await expect(page.getByText(`Projeto "${projectName}" criado.`)).toBeVisible();
   await page.getByRole('link', { name: 'Novo agente' }).click();
   await page.getByRole('textbox', { name: 'Nome' }).fill(agentName);
-  await page.getByRole('combobox', { name: 'Projeto' }).selectOption({ label: projectName });
+  // The project is the agent's team (Phase 39), picked in "Função na empresa".
+  await page.getByRole('radio', { name: projectName }).check();
   await page
     .getByRole('combobox', { name: 'Modelo de IA' })
     .selectOption({ label: `llama3.2:3b (${providerName})` });

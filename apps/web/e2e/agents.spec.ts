@@ -36,7 +36,8 @@ test('an agent can be created, edited, duplicated, deactivated and deleted', asy
   await page.getByRole('textbox', { name: 'Nome' }).fill(agentName);
   await page.getByRole('textbox', { name: 'Objetivo' }).fill('Classificar os pedidos que chegam');
   await page.getByRole('textbox', { name: 'Prompt de sistema' }).fill('Responda em uma linha.');
-  await page.getByRole('combobox', { name: 'Projeto' }).selectOption({ label: projectName });
+  // The project is the agent's team (Phase 39), picked in "Função na empresa".
+  await page.getByRole('radio', { name: projectName }).check();
   await page.getByRole('textbox', { name: 'Temperatura' }).fill('0,3');
   await page.getByRole('textbox', { name: 'Passos por execução' }).fill('8');
   await page.getByRole('button', { name: 'Criar agente' }).click();

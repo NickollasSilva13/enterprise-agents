@@ -58,6 +58,13 @@ Carregado quando a tarefa toca arquivos do servidor. As regras gerais estão em 
 - Modelos de fluxo (Fase 18): `modules/tasks/templates.ts`. O conteúdo é sempre conferido com `templateContentSchema`, ao gravar e ao ler; o que um modelo pode levar é decidido por esse esquema estrito, então campo novo de papel precisa entrar nele de propósito. Aplicar um modelo (`createAreaFromTemplate`) grava toda ferramenta como `ask` e pula as de `scope: 'task'`.
 - Agendamentos (Fase 19): `modules/schedules`. O relógio (`scheduler.ts`) começa no `onReady` e para no `preClose`; `fireDue` grava a próxima vez antes de criar a tarefa (no máximo uma por horário) e cria por `createTask` com `TaskOrigin`. `tasks.schedule_id` não tem cascata no banco: exclua agendamento só por `deleteScheduleRow`, que limpa a coluna antes. Nos testes, um agendamento vencido gravado antes de `makeApp({ database })` é disparado na partida; depois dela, qualquer `PATCH` reprograma o relógio.
 
+## Equipes e papéis (Fase 39)
+
+- Área é equipe. A etapa de agente aponta para um papel (`workflow_stages.role_id`, sem chave estrangeira; `agent_id` sem uso); `area_roles` e `role_members` (um papel por agente). Papel só muda em `replaceWorkflow`, que recebe papéis, etapas e passagens juntos; nunca apague papel por fora.
+- Quem trabalha a tarefa vem de `workerFor` (`service.ts`): quem já trabalhou nela naquela etapa (`previousWorker`, pelo evento `run_started` com o nome da etapa), esperando por ele se ocupado; senão o primeiro livre do papel. `worksStage` confere o papel em `move_task` e `request_from_area`.
+- O papel de um agente é conferido em `modules/agents/service.ts` (`assertRole`: precisa ser da área dele); mudar de área sem mandar `roleId` tira o papel. Exportação leva o nome do papel (`role`); a importação junta ou cria o papel pelo nome.
+- `POST /api/areas/from-template` com `withAgents: false` cria só a equipe; a resposta traz o id de cada papel por chave. `GET /api/teams` lista as equipes com modelo de origem, papéis, agentes e etapas de cada papel.
+
 ## Moldura (Fase 21)
 
 `modules/frame`: busca global e perfil do usuário. A busca compara em JavaScript (`searchRank` de `@ea/shared`), nunca por `LIKE` com o texto do usuário. O perfil fica em `settings` (chave `profile`) e é conferido com `profileSchema` ao ser lido.

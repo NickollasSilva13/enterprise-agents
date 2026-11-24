@@ -109,9 +109,9 @@ describe('ready-made templates (Phase 18)', () => {
       'Validação:agent',
       'Entregue:done',
     ]);
-    // One analyst works the first two stages; another agent checks.
+    // One role works the first two stages; another checks.
     const pedido = dados.board.workflow.stages[0]!;
-    expect(dados.board.workflow.stages[1]!.agentId).toBe(pedido.agentId);
+    expect(dados.board.workflow.stages[1]!.roleId).toBe(pedido.roleId);
     expect(dados.agents.map((agent) => [agent.name, agent.areaAccess])).toEqual([
       ['Análise de dados (Dados)', 'write'],
       ['Validação de dados (Dados)', 'read'],

@@ -71,6 +71,20 @@
       "when": 1795097739547,
       "tag": "0009_item_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1795466706055,
+      "tag": "0010_teams_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1795466712819,
+      "tag": "0011_stage_agents_to_roles",
+      "breakpoints": true
     }
   ]
 }

@@ -26,8 +26,8 @@ test('finds an agent and a task with three letters, by keyboard only', async ({
   const area = await api<Created>(page, 'POST', '/api/projects', { name: `Cópias ${tag}` });
   await api(page, 'PUT', `/api/areas/${area.id}/workflow`, {
     stages: [
-      { key: 'r', name: 'Revisão', kind: 'human', agentId: null },
-      { key: 'd', name: 'Feito', kind: 'done', agentId: null },
+      { key: 'r', name: 'Revisão', kind: 'human', roleKey: null },
+      { key: 'd', name: 'Feito', kind: 'done', roleKey: null },
     ],
     transitions: [{ from: 'r', to: 'd', actor: 'human' }],
   });

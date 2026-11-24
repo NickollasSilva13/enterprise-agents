@@ -47,6 +47,12 @@ export const projects = sqliteTable('projects', {
   id: id(),
   name: text('name').notNull().unique(),
   description: text('description').notNull().default(''),
+  /**
+   * The workflow template the area (team) was made from (Phase 39, D1): a
+   * ready-made id or a saved template's id, kept as it was even if the saved
+   * template is deleted. Null for an area set up by hand.
+   */
+  templateId: text('template_id'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -329,11 +335,48 @@ export const workflowStages = sqliteTable(
     position: integer('position').notNull(),
     name: text('name').notNull(),
     kind: text('kind', { enum: STAGE_KINDS }).notNull(),
-    /** Who works an agent stage. A deleted agent leaves the stage without one. */
+    /**
+     * Who worked an agent stage until Phase 39; always null since then (the
+     * stage points to a role). SQLite cannot drop a column with a foreign key.
+     */
     agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+    /**
+     * The role that works an agent stage (Phase 39, D3). No foreign key:
+     * SQLite cannot add one to an existing table, and roles only change when
+     * the workflow is saved, in the same transaction (`replaceWorkflow`).
+     */
+    roleId: text('role_id'),
     createdAt: createdAt(),
   },
   (table) => [index('workflow_stages_project_idx').on(table.projectId, table.position)],
+);
+
+/** The roles of an area (team): who may work which stages (Phase 39, D3). */
+export const areaRoles = sqliteTable(
+  'area_roles',
+  {
+    id: id(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex('area_roles_name_unique').on(table.projectId, table.name)],
+);
+
+/** Which role each agent has in its area: at most one (Phase 39, D3). */
+export const roleMembers = sqliteTable(
+  'role_members',
+  {
+    agentId: text('agent_id')
+      .primaryKey()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    roleId: text('role_id')
+      .notNull()
+      .references(() => areaRoles.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('role_members_role_idx').on(table.roleId)],
 );
 
 export const workflowTransitions = sqliteTable(

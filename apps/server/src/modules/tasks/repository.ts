@@ -5,6 +5,7 @@ import {
   type TaskEventKind,
   type TaskSummary,
   type Workflow,
+  type WorkflowRole,
   type WorkflowStage,
 } from '@ea/shared';
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
@@ -13,7 +14,9 @@ import { newId } from '../../db/ids';
 import {
   agents,
   areaLinks,
+  areaRoles,
   projects,
+  roleMembers,
   runs,
   schedules,
   taskEvents,
@@ -26,6 +29,7 @@ export type TaskRow = typeof tasks.$inferSelect;
 export type StageRow = typeof workflowStages.$inferSelect;
 export type TransitionRow = typeof workflowTransitions.$inferSelect;
 export type AreaRow = typeof projects.$inferSelect;
+export type RoleRow = typeof areaRoles.$inferSelect;
 
 /** Drizzle's transaction handle exposes the same query builder as the database. */
 type Tx = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
@@ -82,6 +86,106 @@ export function agentById(db: Tx, agentId: string) {
     .from(agents)
     .where(and(eq(agents.id, agentId), isNull(agents.deletedAt)))
     .get();
+}
+
+/** The roles of an area, oldest first. */
+export function rolesOf(db: Tx, areaId: string): RoleRow[] {
+  return db
+    .select()
+    .from(areaRoles)
+    .where(eq(areaRoles.projectId, areaId))
+    .orderBy(asc(areaRoles.createdAt), asc(areaRoles.id))
+    .all();
+}
+
+export function findRole(db: Tx, roleId: string): RoleRow | undefined {
+  return db.select().from(areaRoles).where(eq(areaRoles.id, roleId)).get();
+}
+
+/** Active agents that have the role, oldest first (Phase 39). */
+export function membersOf(db: Tx, roleId: string) {
+  return db
+    .select({ agent: agents })
+    .from(roleMembers)
+    .innerJoin(agents, eq(roleMembers.agentId, agents.id))
+    .where(and(eq(roleMembers.roleId, roleId), isNull(agents.deletedAt)))
+    .orderBy(asc(agents.id))
+    .all()
+    .map((row) => row.agent);
+}
+
+/** The role of an agent, if it has one. */
+export function roleOfAgent(db: Tx, agentId: string): RoleRow | undefined {
+  return db
+    .select({ role: areaRoles })
+    .from(roleMembers)
+    .innerJoin(areaRoles, eq(roleMembers.roleId, areaRoles.id))
+    .where(eq(roleMembers.agentId, agentId))
+    .get()?.role;
+}
+
+/** Gives the agent a role, or takes its role away with null. */
+export function setRoleOfAgent(db: Tx, agentId: string, roleId: string | null): void {
+  db.delete(roleMembers).where(eq(roleMembers.agentId, agentId)).run();
+  if (roleId !== null) db.insert(roleMembers).values({ agentId, roleId }).run();
+}
+
+/** Every role with its active agents, of the areas given or of all (Phase 39). */
+export function rolesWithMembers(db: Tx, areaIds?: readonly string[]) {
+  const roles = db
+    .select()
+    .from(areaRoles)
+    .where(areaIds ? inArray(areaRoles.projectId, [...areaIds]) : undefined)
+    .orderBy(asc(areaRoles.createdAt), asc(areaRoles.id))
+    .all();
+  const members = db
+    .select({ roleId: roleMembers.roleId, id: agents.id, name: agents.name })
+    .from(roleMembers)
+    .innerJoin(agents, eq(roleMembers.agentId, agents.id))
+    .where(isNull(agents.deletedAt))
+    .orderBy(asc(agents.id))
+    .all();
+  return roles.map((role) => ({
+    ...role,
+    agents: members
+      .filter((member) => member.roleId === role.id)
+      .map(({ id, name }) => ({ id, name })),
+  }));
+}
+
+/**
+ * The agent who last started work on the task in this stage: a task sent
+ * back goes to whoever already worked on it there (Phase 39, D3).
+ */
+export function previousWorker(db: Tx, taskId: string, stageName: string): string | undefined {
+  return (
+    db
+      .select({ agentId: taskEvents.agentId })
+      .from(taskEvents)
+      .where(
+        and(
+          eq(taskEvents.taskId, taskId),
+          eq(taskEvents.kind, 'run_started'),
+          eq(taskEvents.toStage, stageName),
+          isNotNull(taskEvents.agentId),
+        ),
+      )
+      .orderBy(desc(taskEvents.id))
+      .get()?.agentId ?? undefined
+  );
+}
+
+/** The agent of the active run of each task given, by task id. */
+export function activeRunAgents(db: Tx, taskIds: readonly string[]): Map<string, string> {
+  if (taskIds.length === 0) return new Map();
+  return new Map(
+    db
+      .select({ taskId: runs.taskId, agentId: runs.agentId })
+      .from(runs)
+      .where(and(inArray(runs.taskId, [...taskIds]), inArray(runs.status, ACTIVE_RUN_STATUSES)))
+      .all()
+      .flatMap((row) => (row.taskId ? [[row.taskId, row.agentId] as const] : [])),
+  );
 }
 
 /** Tasks with a run that is queued, running or waiting for the user. */
@@ -249,10 +353,16 @@ export function insertTask(db: Tx, row: typeof tasks.$inferInsert): void {
   db.insert(tasks).values(row).run();
 }
 
-/** The workflow of an area, with the agent names and how many tasks wait in each stage. */
+/** The workflow of an area, with its roles and how many tasks wait in each stage. */
 export function readWorkflow(db: Tx, areaId: string): Workflow {
   const stageRows = stagesOf(db, areaId);
-  const names = new Map(agentsOfArea(db, areaId).map((agent) => [agent.id, agent.name] as const));
+  const busy = busyAgentIds(db);
+  const roles: WorkflowRole[] = rolesWithMembers(db, [areaId]).map((role) => ({
+    id: role.id,
+    name: role.name,
+    agents: role.agents.map((agent) => ({ ...agent, busy: busy.has(agent.id) })),
+  }));
+  const roleNames = new Map(roles.map((role) => [role.id, role.name] as const));
   const open = db
     .select({ stageId: tasks.stageId })
     .from(tasks)
@@ -263,12 +373,13 @@ export function readWorkflow(db: Tx, areaId: string): Workflow {
     name: stage.name,
     kind: stage.kind,
     position: stage.position,
-    agentId: stage.agentId,
-    agentName: stage.agentId ? (names.get(stage.agentId) ?? null) : null,
+    roleId: stage.roleId,
+    roleName: stage.roleId ? (roleNames.get(stage.roleId) ?? null) : null,
     openTasks: open.filter((task) => task.stageId === stage.id).length,
   }));
   return {
     areaId,
+    roles,
     stages,
     transitions: transitionsOf(db, areaId).map((transition) => ({
       id: transition.id,
@@ -301,14 +412,33 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
   );
   const working = workingTaskIds(db);
   const busy = busyAgentIds(db);
+  const runAgents = activeRunAgents(
+    db,
+    rows.map((row) => row.id),
+  );
+  const roleIds = new Set([...stages.values()].flatMap((stage) => stage.roleId ?? []));
+  const roles = new Map(
+    rolesWithMembers(db)
+      .filter((role) => roleIds.has(role.id))
+      .map((role) => [role.id, role] as const),
+  );
   const waiting = openChildCounts(
     db,
     rows.map((row) => row.id),
   );
   return rows.map((row) => {
     const stage = stages.get(row.stageId);
-    const agentId = stage?.kind === 'agent' ? (stage.agentId ?? null) : null;
+    const role = stage?.kind === 'agent' && stage.roleId ? roles.get(stage.roleId) : undefined;
     const isWorking = working.has(row.id);
+    const members = new Set(role?.agents.map((agent) => agent.id) ?? []);
+    const before = stage && role ? previousWorker(db, row.id, stage.name) : undefined;
+    const returning = before !== undefined && members.has(before) ? before : undefined;
+    const agentId = isWorking ? (runAgents.get(row.id) ?? null) : (returning ?? null);
+    // It waits for the agent it goes back to, or for any agent of the role.
+    const allBusy =
+      returning !== undefined
+        ? busy.has(returning)
+        : members.size > 0 && [...members].every((member) => busy.has(member));
     return {
       id: row.id,
       areaId: row.projectId,
@@ -318,6 +448,7 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
       stageId: row.stageId,
       stageName: stage?.name ?? '',
       stageKind: stage?.kind ?? 'human',
+      roleName: role?.name ?? null,
       agentId,
       agentName: agentId ? (agentNames.get(agentId) ?? null) : null,
       attention: row.attention,
@@ -327,8 +458,7 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
         row.state === 'open' &&
         row.attention === null &&
         !waiting.has(row.id) &&
-        agentId !== null &&
-        busy.has(agentId),
+        allBusy,
       returns: row.returns,
       runCount: row.runCount,
       parentTaskId: row.parentTaskId,
@@ -339,21 +469,55 @@ export function summarize(db: Tx, rows: readonly TaskRow[]): TaskSummary[] {
   });
 }
 
-/** Replaces the stages and transitions of an area, keeping the ids of stages that stay. */
+/** A role as saved with the workflow: new ones are inserted, the others renamed. */
+export interface RoleChange {
+  readonly id: string;
+  readonly isNew: boolean;
+  readonly name: string;
+}
+
+/**
+ * Replaces the roles, stages and transitions of an area, keeping the ids of
+ * roles and stages that stay. A removed role takes its memberships with it
+ * (the agents stay, without a role). Roles change only here, so no stage is
+ * left pointing to a role that is gone (`role_id` has no foreign key).
+ */
 export function replaceWorkflow(
   db: Tx,
   areaId: string,
+  roles: readonly RoleChange[],
   stages: readonly {
     id: string;
     isNew: boolean;
     position: number;
     name: string;
     kind: StageRow['kind'];
-    agentId: string | null;
+    roleId: string | null;
   }[],
   removedStageIds: readonly string[],
   transitions: readonly { fromStageId: string; toStageId: string; actor: TransitionRow['actor'] }[],
 ): void {
+  const kept = new Set(roles.map((role) => role.id));
+  const removedRoles = rolesOf(db, areaId)
+    .filter((role) => !kept.has(role.id))
+    .map((role) => role.id);
+  if (removedRoles.length > 0) {
+    db.delete(areaRoles).where(inArray(areaRoles.id, removedRoles)).run();
+  }
+  // Renames go through a temporary name, so two roles can swap names.
+  for (const role of roles.filter((change) => !change.isNew)) {
+    db.update(areaRoles)
+      .set({ name: `\u0000${role.id}` })
+      .where(eq(areaRoles.id, role.id))
+      .run();
+  }
+  for (const role of roles) {
+    if (role.isNew) {
+      db.insert(areaRoles).values({ id: role.id, projectId: areaId, name: role.name }).run();
+    } else {
+      db.update(areaRoles).set({ name: role.name }).where(eq(areaRoles.id, role.id)).run();
+    }
+  }
   db.delete(workflowTransitions).where(eq(workflowTransitions.projectId, areaId)).run();
   for (const stage of stages) {
     if (stage.isNew) {
@@ -364,7 +528,7 @@ export function replaceWorkflow(
           position: stage.position,
           name: stage.name,
           kind: stage.kind,
-          agentId: stage.agentId,
+          roleId: stage.roleId,
         })
         .run();
     } else {
@@ -373,7 +537,8 @@ export function replaceWorkflow(
           position: stage.position,
           name: stage.name,
           kind: stage.kind,
-          agentId: stage.agentId,
+          roleId: stage.roleId,
+          agentId: null,
         })
         .where(eq(workflowStages.id, stage.id))
         .run();

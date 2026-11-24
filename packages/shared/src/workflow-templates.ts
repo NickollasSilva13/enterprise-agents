@@ -8,7 +8,7 @@ import {
   TRANSITION_ACTORS,
   type TransitionActor,
 } from './enums';
-import { workflowUpdateSchema } from './tasks';
+import { WORKFLOW_LIMITS, workflowUpdateSchema } from './tasks';
 
 // Ready-made workflows with good practice built in (Phase 16, D7) and the
 // user's own (Phase 18). Applying one copies it into a new area: changing the
@@ -127,6 +127,10 @@ const templateTransitionSchema = z.strictObject({
   actor: z.enum(TRANSITION_ACTORS),
 });
 
+/** A template role's name as the role of a team (Phase 39), which is shorter. */
+export const teamRoleName = (name: string): string =>
+  name.trim().slice(0, WORKFLOW_LIMITS.roleName).trimEnd();
+
 /**
  * The content of a template, checked with the same rules as a workflow saved
  * by the editor (a stage's role stands where an agent would), plus the rules
@@ -162,11 +166,13 @@ export const templateContentSchema = z
       }
     });
     const workflow = workflowUpdateSchema.safeParse({
+      // A team's role names are shorter than an agent's: cut, as applying does.
+      roles: content.roles.map((role) => ({ key: role.key, name: teamRoleName(role.name) })),
       stages: content.stages.map((stage) => ({
         key: stage.key,
         name: stage.name,
         kind: stage.kind,
-        agentId: stage.role,
+        roleKey: stage.role,
       })),
       transitions: content.transitions,
     });
@@ -188,13 +194,27 @@ export const workflowTemplateSummarySchema = z.object({
   practices: z.array(z.string()),
   roles: z.array(
     z.object({
+      key: z.string(),
       name: z.string(),
       objective: z.string(),
+      /** Fills the instructions of an agent that takes the role (Phase 39). */
+      systemPrompt: z.string(),
       tools: z.array(z.string()),
       areaAccess: z.enum(AREA_ACCESS),
     }),
   ),
-  stages: z.array(z.object({ name: z.string(), kind: z.enum(STAGE_KINDS) })),
+  stages: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      kind: z.enum(STAGE_KINDS),
+      role: z.string().nullable(),
+    }),
+  ),
+  /** Drawn as arrows in the picture of the template (Phase 39). */
+  transitions: z.array(
+    z.object({ from: z.string(), to: z.string(), actor: z.enum(TRANSITION_ACTORS) }),
+  ),
 });
 export type WorkflowTemplateSummary = z.infer<typeof workflowTemplateSummarySchema>;
 
@@ -213,12 +233,20 @@ export function templateSummary(
     description: template.description,
     practices: [...template.practices],
     roles: template.roles.map((role) => ({
+      key: role.key,
       name: role.name,
       objective: role.objective,
+      systemPrompt: role.systemPrompt,
       tools: [...role.tools],
       areaAccess: role.areaAccess,
     })),
-    stages: template.stages.map((stage) => ({ name: stage.name, kind: stage.kind })),
+    stages: template.stages.map((stage) => ({
+      key: stage.key,
+      name: stage.name,
+      kind: stage.kind,
+      role: stage.role,
+    })),
+    transitions: template.transitions.map((transition) => ({ ...transition })),
   };
 }
 

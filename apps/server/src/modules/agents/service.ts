@@ -10,7 +10,13 @@ import { ConflictError, NotFoundError, ValidationError } from '../../core/errors
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
 import { agents, agentTools, models, projects, runs } from '../../db/schema';
-import { listAgentsWithState, storedAppearance } from './repository';
+import {
+  findAreaRole,
+  listAgentsWithState,
+  rolesByAgent,
+  setAgentRole,
+  storedAppearance,
+} from './repository';
 
 const sameName = (a: string, b: string) =>
   a.toLocaleLowerCase('pt-BR') === b.toLocaleLowerCase('pt-BR');
@@ -54,6 +60,19 @@ function assertReferences(db: Db, input: { projectId?: string | null; modelId?: 
   }
 }
 
+/**
+ * A role must be one of the roles of the agent's area (Phase 39): an agent
+ * without an area has no role.
+ */
+function assertRole(db: Db, roleId: string | null, projectId: string | null): void {
+  if (roleId === null) return;
+  const role = findAreaRole(db, roleId);
+  if (!role) throw fieldError('roleId', 'Papel não encontrado.');
+  if (role.projectId !== projectId) {
+    throw fieldError('roleId', 'O papel precisa ser da equipe (área) do agente.');
+  }
+}
+
 export function listAgents(db: Db): Agent[] {
   const projectNames = new Map(
     db
@@ -69,6 +88,8 @@ export function listAgents(db: Db): Agent[] {
       .all()
       .map((row) => [row.id, row.name]),
   );
+
+  const roles = rolesByAgent(db);
 
   return listAgentsWithState(db).map(({ agent, state }) => ({
     id: agent.id,
@@ -88,6 +109,8 @@ export function listAgents(db: Db): Agent[] {
     enabled: agent.enabled,
     appearance: storedAppearance(agent.appearance),
     areaAccess: agent.areaAccess,
+    roleId: roles.get(agent.id)?.id ?? null,
+    roleName: roles.get(agent.id)?.name ?? null,
     state,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
@@ -104,25 +127,41 @@ export function getAgent(db: Db, id: string): Agent {
 export function createAgent(db: Db, input: AgentCreate): Agent {
   assertNameIsFree(db, input.name);
   assertReferences(db, input);
+  const { roleId, ...fields } = input;
+  assertRole(db, roleId, fields.projectId);
   const id = newId();
-  db.insert(agents)
-    .values({ id, ...input })
-    .run();
+  db.transaction((tx) => {
+    tx.insert(agents)
+      .values({ id, ...fields })
+      .run();
+    setAgentRole(tx, id, roleId);
+  });
   return getAgent(db, id);
 }
 
 export function updateAgent(db: Db, id: string, patch: AgentUpdate): Agent {
-  getAgent(db, id);
+  const current = getAgent(db, id);
   if (patch.name !== undefined) assertNameIsFree(db, patch.name, id);
   assertReferences(db, patch);
+  const { roleId, ...fields } = patch;
+  const projectId = fields.projectId === undefined ? current.projectId : fields.projectId;
+  // Moving to another area leaves the role behind unless a new one comes along.
+  const role =
+    roleId !== undefined ? roleId : projectId === current.projectId ? current.roleId : null;
+  assertRole(db, role, projectId);
   // A new look is not a change of work: it must not reset how long the agent
   // has been idle, which is counted from `updatedAt` (RF-80).
   const keys = Object.keys(patch);
   const lookOnly = keys.length > 0 && keys.every((key) => key === 'appearance');
-  db.update(agents)
-    .set(lookOnly ? patch : { ...patch, updatedAt: new Date().toISOString() })
-    .where(eq(agents.id, id))
-    .run();
+  db.transaction((tx) => {
+    if (Object.keys(fields).length > 0) {
+      tx.update(agents)
+        .set(lookOnly ? fields : { ...fields, updatedAt: new Date().toISOString() })
+        .where(eq(agents.id, id))
+        .run();
+    }
+    if (role !== current.roleId) setAgentRole(tx, id, role);
+  });
   return getAgent(db, id);
 }
 
@@ -159,6 +198,8 @@ export function duplicateAgent(db: Db, id: string): Agent {
         areaAccess: source.areaAccess,
       })
       .run();
+    // A copy works the same stages: another agent in the same role (Phase 39).
+    setAgentRole(tx, copyId, source.roleId);
     const tools = tx.select().from(agentTools).where(eq(agentTools.agentId, id)).all();
     if (tools.length > 0) {
       tx.insert(agentTools)

@@ -44,6 +44,7 @@ Regra do projeto: ao fim de cada fase o trabalho para, é apresentado um relató
 | 36 | Ilha tropical e jardim tecnológico | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
 | 37 | Validação final | Concluída em 2026-11-21 |
 | 38 | Redesenho da interface | Concluída em 2026-11-21 (aguarda a aprovação visual do usuário) |
+| 39 | Equipes por modelo e fluxo em desenho | Concluída em 2026-11-23 (aguarda a aprovação visual do usuário) |
 
 ## Fases concluídas
 
@@ -1628,6 +1629,84 @@ Pedido do usuário: a cidade estava feia, com o entorno cinza, sem detalhes nem 
 - Atrás e à esquerda a praça vai até as torres, sem rua: o fundo aparece pelo vidro do escritório, e o asfalto ali mudava o miolo que `scenery.spec.ts` compara entre os ambientes.
 - Feito com as peças do bairro e do condomínio (`town.ts`, `kit.ts`), sem luz nova nem quadro próprio. As capturas `cidade-dia` e `cidade-noite` foram refeitas.
 
+## Fase 39 — Equipes por modelo e fluxo em desenho (concluída)
+
+**Pedido do usuário (2026-11-23).** Ao criar um agente, escolher um dos modelos
+de fluxo; agentes do mesmo modelo formam equipes, mantendo o fluxo de demanda
+que o usuário definir. A configuração dos modelos e do fluxo era confusa
+(listas de selects de etapas e passagens): repensar com desenho, setas e
+exemplos.
+
+### Decisões (aprovadas pelo usuário em 2026-11-23, todas as recomendações)
+
+- **D1 — Equipe é a área que já existe.** A área passa a guardar de que modelo
+  veio (`projects.template_id`); quadro, sala no Escritório, pasta compartilhada
+  e pedidos entre áreas continuam como estão. Na interface, "área" e "equipe"
+  são a mesma coisa.
+- **D2 — A equipe se forma ao criar o agente.** O formulário do agente ganha
+  "Função na empresa": modelo → equipe → papel. Se só existe uma equipe daquele
+  modelo, ela já vem marcada; se não existe nenhuma, o padrão é "nova equipe"
+  (a área é criada pelo modelo, sem criar os outros agentes). As instruções e
+  ferramentas sugeridas do papel preenchem o agente.
+- **D3 — A etapa aponta para um papel, não para um agente.** Papéis são da
+  equipe (`area_roles`); cada agente tem no máximo um papel (`role_members`).
+  Quem pega a tarefa é o primeiro agente livre do papel; numa devolução ela
+  volta para quem já trabalhou nela naquela etapa, e espera por ele se estiver
+  ocupado. Vários agentes no mesmo papel trabalham em tarefas diferentes ao
+  mesmo tempo.
+- **D4 — Modelo e fluxo da equipe continuam separados.** A equipe nasce com uma
+  cópia do fluxo do modelo; mudar um não muda o outro.
+- **D5 — Editor de fluxo em desenho.** As etapas viram cartões da esquerda para a
+  direita ligados por setas, com devoluções tracejadas por baixo e as etapas do
+  usuário em destaque; clicar numa etapa abre um painel (nome, tipo, papel,
+  agentes livres e ocupados, ligações). Ao lado: o fluxo "em palavras", gerado do
+  próprio desenho, "Simular uma tarefa" (anda pelo fluxo sem chamar modelo,
+  mostrando quem pegaria em cada etapa) e avisos (etapa sem saída, papel sem
+  agente, final inalcançável). No celular, lista vertical com setas. A página
+  Modelos de fluxo mostra o mesmo desenho em miniatura.
+
+**Migração.** Cada agente que hoje responde por uma etapa vira um papel com o
+nome dele, do qual é o único membro, e a etapa passa a apontar para esse papel:
+nada do que existe quebra. `workflow_stages.agent_id` fica sem uso (SQLite não
+apaga coluna com chave estrangeira) e a coluna nova `role_id` não tem chave
+estrangeira, porque papéis só mudam ao salvar o fluxo, na mesma transação.
+
+### Escopo
+
+1. Contrato e banco: `area_roles`, `role_members`, `workflow_stages.role_id`,
+   `projects.template_id`; fluxo com papéis; agente com `roleId`; criar equipe
+   pelo modelo sem agentes; lista de equipes com papéis e membros; migração
+   testada sobre dados existentes.
+2. Servidor: o despachante escolhe o agente do papel (livre, com afinidade na
+   devolução); `move_task` confere o papel; salvar fluxo, criar área por modelo,
+   salvar como modelo, exportar e importar agente com papéis.
+3. Interface: "Função na empresa" no formulário do agente; editor de fluxo em
+   desenho com painel, frases, simulação e avisos; miniatura nos modelos;
+   quadro e tarefa mostram papel e quem trabalha.
+4. Testes (unidade, integração, componentes, E2E), `npm run check:full` e
+   documentação viva.
+
+### O que foi feito
+
+- Contrato e banco: `area_roles`, `role_members`, `workflow_stages.role_id`, `projects.template_id` (migração `0010_teams_roles`, só criação) e a migração de dados `0011_stage_agents_to_roles` (cada agente de etapa vira um papel com o nome dele, testada sobre dados existentes). Fluxo com papéis, agente com `roleId` e `roleName`, `withAgents` na criação de área por modelo, `GET /api/teams`, resumo do modelo com chaves, papéis das etapas e passagens.
+- Servidor: `workerFor` escolhe quem trabalha (afinidade na devolução, primeiro livre do papel); `move_task` e `request_from_area` conferem o papel; salvar fluxo, criar área por modelo, salvar como modelo, editar, duplicar, exportar e importar agente com papéis.
+- Interface: "Função na empresa" no formulário do agente (modelo → equipe → papel, frase que explica, preenchimento pelo papel, equipe nova criada no envio, ferramentas sugeridas como `ask`); editor de fluxo em desenho (cartões e setas em linha ou coluna, painel da etapa, frases, avisos, simulação passo a passo, papéis da equipe); miniatura vertical nos modelos de fluxo; quadro e tarefa mostram o papel e a fila do papel.
+
+### Decisões tomadas durante a implementação
+
+- **Id do papel migrado é `R` + id do agente**, para um agente que atendia várias etapas virar um só papel. Agente excluído ou de outra área numa etapa deixa a etapa sem papel (a tarefa já parava ali antes).
+- **Afinidade pelo nome da etapa** (evento `run_started`): renomear a etapa faz a próxima devolução ir ao primeiro livre, não a quem trabalhou antes.
+- **Nome de papel tem até 40 caracteres** (o de um papel de modelo continua até 80, cortado ao aplicar), para caber no cartão.
+- **Equipe nova criada antes do agente**, no envio do formulário: se gravar o agente falhar, o formulário passa a apontar para a equipe criada, e tentar de novo não cria outra.
+- **Importar agente cria o papel pelo nome**, como já fazia com o projeto: o papel é um rótulo que só diz que etapas ele atende, e as ferramentas continuam entrando como `ask`.
+- **"Qualquer equipe"** no formulário mostra todas as equipes, inclusive as montadas à mão, e "Sem equipe".
+
+### Não validado
+
+- Nenhum modelo real atravessou um fluxo com dois agentes no mesmo papel; a distribuição e a afinidade foram exercitadas com o provedor simulado (`test/teams.test.ts`).
+- O desenho com 12 etapas e muitas devoluções cruzadas foi testado pelas contas (`flow-graph.test.ts`: nada sai do quadro, cartões não se sobrepõem, arcos que se cruzam em faixas diferentes), não olhado na tela.
+
+## Pendências ao final do projeto
 
 Revistas na Fase 37 (validação final), cada uma com o resultado ou o motivo de seguir aberta.
 

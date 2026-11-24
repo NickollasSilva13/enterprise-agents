@@ -1,4 +1,4 @@
-import type { ModelOption, Project } from '@ea/shared';
+import type { ModelOption, Project, Team, WorkflowTemplateSummary } from '@ea/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { json, makeAgent, renderApp } from '../../test/render';
@@ -30,10 +30,57 @@ const cloudModel: ModelOption = {
   supportsTools: true,
 };
 
+/** A team set up by hand, with one role and nobody in it (Phase 39). */
+const team: Team = {
+  areaId: 'p1',
+  areaName: 'Pesquisa',
+  templateId: null,
+  templateName: null,
+  roles: [{ id: 'r1', name: 'Leitura', agents: [], stages: ['Leitura'] }],
+};
+
+const template: WorkflowTemplateSummary = {
+  id: 'desenvolvimento',
+  name: 'Desenvolvimento',
+  origin: 'builtin',
+  description: 'Um pedido é refinado, implementado e testado.',
+  practices: [],
+  roles: [
+    {
+      key: 'dev',
+      name: 'Dev',
+      objective: 'Implementar.',
+      systemPrompt: 'Implemente o que foi pedido.',
+      tools: ['read_file', 'write_file'],
+      areaAccess: 'write',
+    },
+    {
+      key: 'qa',
+      name: 'QA',
+      objective: 'Testar.',
+      systemPrompt: 'Teste.',
+      tools: ['read_file'],
+      areaAccess: 'read',
+    },
+  ],
+  stages: [
+    { key: 'd', name: 'Desenvolvimento', kind: 'agent', role: 'dev' },
+    { key: 't', name: 'Testes', kind: 'agent', role: 'qa' },
+    { key: 'f', name: 'Concluído', kind: 'done', role: null },
+  ],
+  transitions: [
+    { from: 'd', to: 't', actor: 'agent' },
+    { from: 't', to: 'f', actor: 'agent' },
+    { from: 't', to: 'd', actor: 'agent' },
+  ],
+};
+
 const base = {
   '/api/agents': { agents: [] },
   '/api/projects': { projects: [project] },
   '/api/models': { models: [localModel, cloudModel] },
+  '/api/teams': { teams: [team] },
+  '/api/workflow-templates': { templates: [template] },
 };
 
 const field = (name: string | RegExp) => screen.findByRole('textbox', { name });
@@ -71,6 +118,7 @@ describe('creating an agent', () => {
           // A new agent starts as a person drawn at random (Phase 14).
           appearance: expect.objectContaining({ kind: 'person' }) as unknown,
           areaAccess: 'none',
+          roleId: null,
         },
       },
     ]);
@@ -85,9 +133,9 @@ describe('creating an agent', () => {
     await type('Descrição', 'Lê documentos');
     await type('Objetivo', 'Resumir');
     await type('Prompt de sistema', 'Seja breve.');
-    fireEvent.change(screen.getByRole('combobox', { name: 'Projeto' }), {
-      target: { value: 'p1' },
-    });
+    fireEvent.click(screen.getByRole('radio', { name: /Pesquisa/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Leitura/ }));
+    expect(screen.getByText(/Entra na etapa Leitura da equipe Pesquisa\./)).toBeTruthy();
     fireEvent.change(screen.getByRole('combobox', { name: 'Modelo de IA' }), {
       target: { value: 'm1' },
     });
@@ -116,6 +164,73 @@ describe('creating an agent', () => {
       enabled: false,
       appearance: null,
       areaAccess: 'none',
+      roleId: 'r1',
+    });
+  });
+
+  it('makes a new team from a template and joins it in a role, with what the role suggests (Phase 39)', async () => {
+    const { writes } = renderApp('/agentes/novo', {
+      ...base,
+      'POST /api/areas/from-template': () =>
+        json(201, {
+          areaId: 'p2',
+          agentIds: [],
+          roles: [
+            { key: 'dev', id: 'r-dev' },
+            { key: 'qa', id: 'r-qa' },
+          ],
+        }),
+      'POST /api/agents': () => json(201, makeAgent({ id: 'a1', name: 'Dev 1' })),
+      'PUT /api/agents/a1/tools': {
+        agentId: 'a1',
+        grants: [
+          { toolName: 'read_file', permission: 'ask' },
+          { toolName: 'write_file', permission: 'ask' },
+        ],
+      },
+    });
+    await type('Nome', 'Dev 1');
+    fireEvent.click(screen.getByRole('radio', { name: 'Desenvolvimento' }));
+    // No team of this template yet: a new one, named after it (D2).
+    expect(screen.getByRole('radio', { name: /Nova equipe de Desenvolvimento/ })).toHaveProperty(
+      'checked',
+      true,
+    );
+    expect(await field('Nome da nova equipe')).toHaveProperty('value', 'Desenvolvimento');
+    fireEvent.click(screen.getByRole('radio', { name: /^Dev/ }));
+    expect(
+      screen.getByText(/Entra na etapa Desenvolvimento da nova equipe Desenvolvimento\./),
+    ).toBeTruthy();
+    expect(await field('Prompt de sistema')).toHaveProperty(
+      'value',
+      'Implemente o que foi pedido.',
+    );
+    // Another role replaces what the first one filled in.
+    fireEvent.click(screen.getByRole('radio', { name: /^QA/ }));
+    expect(await field('Prompt de sistema')).toHaveProperty('value', 'Teste.');
+    fireEvent.click(screen.getByRole('radio', { name: /^Dev/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar agente' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(3));
+    expect(writes()[0]).toMatchObject({
+      url: '/api/areas/from-template',
+      body: { templateId: 'desenvolvimento', name: 'Desenvolvimento', withAgents: false },
+    });
+    expect(writes()[1]?.body).toMatchObject({
+      name: 'Dev 1',
+      projectId: 'p2',
+      roleId: 'r-dev',
+      objective: 'Implementar.',
+      areaAccess: 'write',
+    });
+    expect(writes()[2]).toMatchObject({
+      url: '/api/agents/a1/tools',
+      body: {
+        grants: [
+          { toolName: 'read_file', permission: 'ask' },
+          { toolName: 'write_file', permission: 'ask' },
+        ],
+      },
     });
   });
 
@@ -242,7 +357,8 @@ describe('editing an agent', () => {
     expect(await field('Prompt de sistema')).toHaveProperty('value', 'Seja breve.');
     expect(await field('Temperatura')).toHaveProperty('value', '0,2');
     expect(await field('Tokens por execução')).toHaveProperty('value', '9000');
-    expect(screen.getByRole('combobox', { name: 'Projeto' })).toHaveProperty('value', 'p1');
+    expect(screen.getByRole('radio', { name: /Pesquisa/ })).toHaveProperty('checked', true);
+    expect(screen.getByText(/Entra na equipe Pesquisa sem papel/)).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Modelo de IA' })).toHaveProperty('value', 'm1');
     expect(screen.getByRole('link', { name: 'Abrir as conversas' }).getAttribute('href')).toBe(
       '/agentes/a1/conversa',

@@ -35,6 +35,7 @@ const waitingTask: TaskSummary & { areaName: string } = {
   stageId: 's2',
   stageName: 'Sua revisão',
   stageKind: 'human',
+  roleName: null,
   agentId: null,
   agentName: null,
   attention: null,

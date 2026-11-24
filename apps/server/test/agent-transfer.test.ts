@@ -106,6 +106,7 @@ describe('exporting agents (RF-20)', () => {
         appearance: null,
         areaAccess: 'none',
         project: null,
+        role: null,
         model: null,
         tools: [],
       },
@@ -123,6 +124,7 @@ describe('exporting agents (RF-20)', () => {
         appearance: null,
         areaAccess: 'none',
         project: 'Atendimento',
+        role: null,
         model: { name: 'llama3.2:3b', provider: 'Ollama local' },
         tools: [
           { toolName: 'read_file', permission: 'ask' },

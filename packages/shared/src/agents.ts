@@ -76,6 +76,7 @@ export const AGENT_DEFAULTS = {
   enabled: true,
   appearance: null,
   areaAccess: 'none',
+  roleId: null,
 } as const;
 
 const between = (label: string, range: { min: number; max: number }) =>
@@ -111,6 +112,8 @@ const agentFields = {
   appearance: appearanceSchema.nullable(),
   /** What the agent may do in its area's shared folder (Phase 16). */
   areaAccess: z.enum(AREA_ACCESS),
+  /** Its role in the area (team), which says which stages it works (Phase 39). */
+  roleId: id.nullable(),
 };
 
 export const agentCreateSchema = z.strictObject({
@@ -128,6 +131,7 @@ export const agentCreateSchema = z.strictObject({
   enabled: agentFields.enabled.default(AGENT_DEFAULTS.enabled),
   appearance: agentFields.appearance.default(AGENT_DEFAULTS.appearance),
   areaAccess: agentFields.areaAccess.default(AGENT_DEFAULTS.areaAccess),
+  roleId: agentFields.roleId.default(AGENT_DEFAULTS.roleId),
 });
 export type AgentCreate = z.infer<typeof agentCreateSchema>;
 /** What a client may send: everything but the name is optional. */
@@ -154,6 +158,8 @@ export const agentSchema = z.object({
   enabled: z.boolean(),
   appearance: appearanceSchema.nullable(),
   areaAccess: z.enum(AREA_ACCESS),
+  roleId: id.nullable(),
+  roleName: z.string().nullable(),
   state: agentStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -203,6 +209,8 @@ export const exportedAgentSchema = z.strictObject({
   areaAccess: agentFields.areaAccess.default(AGENT_DEFAULTS.areaAccess),
   /** Name of the project, or null for none. */
   project: z.string().trim().min(1).max(PROJECT_LIMITS.name).nullable().default(null),
+  /** Name of its role in that project (Phase 39), or null for none. */
+  role: z.string().trim().min(1).max(40).nullable().default(null),
   model: z
     .strictObject({
       name: z.string().min(1).max(200),

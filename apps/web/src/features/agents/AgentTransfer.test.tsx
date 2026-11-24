@@ -24,6 +24,7 @@ const exported: AgentExport = {
       appearance: null,
       areaAccess: 'none',
       project: null,
+      role: null,
       model: null,
       tools: [],
     },

@@ -16,14 +16,16 @@ import {
   type TaskSummary,
   type TaskUpdate,
   type TasksWaiting,
+  type TeamList,
+  teamRoleName,
   type Workflow,
   type WorkflowUpdate,
 } from '@ea/shared';
-import { eq, isNull } from 'drizzle-orm';
+import { asc, eq, isNull } from 'drizzle-orm';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
-import { agents, agentTools, models, projects } from '../../db/schema';
+import { agents, agentTools, models, projects, workflowStages } from '../../db/schema';
 import type { RunRef } from '../../runtime/types';
 import type { ToolRegistry } from '../../tools/registry';
 import { type AreaRequest, type TaskPort, toolError, type ToolResult } from '../../tools/types';
@@ -31,9 +33,8 @@ import { resolveInWorkspace, WorkspacePathError } from '../../tools/workspace';
 import { recordAudit } from '../audit/service';
 import { areaDirOf, blockedReason, type RunsContext, startTaskRun } from '../runs/service';
 import { AreaCopyError, copyFolderContents, copyIntoFolder } from './area-files';
-import { findTemplate } from './templates';
+import { findTemplate, listTemplates } from './templates';
 import {
-  agentById,
   type AreaLinkRow,
   areaNames,
   childrenOf,
@@ -46,8 +47,12 @@ import {
   openChildCounts,
   unfinishedRequests,
   updateLink,
-  agentsOfArea,
   busyAgentIds,
+  membersOf,
+  previousWorker,
+  roleOfAgent,
+  rolesOf,
+  rolesWithMembers,
   eventsOf,
   findArea,
   findRunOfTask,
@@ -60,6 +65,7 @@ import {
   readWorkflow,
   replaceWorkflow,
   runMovedTask,
+  setRoleOfAgent,
   scheduleNameOf,
   type StageRow,
   stagesOf,
@@ -219,26 +225,24 @@ export function listWaiting(db: Db): TasksWaiting {
 // ---- Workflow ------------------------------------------------------------------
 
 /**
- * Saves the whole workflow of an area at once. Stages that stay keep their
- * id (and their tasks); a stage with tasks in it cannot be removed. An agent
- * stage must be worked by an agent of the same area (D1).
+ * Saves the whole workflow of an area at once, with its roles (Phase 39).
+ * Stages and roles that stay keep their id (a stage its tasks, a role its
+ * agents); a stage with tasks in it cannot be removed. A key that is not the
+ * id of one of this area's roles or stages makes a new one.
  */
 export function saveWorkflow(ctx: TasksContext, areaId: string, input: WorkflowUpdate): Workflow {
   const { db } = ctx;
   requireArea(db, areaId);
   const existing = new Map(stagesOf(db, areaId).map((stage) => [stage.id, stage] as const));
-  const areaAgents = new Set(agentsOfArea(db, areaId).map((agent) => agent.id));
+  const existingRoles = new Set(rolesOf(db, areaId).map((role) => role.id));
 
-  const problems: { path: string; message: string }[] = [];
-  input.stages.forEach((stage, index) => {
-    if (stage.agentId !== null && !areaAgents.has(stage.agentId)) {
-      problems.push({
-        path: `stages.${index}.agentId`,
-        message: 'O responsável precisa ser um agente desta área.',
-      });
-    }
+  const roleIdOfKey = new Map<string, string>();
+  const roles = input.roles.map((role) => {
+    const isNew = !existingRoles.has(role.key);
+    const id = isNew ? newId() : role.key;
+    roleIdOfKey.set(role.key, id);
+    return { id, isNew, name: role.name.trim() };
   });
-  if (problems.length > 0) throw new ValidationError(problems);
 
   const idOfKey = new Map<string, string>();
   const stages = input.stages.map((stage, position) => {
@@ -251,7 +255,7 @@ export function saveWorkflow(ctx: TasksContext, areaId: string, input: WorkflowU
       position,
       name: stage.name.trim(),
       kind: stage.kind,
-      agentId: stage.agentId,
+      roleId: stage.roleKey === null ? null : (roleIdOfKey.get(stage.roleKey) ?? null),
     };
   });
   const kept = new Set(stages.map((stage) => stage.id));
@@ -268,12 +272,17 @@ export function saveWorkflow(ctx: TasksContext, areaId: string, input: WorkflowU
     actor: transition.actor,
   }));
 
-  db.transaction((tx) => replaceWorkflow(tx, areaId, stages, removed, transitions));
+  db.transaction((tx) => replaceWorkflow(tx, areaId, roles, stages, removed, transitions));
   recordAudit(db, {
     actor: 'user',
     action: 'workflow.saved',
     target: areaId,
-    details: { stages: stages.length, transitions: transitions.length, removed: removed.length },
+    details: {
+      roles: roles.length,
+      stages: stages.length,
+      transitions: transitions.length,
+      removed: removed.length,
+    },
   });
   pump(ctx);
   return readWorkflow(db, areaId);
@@ -530,21 +539,13 @@ export function pump(ctx: TasksContext): void {
     if (working.has(task.id) || waiting.has(task.id)) continue;
     const stage = findStage(db, task.stageId);
     if (!stage || stage.kind !== 'agent') continue;
-    if (!stage.agentId) {
-      stop(db, task.id, `A etapa "${stage.name}" não tem um agente responsável.`);
+    const pick = workerFor(db, task, stage, busy);
+    if (pick.kind === 'wait') continue;
+    if (pick.kind === 'stop') {
+      stop(db, task.id, pick.reason);
       continue;
     }
-    if (busy.has(stage.agentId)) continue;
-    const agent = agentById(db, stage.agentId);
-    if (!agent || agent.projectId !== task.projectId) {
-      stop(db, task.id, `O responsável pela etapa "${stage.name}" não está mais nesta área.`);
-      continue;
-    }
-    const blocked = blockedReason(db, agent);
-    if (blocked) {
-      stop(db, task.id, `${agent.name} não pode trabalhar agora: ${blocked.message}`);
-      continue;
-    }
+    const { agent } = pick;
     if (task.runCount >= TASK_LIMITS.maxRuns) {
       stop(
         db,
@@ -568,6 +569,47 @@ export function pump(ctx: TasksContext): void {
     busy.add(agent.id);
     working.add(task.id);
   }
+}
+
+type Pick =
+  | { kind: 'run'; agent: ReturnType<typeof membersOf>[number] }
+  | { kind: 'wait' }
+  | { kind: 'stop'; reason: string };
+
+/**
+ * Who works the task in its stage (Phase 39, D3): the agent who already
+ * worked on it there, if it still has the role (and the task waits for it
+ * while it is busy); otherwise the first agent of the role that is free and
+ * able to run. The task stops when the role has nobody who can work.
+ */
+function workerFor(db: Db, task: TaskRow, stage: StageRow, busy: ReadonlySet<string>): Pick {
+  if (!stage.roleId) {
+    return { kind: 'stop', reason: `A etapa "${stage.name}" não tem um papel que a atenda.` };
+  }
+  const role = rolesOf(db, task.projectId).find((candidate) => candidate.id === stage.roleId);
+  const members = role
+    ? membersOf(db, role.id).filter((agent) => agent.projectId === task.projectId)
+    : [];
+  if (!role || members.length === 0) {
+    return {
+      kind: 'stop',
+      reason: `Nenhum agente da equipe tem o papel ${role ? `"${role.name}"` : 'desta etapa'}, que atende a etapa "${stage.name}". Dê esse papel a um agente.`,
+    };
+  }
+  const before = previousWorker(db, task.id, stage.name);
+  const returning = members.find((agent) => agent.id === before);
+  const candidates = returning ? [returning] : members;
+  const free = candidates.filter((agent) => !busy.has(agent.id));
+  if (free.length === 0) return { kind: 'wait' };
+  let firstBlocked: string | null = null;
+  for (const agent of free) {
+    const blocked = blockedReason(db, agent);
+    if (!blocked) return { kind: 'run', agent };
+    firstBlocked ??= `${agent.name} não pode trabalhar agora: ${blocked.message}`;
+  }
+  // Someone of the role is busy and may be able to run when done.
+  if (candidates.some((agent) => busy.has(agent.id))) return { kind: 'wait' };
+  return { kind: 'stop', reason: firstBlocked ?? `Ninguém pode atender a etapa "${stage.name}".` };
 }
 
 /**
@@ -626,6 +668,11 @@ const HISTORY_KINDS = new Set<string>([
   'delivered',
 ]);
 
+/** Whether the agent has the role of the stage, so it may pass a task on from there. */
+function worksStage(db: Db, agentId: string, stage: StageRow): boolean {
+  return stage.roleId !== null && roleOfAgent(db, agentId)?.id === stage.roleId;
+}
+
 /** What the run of a task may do to it. Every move is checked here (D4). */
 function portFor(ctx: TasksContext, taskId: string, ref: RunRef): TaskPort {
   const { db } = ctx;
@@ -640,7 +687,7 @@ function portFor(ctx: TasksContext, taskId: string, ref: RunRef): TaskPort {
         );
       }
       const from = findStage(db, task.stageId);
-      if (!from || from.agentId !== ref.agentId) {
+      if (!from || !worksStage(db, ref.agentId, from)) {
         return toolError('A tarefa não está mais numa etapa sua.');
       }
       const allowed = transitionsFrom(db, from.id)
@@ -678,7 +725,7 @@ function portFor(ctx: TasksContext, taskId: string, ref: RunRef): TaskPort {
       if (!task || task.state !== 'open')
         return toolError('Esta tarefa não está mais em andamento.');
       const from = findStage(db, task.stageId);
-      if (!from || from.agentId !== ref.agentId || runMovedTask(db, taskId, ref.runId)) {
+      if (!from || !worksStage(db, ref.agentId, from) || runMovedTask(db, taskId, ref.runId)) {
         return toolError('A tarefa não está mais numa etapa sua.');
       }
       const area = db
@@ -1151,9 +1198,10 @@ function agentNameFor(role: string, area: string, taken: readonly string[]): str
 }
 
 /**
- * Creates an area from a template: the area, one agent per role with the
- * suggested tools as "ask" (D7), the stages and the transitions. The user
- * then changes whatever they want; the template is never touched.
+ * Creates an area (team) from a template: the area, its roles, the stages and
+ * the transitions, and, unless `withAgents` is false (Phase 39, D2), one agent
+ * per role with the suggested tools as "ask" (D7). The user then changes
+ * whatever they want; the template is never touched.
  */
 export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplate): AreaCreated {
   const { db } = ctx;
@@ -1167,24 +1215,40 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
   ) {
     throw new ConflictError('name_taken', 'Já existe uma área com esse nome.');
   }
-  const model = db.select().from(models).where(eq(models.id, input.modelId)).get();
-  if (!model?.enabled) {
+  const model =
+    input.modelId === null
+      ? null
+      : db.select().from(models).where(eq(models.id, input.modelId)).get();
+  if (input.withAgents && !model?.enabled) {
     throw new ValidationError([{ path: 'modelId', message: 'Escolha um modelo habilitado.' }]);
   }
 
   const areaId = newId();
   const agentIdOfRole = new Map<string, string>();
+  const roleIdOfKey = new Map(template.roles.map((role) => [role.key, newId()] as const));
   db.transaction((tx) => {
     tx.insert(projects)
-      .values({ id: areaId, name: input.name, description: template.description })
+      .values({
+        id: areaId,
+        name: input.name,
+        description: template.description,
+        templateId: template.id,
+      })
       .run();
+    const roles = template.roles.map((role) => ({
+      id: roleIdOfKey.get(role.key) ?? newId(),
+      isNew: true,
+      name: teamRoleName(role.name),
+    }));
     const taken = tx
       .select({ name: agents.name })
       .from(agents)
       .where(isNull(agents.deletedAt))
       .all()
       .map((row) => row.name);
-    for (const role of template.roles) {
+    // The roles first: the agents below join them.
+    replaceWorkflow(tx, areaId, roles, [], [], []);
+    for (const role of input.withAgents && model ? template.roles : []) {
       const id = newId();
       const name = agentNameFor(role.name, input.name, taken);
       taken.push(name);
@@ -1196,10 +1260,11 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
           objective: role.objective,
           systemPrompt: role.systemPrompt,
           projectId: areaId,
-          modelId: model.id,
+          modelId: model?.id ?? null,
           areaAccess: role.areaAccess,
         })
         .run();
+      setRoleOfAgent(tx, id, roleIdOfKey.get(role.key) ?? null);
       // Tools that only exist inside tasks are never granted per agent (C-26).
       const known = role.tools.filter((tool) => {
         const definition = ctx.registry.get(tool);
@@ -1215,6 +1280,7 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
     replaceWorkflow(
       tx,
       areaId,
+      roles.map((role) => ({ ...role, isNew: false })),
       template.stages.map((stage, position) => {
         const id = newId();
         stageIdOfKey.set(stage.key, id);
@@ -1224,7 +1290,7 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
           position,
           name: stage.name,
           kind: stage.kind,
-          agentId: stage.role ? (agentIdOfRole.get(stage.role) ?? null) : null,
+          roleId: stage.role ? (roleIdOfKey.get(stage.role) ?? null) : null,
         };
       }),
       [],
@@ -1241,7 +1307,43 @@ export function createAreaFromTemplate(ctx: TasksContext, input: AreaFromTemplat
     target: areaId,
     details: { template: template.id, name: input.name, agents: agentIdOfRole.size },
   });
-  return { areaId, agentIds: [...agentIdOfRole.values()] };
+  return {
+    areaId,
+    agentIds: [...agentIdOfRole.values()],
+    roles: [...roleIdOfKey].map(([key, id]) => ({ key, id })),
+  };
+}
+
+/** Every area as a team: the template it came from and its roles with their agents (Phase 39). */
+export function listTeams(db: Db): TeamList {
+  const templates = new Map(
+    listTemplates(db).map((template) => [template.id, template.name] as const),
+  );
+  const roles = rolesWithMembers(db);
+  const stages = db.select().from(workflowStages).orderBy(asc(workflowStages.position)).all();
+  return {
+    teams: db
+      .select()
+      .from(projects)
+      .all()
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .map((area) => ({
+        areaId: area.id,
+        areaName: area.name,
+        templateId: area.templateId,
+        templateName: area.templateId ? (templates.get(area.templateId) ?? null) : null,
+        roles: roles
+          .filter((role) => role.projectId === area.id)
+          .map((role) => ({
+            id: role.id,
+            name: role.name,
+            agents: role.agents,
+            stages: stages
+              .filter((stage) => stage.roleId === role.id && stage.kind === 'agent')
+              .map((stage) => stage.name),
+          })),
+      })),
+  };
 }
 
 /** Whether the area has tasks, cancelled ones included, which keeps it from being deleted. */

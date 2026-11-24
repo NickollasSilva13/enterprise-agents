@@ -1,4 +1,5 @@
 import type { AreaAccess, WorkflowTemplateSummary } from '@ea/shared';
+import { FlowGraph } from './FlowGraph';
 
 const ACCESS_LABEL: Record<AreaAccess, string> = {
   none: 'sem acesso à pasta da área',
@@ -7,20 +8,38 @@ const ACCESS_LABEL: Record<AreaAccess, string> = {
 };
 
 /**
- * What applying a template creates: its stages, one agent per role with the
- * area access and the tools it starts with, and the good practice it carries
- * (Phase 18, D4: shown before applying).
+ * What applying a template creates: its flow (drawn since Phase 39), its
+ * roles with the area access and the tools an agent in each starts with, and
+ * the good practice it carries (Phase 18, D4: shown before applying).
  */
 export function TemplateDetails({ template }: { template: WorkflowTemplateSummary }) {
   return (
     <div className="space-y-2 text-sm">
       {template.description && <p>{template.description}</p>}
       <div>
-        <p className="font-semibold">Etapas</p>
-        <p className="text-dim">{template.stages.map((stage) => stage.name).join(' → ')}</p>
+        <p className="font-semibold">Fluxo</p>
+        <div
+          className="overflow-x-auto py-1"
+          tabIndex={0}
+          role="region"
+          aria-label="Desenho do fluxo"
+        >
+          <FlowGraph
+            size="compact"
+            // The catalogue's column is narrow: the flow goes down the page.
+            orientation="column"
+            stages={template.stages}
+            transitions={template.transitions.map((transition) => ({
+              ...transition,
+              id: `${transition.from}>${transition.to}`,
+            }))}
+            roles={template.roles.map((role) => ({ key: role.key, name: role.name, agents: null }))}
+            label={`Etapas: ${template.stages.map((stage) => stage.name).join(' → ')}`}
+          />
+        </div>
       </div>
       <div>
-        <p className="font-semibold">Agentes criados</p>
+        <p className="font-semibold">Papéis</p>
         {template.roles.length > 0 ? (
           <ul className="space-y-1 text-dim">
             {template.roles.map((role) => (
@@ -35,7 +54,7 @@ export function TemplateDetails({ template }: { template: WorkflowTemplateSummar
             ))}
           </ul>
         ) : (
-          <p className="text-dim">Nenhum: as etapas de agente ficam sem responsável.</p>
+          <p className="text-dim">Nenhum: as etapas de agente ficam sem papel.</p>
         )}
       </div>
       {template.practices.length > 0 && (

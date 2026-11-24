@@ -48,6 +48,7 @@ const summary = (overrides: Partial<TaskSummary> & { id: string }): TaskSummary 
   stageId: 's1',
   stageName: 'Criação',
   stageKind: 'human',
+  roleName: null,
   agentId: null,
   agentName: null,
   attention: null,

@@ -24,8 +24,8 @@ test('an area becomes a template that goes to a file and back', async ({ page },
   const area = await api<Created>(page, 'POST', '/api/projects', { name: areaName });
   await api(page, 'PUT', `/api/areas/${area.id}/workflow`, {
     stages: [
-      { key: 'f', name: 'Triagem', kind: 'human', agentId: null },
-      { key: 'd', name: 'Resolvido', kind: 'done', agentId: null },
+      { key: 'f', name: 'Triagem', kind: 'human', roleKey: null },
+      { key: 'd', name: 'Resolvido', kind: 'done', roleKey: null },
     ],
     transitions: [{ from: 'f', to: 'd', actor: 'human' }],
   });
@@ -44,7 +44,7 @@ test('an area becomes a template that goes to a file and back', async ({ page },
   await page.getByRole('link', { name: 'Modelos de fluxo' }).click();
   const mine = page.getByRole('region', { name: 'Seus modelos' });
   const item = mine.getByRole('listitem').filter({ hasText: templateName }).first();
-  await expect(item.getByText('Triagem → Resolvido')).toBeVisible();
+  await expect(item.getByRole('img', { name: 'Etapas: Triagem → Resolvido' })).toBeVisible();
   await expect(item.getByText('Responder no mesmo dia.')).toBeVisible();
   await expectNoHorizontalScroll(page);
 
@@ -78,7 +78,7 @@ test('an area becomes a template that goes to a file and back', async ({ page },
   await dialog
     .getByRole('combobox', { name: 'Modelo de fluxo' })
     .selectOption({ label: templateName });
-  await expect(dialog.getByText('Triagem → Resolvido')).toBeVisible();
+  await expect(dialog.getByRole('img', { name: 'Etapas: Triagem → Resolvido' })).toBeVisible();
 
   expect(problems).toEqual([]);
 });

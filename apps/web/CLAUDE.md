@@ -37,6 +37,12 @@ Carregado quando a tarefa toca a interface. As regras gerais estão em `CLAUDE.m
 - Os serviços de "Adicionar provedor" são predefinições da interface (`features/models/presets.ts`): a maioria é `openai_compatible` com o endereço do serviço. O que se grava é o tipo e o endereço; o serviço de um provedor gravado vem de `presetOf` (host do endereço). Serviço novo compatível entra lá e em `presets.test.ts`, com o logotipo em `components/ProviderLogo.tsx` (SVG na página, nunca imagem de fora).
 - O formulário tem as abas "API" e "Harness" (`group` da predefinição); cada serviço é um rádio que cobre o cartão inteiro (invisível, não `sr-only`, para o Playwright conseguir marcar).
 
+## Equipes e fluxo em desenho (Fase 39)
+
+- Formulário do agente: "Função na empresa" (`features/agents/FunctionFields.tsx`) sobre a lógica pura de `team-role.ts` (modelo → equipe → papel; `describeFunction` diz a frase). Equipe nova é criada no envio por `useCreateAreaFromTemplate` com `withAgents: false`, antes do agente; as ferramentas do papel vão depois por `useSetAgentTools`, como `ask`. `renderApp()` responde `/api/teams` e `/api/workflow-templates` vazios.
+- Editor de fluxo: `features/tasks/flow-graph.ts` (puro: `layoutFlow` em linha ou coluna, `flowSentences`, `flowWarnings`, `exitsOf`, `whoWorks`) e `FlowGraph.tsx` (SVG; cartões são `role="button"` no editor e `role="img"` com as etapas no nome nos modelos, o que os testes procuram). Cores das setas e cartões só por `TONES[...].ink` com `currentColor`. O editor escolhe a orientação por `matchMedia('(min-width: 640px)')`.
+- Mudanças em `queries.ts` de agentes invalidam também `teams`, `workflow` e `board`.
+
 ## Moldura (Fase 21)
 
 - Menu em `app/navigation.ts` (em grupos desde a Fase 38, `NAV_GROUPS`; `NAV_ITEMS` é a lista plana derivada): o item atual vem de `isCurrent` (com `except` para que Tarefas não acenda em `/tarefas/agendamentos`, que é Automações); contadores só onde algo espera o usuário (`counter`). A ajuda é a área planejada `HELP_AREA` (Fase 27), no rodapé do menu, fora do `nav` "Principal".
@@ -86,7 +92,7 @@ O lugar de cada agente é decidido só por `placeOf`/`placesOf` (`src/features/o
 
 ## Quadro de tarefas (Fase 16)
 
-Telas em `src/features/tasks/` (quadro em `/tarefas?area=<id>`, tarefa em `/tarefas/:taskId`, fluxo em `/tarefas/fluxo/:areaId`); consultas em `src/lib/task-queries.ts`, com atualização a cada 3 s enquanto agentes trabalham. Texto de tarefa, nota e comentário vêm de pessoas e modelos: só pelo `Markdown`. O editor de fluxo valida com `workflowUpdateSchema` antes de enviar. Pedidos entre áreas (Fase 17) ficam em `/tarefas/pedidos` (`RequestsPage.tsx`) os modelos de fluxo (Fase 18) em `/tarefas/modelos` (`TemplatesPage.tsx`) e os agendamentos (Fase 19) em `/tarefas/agendamentos` (`SchedulesPage.tsx`, com `describeRule` para a repetição por extenso), todas declaradas antes de `/tarefas/:taskId`. O que um modelo cria aparece por `TemplateDetails.tsx`, usado no catálogo e em "Nova área a partir de modelo". Baixar um arquivo: `download()` de `src/lib/download.ts`. No Escritório, `visit` do agente vira o lugar `room` (sala da outra área) só enquanto `until` não passou e a área tem sala no layout.
+Telas em `src/features/tasks/` (quadro em `/tarefas?area=<id>`, tarefa em `/tarefas/:taskId`, fluxo em `/tarefas/fluxo/:areaId`); consultas em `src/lib/task-queries.ts`, com atualização a cada 3 s enquanto agentes trabalham. Texto de tarefa, nota e comentário vêm de pessoas e modelos: só pelo `Markdown`. O editor de fluxo valida com `workflowUpdateSchema` (papéis, etapas e passagens) antes de enviar. Pedidos entre áreas (Fase 17) ficam em `/tarefas/pedidos` (`RequestsPage.tsx`) os modelos de fluxo (Fase 18) em `/tarefas/modelos` (`TemplatesPage.tsx`) e os agendamentos (Fase 19) em `/tarefas/agendamentos` (`SchedulesPage.tsx`, com `describeRule` para a repetição por extenso), todas declaradas antes de `/tarefas/:taskId`. O que um modelo cria aparece por `TemplateDetails.tsx`, usado no catálogo e em "Nova área a partir de modelo". Baixar um arquivo: `download()` de `src/lib/download.ts`. No Escritório, `visit` do agente vira o lugar `room` (sala da outra área) só enquanto `until` não passou e a área tem sala no layout.
 
 ## Testes de componente
 

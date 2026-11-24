@@ -147,6 +147,9 @@ Consumo de CPU/memória do processo é exibido apenas se disponível; consumo po
 
 | ID | Requisito | Fase |
 |---|---|---|
+| RF-106 | Ao criar ou editar um agente, o usuário escolhe a função na empresa: um modelo de fluxo, uma equipe (área) desse modelo ou uma nova, criada pelo modelo sem outros agentes, e um papel nela. As instruções, o acesso à pasta e as ferramentas sugeridas do papel (todas pedindo aprovação) preenchem o agente. | 39 |
+| RF-107 | A etapa de agente aponta para um papel da equipe: qualquer agente livre do papel pega a tarefa, vários agentes no mesmo papel trabalham em tarefas diferentes ao mesmo tempo, e uma tarefa devolvida volta a quem já trabalhou nela naquela etapa. | 39 |
+| RF-108 | O fluxo da equipe é editado num desenho (etapas ligadas por setas, devoluções tracejadas, etapas do usuário em destaque), com painel da etapa, o fluxo em frases, avisos do que faria uma tarefa parar e a simulação de uma tarefa passo a passo, sem chamar modelo. Os modelos de fluxo mostram o mesmo desenho. | 39 |
 | RF-103 | O usuário agenda uma tarefa para o quadro de uma área: uma vez, todo dia, em dias da semana ou num dia do mês, numa hora, no horário desta máquina. Na hora marcada, a tarefa entra na primeira etapa do fluxo da área. | 19 |
 | RF-104 | Tela "Agendamentos" com a repetição por extenso, a próxima vez e o último resultado de cada agendamento; criar, editar, pausar, retomar, "criar agora" e excluir. A tarefa criada mostra de qual agendamento veio. | 19 |
 | RF-105 | Horários perdidos com a plataforma desligada criam uma tarefa só, quando ela volta, com o horário marcado no histórico. | 19 |

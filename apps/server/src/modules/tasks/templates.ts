@@ -19,7 +19,7 @@ import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
 import type { ToolRegistry } from '../../tools/registry';
 import { recordAudit } from '../audit/service';
-import { agentsOfArea, findArea, stagesOf, transitionsOf } from './repository';
+import { findArea, membersOf, rolesOf, stagesOf, transitionsOf } from './repository';
 import {
   deleteTemplateRow,
   findSavedTemplate,
@@ -114,20 +114,13 @@ function checked(content: TemplateContent): TemplateContent {
   return parsed.data;
 }
 
-/** "Produto (Site)" made from a template in the area Site goes back to "Produto". */
-function roleName(agentName: string, areaName: string): string {
-  const suffix = ` (${areaName})`;
-  return agentName.endsWith(suffix) && agentName.length > suffix.length
-    ? agentName.slice(0, -suffix.length)
-    : agentName;
-}
-
 /**
- * Saves the workflow of an area as a template (D3). The agents that work its
- * stages become the roles, with their instructions, their area access and the
- * names of the tools they have (never the permission: applying makes every
- * one "ask"). Tools that only exist in tasks are not granted per agent, so
- * they never show up here.
+ * Saves the workflow of an area as a template (D3). The roles of the area
+ * that work its stages become the template's roles (Phase 39), each with the
+ * instructions, the area access and the names of the tools of its first agent
+ * (never the permission: applying makes every one "ask"); a role nobody has
+ * yet goes with empty instructions. Tools that only exist in tasks are not
+ * granted per agent, so they never show up here.
  */
 export function saveTemplateFromArea(
   db: Db,
@@ -143,30 +136,32 @@ export function saveTemplateFromArea(
 
   const stages = stagesOf(db, area.id);
   const transitions = transitionsOf(db, area.id);
-  const onStages = new Set(stages.flatMap((stage) => (stage.agentId ? [stage.agentId] : [])));
-  const workers = agentsOfArea(db, area.id).filter((agent) => onStages.has(agent.id));
+  const onStages = new Set(stages.flatMap((stage) => (stage.roleId ? [stage.roleId] : [])));
+  const areaRoles = rolesOf(db, area.id).filter((role) => onStages.has(role.id));
+  const model = new Map(areaRoles.map((role) => [role.id, membersOf(db, role.id)[0]] as const));
   const tools = grantedTools(
     db,
-    workers.map((agent) => agent.id),
+    [...model.values()].flatMap((agent) => (agent ? [agent.id] : [])),
   );
 
   const roleKeyOf = new Map<string, string>();
   const roles: TemplateRole[] = [];
-  for (const agent of workers) {
+  for (const role of areaRoles) {
     const key = `papel-${roles.length + 1}`;
-    roleKeyOf.set(agent.id, key);
-    let name = roleName(agent.name, area.name);
-    if (roles.some((role) => sameText(role.name, name))) name = agent.name;
+    roleKeyOf.set(role.id, key);
+    const agent = model.get(role.id);
     roles.push({
       key,
-      name,
-      objective: agent.objective,
-      systemPrompt: agent.systemPrompt,
-      tools: tools
-        .filter((grant) => grant.agentId === agent.id)
-        .map((grant) => grant.toolName)
-        .filter((tool) => registry.get(tool) !== undefined),
-      areaAccess: agent.areaAccess,
+      name: role.name,
+      objective: agent?.objective ?? '',
+      systemPrompt: agent?.systemPrompt ?? '',
+      tools: agent
+        ? tools
+            .filter((grant) => grant.agentId === agent.id)
+            .map((grant) => grant.toolName)
+            .filter((tool) => registry.get(tool) !== undefined)
+        : [],
+      areaAccess: agent?.areaAccess ?? 'none',
     });
   }
   const stageKeyOf = new Map(stages.map((stage, index) => [stage.id, `etapa-${index + 1}`]));
@@ -178,7 +173,7 @@ export function saveTemplateFromArea(
       key: stageKeyOf.get(stage.id) ?? '',
       name: stage.name,
       kind: stage.kind,
-      role: stage.agentId ? (roleKeyOf.get(stage.agentId) ?? null) : null,
+      role: stage.roleId ? (roleKeyOf.get(stage.roleId) ?? null) : null,
     })),
     transitions: transitions.map((transition) => ({
       from: stageKeyOf.get(transition.fromStageId) ?? '',

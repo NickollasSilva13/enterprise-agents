@@ -23,7 +23,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { agents, auditLog } from '../src/db/schema';
 import { FakeProvider, type FakeTurn, gate, waitFor } from './fake-provider';
-import { addAgent, addModel, addProvider } from './fixtures';
+import { addModel, addProvider } from './fixtures';
 import { makeApp, type TestApp } from './helpers';
 
 let current: TestApp | undefined;
@@ -138,11 +138,17 @@ describe('areas from a template (D7)', () => {
       { toolName: 'list_dir', permission: 'ask' },
       { toolName: 'read_file', permission: 'ask' },
     ]);
-    expect(area.stage('Testes').agentName).toBe('Testes (Site)');
+    // Each role of the template is a role of the team, with its agent (Phase 39).
+    const membersOf = (board: typeof area.board, stage: string) =>
+      board.workflow.roles
+        .find((role) => role.id === board.workflow.stages.find((s) => s.name === stage)?.roleId)
+        ?.agents.map((agent) => agent.name);
+    expect(area.stage('Testes').roleName).toBe('Testes');
+    expect(membersOf(area.board, 'Testes')).toEqual(['Testes (Site)']);
 
-    // A second area of the same kind gets agents of its own.
+    // A second area of the same kind gets roles and agents of its own.
     const other = await s.devArea('Loja');
-    expect(other.stage('Testes').agentName).toBe('Testes (Loja)');
+    expect(membersOf(other.board, 'Testes')).toEqual(['Testes (Loja)']);
     expect(
       s.database.db
         .select()
@@ -355,11 +361,8 @@ describe('who works when (D5)', () => {
     const s = await setup();
     const area = await s.devArea();
     const produto = area.stage('Refinamento');
-    s.database.db
-      .update(agents)
-      .set({ enabled: false })
-      .where(eq(agents.id, produto.agentId!))
-      .run();
+    const worker = area.board.workflow.roles.find((role) => role.id === produto.roleId)!.agents[0]!;
+    s.database.db.update(agents).set({ enabled: false }).where(eq(agents.id, worker.id)).run();
     const task = await s.newTask(area.areaId);
     const stopped = await s.detail(task.id);
     expect(stopped.task.attention).toContain('não pode trabalhar agora');
@@ -373,8 +376,10 @@ describe('the workflow (D2)', () => {
       key: stage.id,
       name: stage.name,
       kind: stage.kind,
-      agentId: stage.agentId,
+      roleKey: stage.roleId,
     }));
+  const rolesOf = (workflow: ReturnType<typeof workflowSchema.parse>) =>
+    workflow.roles.map((role) => ({ key: role.id, name: role.name }));
 
   it('is saved whole, keeping the ids of the stages that stay', async () => {
     const s = await setup();
@@ -382,9 +387,10 @@ describe('the workflow (D2)', () => {
     const workflow = area.board.workflow;
     const stages = stagesOf(workflow);
     const update = {
+      roles: rolesOf(workflow),
       stages: [
         stages[0],
-        { key: 'novo', name: 'Design', kind: 'agent', agentId: null },
+        { key: 'novo', name: 'Design', kind: 'agent', roleKey: null },
         ...stages.slice(1),
       ],
       transitions: [
@@ -408,26 +414,31 @@ describe('the workflow (D2)', () => {
     expect(saved.transitions).toHaveLength(3);
   });
 
-  it('refuses an agent of another area, a stage with tasks removed, and agents moving out of your stage', async () => {
+  it('refuses an unknown role, a stage with tasks removed, and agents moving out of your stage', async () => {
     const s = await setup([{ hang: true }]);
     const area = await s.devArea();
     const stages = stagesOf(area.board.workflow);
-    const stranger = addAgent(s.database, { name: 'De fora', modelId: s.modelId });
+    const roles = rolesOf(area.board.workflow);
 
-    const foreign = await s.call('PUT', `/api/areas/${area.areaId}/workflow`, {
-      stages: stages.map((stage, index) => (index === 0 ? { ...stage, agentId: stranger } : stage)),
+    const unknown = await s.call('PUT', `/api/areas/${area.areaId}/workflow`, {
+      roles,
+      stages: stages.map((stage, index) =>
+        index === 0 ? { ...stage, roleKey: 'desconhecido' } : stage,
+      ),
       transitions: [],
     });
-    expect(foreign.status).toBe(400);
+    expect(unknown.status).toBe(400);
 
     await s.newTask(area.areaId);
     const withoutFirst = await s.call('PUT', `/api/areas/${area.areaId}/workflow`, {
+      roles,
       stages: stages.slice(1),
       transitions: [],
     });
     expect(withoutFirst.status).toBe(409);
 
     const agentFromHuman = await s.call('PUT', `/api/areas/${area.areaId}/workflow`, {
+      roles,
       stages,
       transitions: [{ from: stages[3]!.key, to: stages[4]!.key, actor: 'agent' }],
     });

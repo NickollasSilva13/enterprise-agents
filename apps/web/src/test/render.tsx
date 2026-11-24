@@ -80,6 +80,8 @@ export function makeAgent(overrides: Partial<Agent> & { id: string; name: string
     enabled: true,
     appearance: null,
     areaAccess: 'none',
+    roleId: null,
+    roleName: null,
     state: 'idle',
     createdAt: '2026-11-12T12:00:00.000Z',
     updatedAt: '2026-11-12T12:00:00.000Z',
@@ -124,7 +126,8 @@ type Handler = (request: RecordedRequest) => Response | Promise<Response>;
  * or to a function returning a Response. A request with a query string also
  * matches the entry for its path alone. The session handshake the dashboard
  * summary used by the status strip, an empty approval queue, no waiting
- * tasks or requests and an empty profile are answered for you.
+ * tasks or requests, an empty profile, and no teams or templates are
+ * answered for you.
  */
 export function renderApp(path: string, api: Record<string, unknown>) {
   resetSessionForTests();
@@ -140,6 +143,9 @@ export function renderApp(path: string, api: Record<string, unknown>) {
     '/api/indicators': emptyIndicators,
     // Everything done and no tip closed: screens without the checklist (Phase 32).
     '/api/guide': setUpGuide,
+    // No teams and no templates: the agent form without a role (Phase 39).
+    '/api/teams': { teams: [] },
+    '/api/workflow-templates': { templates: [] },
     ...api,
   };
 

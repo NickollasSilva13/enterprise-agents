@@ -7,13 +7,14 @@ const stage = (id: string, name: string) => ({
   name,
   kind: 'agent' as const,
   position: 0,
-  agentId: null,
-  agentName: null,
+  roleId: null,
+  roleName: null,
   openTasks: 0,
 });
 
 const workflow: Workflow = {
   areaId: 'p1',
+  roles: [],
   stages: [stage('s1', 'Desenvolvimento'), stage('s2', 'Revisão'), stage('s3', 'Concluído')],
   transitions: [
     { id: 't1', fromStageId: 's1', toStageId: 's2', actor: 'both' },
@@ -32,6 +33,7 @@ const task = (overrides: Partial<TaskSummary> = {}): TaskSummary => ({
   stageId: 's1',
   stageName: 'Desenvolvimento',
   stageKind: 'agent',
+  roleName: null,
   agentId: null,
   agentName: null,
   attention: null,

@@ -24,8 +24,8 @@ test('a schedule creates a task on the board of its area', async ({ page }, test
   const area = await api<Created>(page, 'POST', '/api/projects', { name: areaName });
   await api(page, 'PUT', `/api/areas/${area.id}/workflow`, {
     stages: [
-      { key: 'f', name: 'Conferência', kind: 'human', agentId: null },
-      { key: 'd', name: 'Fechado', kind: 'done', agentId: null },
+      { key: 'f', name: 'Conferência', kind: 'human', roleKey: null },
+      { key: 'd', name: 'Fechado', kind: 'done', roleKey: null },
     ],
     transitions: [{ from: 'f', to: 'd', actor: 'human' }],
   });

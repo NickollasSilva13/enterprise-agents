@@ -41,7 +41,10 @@ test('a task crosses the flow of an area on its own and waits for the user', asy
     .click();
   const dialog = page.getByRole('dialog', { name: 'Nova área a partir de um modelo' });
   await expect(
-    dialog.getByText('Refinamento → Desenvolvimento → Testes → Sua revisão → Concluído'),
+    // The flow is drawn (Phase 39), with its stages in order for screen readers.
+    dialog.getByRole('img', {
+      name: 'Etapas: Refinamento → Desenvolvimento → Testes → Sua revisão → Concluído',
+    }),
   ).toBeVisible();
   await dialog.getByRole('textbox', { name: 'Nome da área' }).fill(areaName);
   await dialog

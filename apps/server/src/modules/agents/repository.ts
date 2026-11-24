@@ -5,9 +5,9 @@ import {
   appearanceSchema,
   type RunStatus,
 } from '@ea/shared';
-import { asc, inArray, isNull, max, notInArray } from 'drizzle-orm';
+import { asc, eq, inArray, isNull, max, notInArray } from 'drizzle-orm';
 import type { Db } from '../../db/client';
-import { agents, runs } from '../../db/schema';
+import { agents, areaRoles, roleMembers, runs } from '../../db/schema';
 import { deriveAgentState } from './agent-state';
 
 export type AgentRow = typeof agents.$inferSelect;
@@ -65,3 +65,32 @@ export function listAgentsWithState(db: Db): AgentWithState[] {
  */
 export const storedAppearance = (value: unknown): Appearance | null =>
   appearanceSchema.safeParse(value).data ?? null;
+
+type Tx = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
+
+/** The role of every agent that has one, by agent id (Phase 39). */
+export function rolesByAgent(db: Tx): Map<string, { id: string; name: string }> {
+  return new Map(
+    db
+      .select({ agentId: roleMembers.agentId, id: areaRoles.id, name: areaRoles.name })
+      .from(roleMembers)
+      .innerJoin(areaRoles, eq(roleMembers.roleId, areaRoles.id))
+      .all()
+      .map((row) => [row.agentId, { id: row.id, name: row.name }] as const),
+  );
+}
+
+export function findAreaRole(db: Tx, roleId: string) {
+  return db.select().from(areaRoles).where(eq(areaRoles.id, roleId)).get();
+}
+
+/** The roles of an area, for import by name. */
+export function areaRolesOf(db: Tx, areaId: string) {
+  return db.select().from(areaRoles).where(eq(areaRoles.projectId, areaId)).all();
+}
+
+/** Gives the agent a role, or takes its role away with null. */
+export function setAgentRole(db: Tx, agentId: string, roleId: string | null): void {
+  db.delete(roleMembers).where(eq(roleMembers.agentId, agentId)).run();
+  if (roleId !== null) db.insert(roleMembers).values({ agentId, roleId }).run();
+}

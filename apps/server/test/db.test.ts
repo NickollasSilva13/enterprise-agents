@@ -11,6 +11,7 @@ import {
   messages,
   models,
   officeItems,
+  projects,
   providers,
   runs,
   runSteps,
@@ -26,6 +27,7 @@ const EXPECTED_TABLES = [
   'agents',
   'approvals',
   'area_links',
+  'area_roles',
   'audit_log',
   'conversations',
   'messages',
@@ -34,6 +36,7 @@ const EXPECTED_TABLES = [
   'office_items',
   'projects',
   'providers',
+  'role_members',
   'run_steps',
   'runs',
   'schedules',
@@ -296,6 +299,81 @@ describe('migrations over existing data', () => {
       kind: 'sofa',
       color: 'default',
     });
+    expect(tableNames(database)).toEqual(EXPECTED_TABLES);
+  });
+});
+
+describe('roles of a team over existing flows (0010, 0011)', () => {
+  it('turn every agent on a stage into a role it alone has, and point its stages to it', () => {
+    const folder = makeTempDir();
+    cleanups.push(folder.remove);
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: { idx: number; tag: string }[] };
+    const entries = journal.entries.filter((entry) => entry.idx <= 9);
+    mkdirSync(join(folder.path, 'meta'));
+    writeFileSync(
+      join(folder.path, 'meta', '_journal.json'),
+      JSON.stringify({ ...journal, entries }),
+    );
+    for (const { tag } of entries) {
+      copyFileSync(join(MIGRATIONS_DIR, `${tag}.sql`), join(folder.path, `${tag}.sql`));
+    }
+    const database = openDatabase(':memory:');
+    cleanups.push(() => database.close());
+    runMigrations(database, folder.path);
+    // One analyst on two stages, a reviewer, a deleted agent and one from
+    // another area on a stage, and an agent on no stage.
+    database.sqlite.exec(`
+      INSERT INTO projects (id, name) VALUES ('pr1', 'Dados'), ('pr2', 'Site');
+      INSERT INTO agents (id, name, project_id) VALUES
+        ('a1', 'Analista', 'pr1'), ('a2', 'Revisor', 'pr1'), ('a3', 'Sem etapa', 'pr1'),
+        ('a5', 'De fora', 'pr2');
+      INSERT INTO agents (id, name, project_id, deleted_at) VALUES ('a4', 'Antigo', 'pr1', 'x');
+      INSERT INTO workflow_stages (id, project_id, position, name, kind, agent_id) VALUES
+        ('s1', 'pr1', 0, 'Pedido', 'agent', 'a1'),
+        ('s2', 'pr1', 1, 'Análise', 'agent', 'a1'),
+        ('s3', 'pr1', 2, 'Revisão', 'agent', 'a2'),
+        ('s4', 'pr1', 3, 'Velha', 'agent', 'a4'),
+        ('s5', 'pr1', 4, 'Estranha', 'agent', 'a5'),
+        ('s6', 'pr1', 5, 'Fim', 'done', NULL);
+      INSERT INTO tasks (id, project_id, title, stage_id) VALUES ('t1', 'pr1', 'Tarefa', 's2');
+    `);
+
+    runMigrations(database);
+
+    expect(
+      database.sqlite.prepare('SELECT id, project_id, name FROM area_roles ORDER BY id').all(),
+    ).toEqual([
+      { id: 'Ra1', project_id: 'pr1', name: 'Analista' },
+      { id: 'Ra2', project_id: 'pr1', name: 'Revisor' },
+    ]);
+    expect(
+      database.sqlite.prepare('SELECT agent_id, role_id FROM role_members ORDER BY agent_id').all(),
+    ).toEqual([
+      { agent_id: 'a1', role_id: 'Ra1' },
+      { agent_id: 'a2', role_id: 'Ra2' },
+    ]);
+    expect(
+      database.sqlite
+        .prepare('SELECT id, agent_id, role_id FROM workflow_stages ORDER BY position')
+        .all(),
+    ).toEqual([
+      { id: 's1', agent_id: null, role_id: 'Ra1' },
+      { id: 's2', agent_id: null, role_id: 'Ra1' },
+      { id: 's3', agent_id: null, role_id: 'Ra2' },
+      { id: 's4', agent_id: null, role_id: null },
+      { id: 's5', agent_id: null, role_id: null },
+      { id: 's6', agent_id: null, role_id: null },
+    ]);
+    expect(database.db.select().from(tasks).get()).toMatchObject({ id: 't1', stageId: 's2' });
+    expect(
+      database.db
+        .select()
+        .from(projects)
+        .all()
+        .map((area) => area.templateId),
+    ).toEqual([null, null]);
     expect(tableNames(database)).toEqual(EXPECTED_TABLES);
   });
 });

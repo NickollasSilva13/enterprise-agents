@@ -22,7 +22,15 @@ export function taskStatus(task: TaskSummary): { label: string; tone: Tone } {
       tone: 'idle',
     };
   }
-  if (task.queued) return { label: `Na fila de ${task.agentName ?? 'agente'}`, tone: 'idle' };
+  if (task.queued) {
+    // Waits for the agent it goes back to, or for anyone of the role (Phase 39).
+    return {
+      label: task.agentName
+        ? `Na fila de ${task.agentName}`
+        : `Na fila: ${task.roleName ? `todos de ${task.roleName}` : 'agentes'} ocupados`,
+      tone: 'idle',
+    };
+  }
   if (task.stageKind === 'human') return { label: 'Esperando você', tone: 'wait' };
   return { label: 'Aguardando', tone: 'idle' };
 }

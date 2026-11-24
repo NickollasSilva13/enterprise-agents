@@ -11,11 +11,11 @@ import { eq, isNull } from 'drizzle-orm';
 import { NotFoundError } from '../../core/errors';
 import type { Db } from '../../db/client';
 import { newId } from '../../db/ids';
-import { agents, agentTools, models, projects, providers } from '../../db/schema';
+import { agents, agentTools, areaRoles, models, projects, providers } from '../../db/schema';
 import type { ToolRegistry } from '../../tools/registry';
 import { maxPermission } from '../../tools/types';
 import { recordAudit } from '../audit/service';
-import { storedAppearance } from './repository';
+import { areaRolesOf, rolesByAgent, setAgentRole, storedAppearance } from './repository';
 
 // Export and import of agents as JSON (RF-20). A file names things instead
 // of pointing at them: ids mean nothing in another installation. Nothing
@@ -53,6 +53,7 @@ export function exportAgents(db: Db, ids: readonly string[] | undefined): AgentE
       .map((row) => [row.id, { name: row.name, provider: row.provider }]),
   );
   const grants = db.select().from(agentTools).all();
+  const roles = rolesByAgent(db);
 
   return {
     format: AGENT_EXPORT_FORMAT,
@@ -72,6 +73,7 @@ export function exportAgents(db: Db, ids: readonly string[] | undefined): AgentE
       appearance: storedAppearance(agent.appearance),
       areaAccess: agent.areaAccess,
       project: agent.projectId ? (projectNames.get(agent.projectId) ?? null) : null,
+      role: agent.projectId ? (roles.get(agent.id)?.name ?? null) : null,
       model: agent.modelId ? (modelsById.get(agent.modelId) ?? null) : null,
       tools: grants
         .filter((grant) => grant.agentId === agent.id)
@@ -94,7 +96,8 @@ function freeName(wanted: string, taken: readonly string[]): string {
 /**
  * Creates the agents of a file. Always adds, never replaces: a name already
  * in use gets a suffix. What the file names and this installation does not
- * have is not invented, except projects, which are plain labels:
+ * have is not invented, except projects and their roles (Phase 39), which are
+ * plain labels (a role only says which stages the agent works):
  * - a model that is not here, or is disabled, leaves the agent without one;
  * - a tool that does not exist here is left out;
  * - no tool arrives able to act on its own: "allow" in the file becomes
@@ -133,8 +136,15 @@ export function importAgents(
       if (found) return found.id;
       const created = { id: newId(), name: name.trim(), description: '' };
       tx.insert(projects).values(created).run();
-      knownProjects.push({ ...created, createdAt: '', updatedAt: '' });
+      knownProjects.push({ ...created, templateId: null, createdAt: '', updatedAt: '' });
       return created.id;
+    };
+    const roleIdFor = (projectId: string, name: string): string => {
+      const found = areaRolesOf(tx, projectId).find((role) => sameText(role.name, name));
+      if (found) return found.id;
+      const id = newId();
+      tx.insert(areaRoles).values({ id, projectId, name: name.trim() }).run();
+      return id;
     };
 
     for (const entry of document.agents) {
@@ -157,6 +167,7 @@ export function importAgents(
       }
 
       const id = newId();
+      const projectId = entry.project === null ? null : projectIdFor(entry.project);
       tx.insert(agents)
         .values({
           id,
@@ -164,7 +175,7 @@ export function importAgents(
           description: entry.description,
           objective: entry.objective,
           systemPrompt: entry.systemPrompt,
-          projectId: entry.project === null ? null : projectIdFor(entry.project),
+          projectId,
           modelId,
           temperature: entry.temperature,
           maxOutputTokens: entry.maxOutputTokens,
@@ -179,6 +190,9 @@ export function importAgents(
         tx.insert(agentTools)
           .values(grants.map((grant) => ({ agentId: id, ...grant })))
           .run();
+      }
+      if (entry.role !== null && projectId !== null) {
+        setAgentRole(tx, id, roleIdFor(projectId, entry.role));
       }
       imported.push({ id, name, nameInFile: entry.name, warnings });
     }

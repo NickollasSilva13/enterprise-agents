@@ -107,10 +107,18 @@ function useRefreshAll() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all(
-      // Providers too: they show how many agents use them.
-      [['agents'], ['projects'], ['office'], ['dashboard'], ['providers']].map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey }),
-      ),
+      // Providers too: they show how many agents use them. Teams and flows
+      // show the agents of each role (Phase 39).
+      [
+        ['agents'],
+        ['projects'],
+        ['office'],
+        ['dashboard'],
+        ['providers'],
+        ['teams'],
+        ['workflow'],
+        ['board'],
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     );
 }
 

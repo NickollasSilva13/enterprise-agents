@@ -26,8 +26,8 @@ test('one area asks another for work and gets the delivery', async ({ page }, te
     const project = await api<Created>(page, 'POST', '/api/projects', { name });
     await api(page, 'PUT', `/api/areas/${project.id}/workflow`, {
       stages: [
-        { key: 'f', name: 'Fila', kind: 'human', agentId: null },
-        { key: 'd', name: 'Fim', kind: 'done', agentId: null },
+        { key: 'f', name: 'Fila', kind: 'human', roleKey: null },
+        { key: 'd', name: 'Fim', kind: 'done', roleKey: null },
       ],
       transitions: [{ from: 'f', to: 'd', actor: 'human' }],
     });
